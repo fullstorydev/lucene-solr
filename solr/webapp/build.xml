@@ -49,6 +49,7 @@
     <copy todir="${server.dir}/solr-webapp/webapp/WEB-INF/lib">
       <fileset dir="${common-solr.dir}/core/lib" excludes="${exclude.from.webapp},${common.classpath.excludes}"/>
       <fileset dir="${common-solr.dir}/solrj/lib" excludes="${exclude.from.webapp},${common.classpath.excludes}"/>
+      <fileset dir="${common-solr.dir}/contrib/jolokia/lib" excludes="${exclude.from.webapp},${common.classpath.excludes}"/> <!-- added by ianrose -->
       <fileset dir="${lucene-libs}" excludes="${exclude.from.webapp},${common.classpath.excludes}" />
       <fileset dir="${dist}" excludes="${exclude.from.webapp},${common.classpath.excludes}">
         <include name="solr-solrj-${version}.jar" />
