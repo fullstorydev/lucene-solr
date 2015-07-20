@@ -135,6 +135,12 @@
     </init-param>
   </servlet>
 
+  <servlet>
+    <servlet-name>jolokia-agent</servlet-name>
+    <servlet-class>org.jolokia.http.AgentServlet</servlet-class>
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+
   <servlet-mapping>
     <servlet-name>RedirectOldAdminUI</servlet-name>
     <url-pattern>/admin/</url-pattern>
@@ -168,6 +174,11 @@
     <url-pattern>/schema/*</url-pattern>
   </servlet-mapping>
   
+  <servlet-mapping>
+    <servlet-name>jolokia-agent</servlet-name>
+    <url-pattern>/jolokia/*</url-pattern>
+  </servlet-mapping>
+
   <mime-mapping>
     <extension>.xsl</extension>
     <!-- per http://www.w3.org/TR/2006/PR-xslt20-20061121/ -->
