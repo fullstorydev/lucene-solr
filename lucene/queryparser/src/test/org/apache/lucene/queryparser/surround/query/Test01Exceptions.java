@@ -33,8 +33,8 @@ public class Test01Exceptions extends LuceneTestCase {
 
   String[] exceptionQueries = {
     "*",
-    "a*",
-    "ab*",
+    //"a*",
+    //"ab*",
     "?",
     "a?",
     "ab?",
