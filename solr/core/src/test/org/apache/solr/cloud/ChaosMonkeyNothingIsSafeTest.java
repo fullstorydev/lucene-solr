@@ -219,7 +219,7 @@ public class ChaosMonkeyNothingIsSafeTest extends AbstractFullDistribZkTestBase 
       
       // TODO: assert we didnt kill everyone
       
-      zkStateReader.updateClusterState(true);
+      zkStateReader.updateClusterState();
       assertTrue(zkStateReader.getClusterState().getLiveNodes().size() > 0);
       
       

@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-7854: Remove unused ZkStateReader.updateClusterState(false) method. (Scott Blum via shalin)
 * Fix test failures for FullStory changes. (Scott Blum)
 * Add FullStory settings in directly rather than overlay (Scott Blum)
 * Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)

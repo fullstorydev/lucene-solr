@@ -939,7 +939,7 @@ public final class ZkController {
       }
 
       // make sure we have an update cluster state right away
-      zkStateReader.updateClusterState(true);
+      zkStateReader.updateClusterState();
       return shardId;
     } finally {
       MDCUtils.cleanupMDC(previousMDCContext);
