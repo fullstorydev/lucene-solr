@@ -870,6 +870,24 @@ public class CollectionAdminRequest extends SolrRequest<CollectionAdminResponse>
       return params;
     }
   }
+
+  // MIGRATECLUSTERSTATE request
+  public static class MigrateClusterState extends CollectionShardAdminRequest {
+
+    public MigrateClusterState() {
+      this.action = CollectionAction.MIGRATESTATEFORMAT;
+    }
+
+    @Override
+    public void setShardName(String shard) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String getShardName() {
+      throw new UnsupportedOperationException();
+    }
+  }
   
   // BALANCESHARDUNIQUE request
   public static class BalanceShardUnique extends CollectionAdminRequest {

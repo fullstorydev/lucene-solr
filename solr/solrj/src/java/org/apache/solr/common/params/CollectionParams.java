@@ -53,7 +53,8 @@ public interface CollectionParams
     DELETEREPLICAPROP,
     BALANCESHARDUNIQUE,
     REBALANCELEADERS,
-    MODIFYCOLLECTION;
+    MODIFYCOLLECTION,
+    MIGRATESTATEFORMAT;
 
     public static CollectionAction get(String p) {
       if( p != null ) {
