@@ -8,6 +8,12 @@ caching, replication, and a web administration interface.
 
 See http://lucene.apache.org/solr for more information.
 
+================= FullStory ================
+
+* Fix test failures for FullStory changes. (Scott Blum)
+* Add FullStory settings in directly rather than overlay (Scott Blum)
+* Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
+* add jolokia jars to solr war (Ian Rose)
 
 ==================  5.2.1 ==================
 
