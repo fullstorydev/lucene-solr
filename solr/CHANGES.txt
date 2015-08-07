@@ -8,6 +8,11 @@ caching, replication, and a web administration interface.
 
 See http://lucene.apache.org/solr for more information.
 
+================= FullStory ================
+
+* Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
+* add jolokia jars to solr war (Ian Rose)
+
 ==================  5.4.1 ==================
 
 Bug Fixes
