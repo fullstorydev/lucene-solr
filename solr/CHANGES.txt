@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* Disable flaky test (FullStory)
 * Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
 * add jolokia jars to solr war (Ian Rose)
 
