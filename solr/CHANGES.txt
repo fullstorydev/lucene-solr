@@ -10,6 +10,10 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-6760: New optimized DistributedQueue implementation for overseer increases
+  message processing performance by ~470%.
+  (Noble Paul, Scott Blum, shalin)
+
 * SOLR-5756: A utility Collection API to move a collection from shared clusterstate.json (stateFormat=1,
   default until 4.x) to the per-collection state.json stored in ZooKeeper (stateFormat=2,
   default since 5.0) seamlessly without any application down-time.

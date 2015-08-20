@@ -54,7 +54,7 @@ import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.cloud.Assign.Node;
-import org.apache.solr.cloud.DistributedQueue.QueueEvent;
+import org.apache.solr.cloud.OverseerCollectionQueue.QueueEvent;
 import org.apache.solr.cloud.Overseer.LeaderStatus;
 import org.apache.solr.cloud.rule.Rule;
 import org.apache.solr.cloud.rule.ReplicaAssigner;
@@ -162,7 +162,7 @@ public class OverseerCollectionProcessor implements Runnable, Closeable {
   private static Logger log = LoggerFactory
       .getLogger(OverseerCollectionProcessor.class);
 
-  private DistributedQueue workQueue;
+  private OverseerCollectionQueue workQueue;
   private DistributedMap runningMap;
   private DistributedMap completedMap;
   private DistributedMap failureMap;
@@ -209,7 +209,7 @@ public class OverseerCollectionProcessor implements Runnable, Closeable {
                                         final ShardHandlerFactory shardHandlerFactory,
                                         String adminPath,
                                         Overseer.Stats stats,
-                                        DistributedQueue workQueue,
+                                        OverseerCollectionQueue workQueue,
                                         DistributedMap runningMap,
                                         DistributedMap completedMap,
                                         DistributedMap failureMap) {
