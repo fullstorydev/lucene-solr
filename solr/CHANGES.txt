@@ -10,6 +10,10 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-6629: Watch /collections zk node on all nodes so that cluster state updates
+  are more efficient especially when cluster has a mix of collections in stateFormat=1
+  and stateFormat=2. (Scott Blum, shalin)
+
 * Disable flaky test (FullStory)
 
 * SOLR-6760: New optimized DistributedQueue implementation for overseer increases

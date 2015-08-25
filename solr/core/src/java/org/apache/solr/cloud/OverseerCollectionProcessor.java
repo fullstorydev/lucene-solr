@@ -2402,7 +2402,7 @@ public class OverseerCollectionProcessor implements Runnable, Closeable {
       boolean created = false;
       while (System.nanoTime() < waitUntil) {
         Thread.sleep(100);
-        created = zkStateReader.getClusterState().getCollections().contains(message.getStr(NAME));
+        created = zkStateReader.getClusterState().hasCollection(message.getStr(NAME));
         if(created) break;
       }
       if (!created)
