@@ -35,6 +35,10 @@ import org.slf4j.MDC;
 public class ExecutorUtil {
   public static Logger log = LoggerFactory.getLogger(ExecutorUtil.class);
   
+  // ** This will interrupt the threads! ** Lucene and Solr do not like this because it can close channels, so only use
+  // this if you know what you are doing - you probably want shutdownAndAwaitTermination.
+  // Marked as Deprecated to discourage use.
+  @Deprecated
   public static void shutdownNowAndAwaitTermination(ExecutorService pool) {
     pool.shutdown(); // Disable new tasks from being submitted
     pool.shutdownNow(); // Cancel currently executing tasks

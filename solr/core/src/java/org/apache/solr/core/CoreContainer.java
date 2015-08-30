@@ -396,7 +396,7 @@ public class CoreContainer {
       backgroundCloser.start();
 
     } finally {
-      ExecutorUtil.shutdownNowAndAwaitTermination(coreLoadExecutor);
+      ExecutorUtil.shutdownAndAwaitTermination(coreLoadExecutor);
     }
     
     if (isZooKeeperAware()) {

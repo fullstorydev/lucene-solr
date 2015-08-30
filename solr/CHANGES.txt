@@ -11,7 +11,8 @@ See http://lucene.apache.org/solr for more information.
 ================= FullStory ================
 
 * SOLR-7956: There are interrupts on shutdown in places that can cause ChannelAlreadyClosed
-  exceptions which prevents proper closing of transaction logs. (Mark Miller)
+  exceptions which prevents proper closing of transaction logs, interfere with the IndexWriter,
+  the hdfs client and other things. (Mark Miller, Scott Blum)
 
 * SOLR-6629: Watch /collections zk node on all nodes so that cluster state updates
   are more efficient especially when cluster has a mix of collections in stateFormat=1
