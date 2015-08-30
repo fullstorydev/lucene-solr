@@ -246,7 +246,7 @@ public class ZkContainer {
           zkServer.stop();
         }
       } finally {
-        ExecutorUtil.shutdownNowAndAwaitTermination(coreZkRegister);
+        ExecutorUtil.shutdownAndAwaitTermination(coreZkRegister);
       }
     }
     

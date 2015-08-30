@@ -701,7 +701,7 @@ public class SolrConfigHandler extends RequestHandlerBase {
           prop, expectedVersion, concurrentTasks.size(), collection));
       Thread.currentThread().interrupt();
     } finally {
-      ExecutorUtil.shutdownNowAndAwaitTermination(parallelExecutor);
+      ExecutorUtil.shutdownAndAwaitTermination(parallelExecutor);
     }
 
     long diffMs = (System.currentTimeMillis() - startMs);
