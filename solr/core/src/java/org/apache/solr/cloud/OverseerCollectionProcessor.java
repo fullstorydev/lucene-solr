@@ -397,16 +397,7 @@ public class OverseerCollectionProcessor implements Runnable, Closeable {
     isClosed = true;
     if(tpe != null) {
       if (!tpe.isShutdown()) {
-        tpe.shutdown();
-        try {
-          tpe.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-          log.warn("Thread interrupted while waiting for OCP threadpool close.");
-          Thread.currentThread().interrupt();
-        } finally {
-          if (!tpe.isShutdown())
-            tpe.shutdownNow();
-        }
+        ExecutorUtil.shutdownAndAwaitTermination(tpe);
       }
     }
   }
