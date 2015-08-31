@@ -538,8 +538,7 @@ public class IndexFetcher {
       replicationStartTime = 0;
       dirFileFetcher = null;
       localFileFetcher = null;
-      if (fsyncService != null && !fsyncService.isShutdown()) fsyncService
-          .shutdownNow();
+      if (fsyncService != null && !fsyncService.isShutdown()) fsyncService.shutdown();
       fsyncService = null;
       stop = false;
       fsyncException = null;
