@@ -38,7 +38,7 @@ set GC_TUNE=-XX:NewRatio=3 ^
  -XX:+CMSScavengeBeforeRemark ^
  -XX:PretenureSizeThreshold=64m ^
  -XX:+UseCMSInitiatingOccupancyOnly ^
- -XX:CMSInitiatingOccupancyFraction=50 ^
+ -XX:CMSInitiatingOccupancyFraction=70 ^
  -XX:CMSMaxAbortablePrecleanTime=6000 ^
  -XX:+CMSParallelRemarkEnabled ^
  -XX:+ParallelRefProcEnabled
