@@ -10,6 +10,8 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-7090: Cross node join - FullJoinQParserPlugin (Scott Blum)
+
 * SOLR-7956: There are interrupts on shutdown in places that can cause ChannelAlreadyClosed
   exceptions which prevents proper closing of transaction logs, interfere with the IndexWriter,
   the hdfs client and other things. (Mark Miller, Scott Blum)

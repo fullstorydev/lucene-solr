@@ -61,6 +61,7 @@ public abstract class QParserPlugin implements NamedListInitializedPlugin, SolrI
     map.put(SpatialFilterQParserPlugin.NAME, SpatialFilterQParserPlugin.class);
     map.put(SpatialBoxQParserPlugin.NAME, SpatialBoxQParserPlugin.class);
     map.put(JoinQParserPlugin.NAME, JoinQParserPlugin.class);
+    map.put(FullJoinQParserPlugin.NAME, FullJoinQParserPlugin.class);
     map.put(SurroundQParserPlugin.NAME, SurroundQParserPlugin.class);
     map.put(SwitchQParserPlugin.NAME, SwitchQParserPlugin.class);
     map.put(MaxScoreQParserPlugin.NAME, MaxScoreQParserPlugin.class);

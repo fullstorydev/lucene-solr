@@ -201,7 +201,9 @@ public class DisMaxQParser extends QParser {
 
       Query phrase = getPhraseQuery(userQuery, pp);
       if (null != phrase) {
-        query.add(phrase, BooleanClause.Occur.SHOULD);
+        if (!(phrase instanceof BooleanQuery) || !((BooleanQuery) phrase).clauses().isEmpty()) {
+          query.add(phrase, BooleanClause.Occur.SHOULD);
+        }
       }
     }
     return true;
