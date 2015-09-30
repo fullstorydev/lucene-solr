@@ -407,6 +407,22 @@ public class QueryEqualityTest extends SolrTestCaseJ4 {
     }
   }
 
+  public void testQueryFullJoin() throws Exception {
+    SolrQueryRequest req = req("myVar", "5",
+        "df","text",
+        "ff","foo_s",
+        "tt", "bar_s");
+
+    try {
+      assertQueryEquals("fulljoin", req,
+          "{!fulljoin from=foo_s to=bar_s}asdf",
+          "{!fulljoin from=$ff to=$tt}asdf",
+          "{!fulljoin from=$ff to='bar_s'}text:asdf");
+    } finally {
+      req.close();
+    }
+  }
+
   public void testTerms() throws Exception {
     assertQueryEquals("terms", "{!terms f=foo_i}10,20,30,-10,-20,-30", "{!terms f=foo_i}10,20,30,-10,-20,-30");
   }
