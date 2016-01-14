@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* Remove pathological error reporting. Don't serialize the entire clusterstate to log.
 * SOLR-7090(unmerged): Cross node join - FullJoinQParserPlugin (Scott Blum)
 * Disable flaky test (FullStory)
 * Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
