@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -459,13 +460,23 @@ public class ZkStateReader implements Closeable {
     }
 
     this.clusterState = new ClusterState(liveNodes, result, legacyClusterStateVersion);
-    log.debug("clusterStateSet: version {} legacy {} interesting {} watched {} lazy {} total {}",
+    log.debug("clusterStateSet: version [{}] legacy [{}] interesting [{}] watched [{}] lazy [{}] total [{}]",
         clusterState.getZkClusterStateVersion(),
-        legacyCollectionStates.keySet(),
-        interestingCollections,
-        watchedCollectionStates.keySet(),
-        lazyCollectionStates.keySet(),
-        clusterState.getCollections());
+        legacyCollectionStates.keySet().size(),
+        interestingCollections.size(),
+        watchedCollectionStates.keySet().size(),
+        lazyCollectionStates.keySet().size(),
+        clusterState.getCollectionStates().size());
+
+    if (log.isTraceEnabled()) {
+      log.trace("clusterStateSet: version [{}] legacy [{}] interesting [{}] watched [{}] lazy [{}] total [{}]",
+          clusterState.getZkClusterStateVersion(),
+          legacyCollectionStates.keySet(),
+          interestingCollections,
+          watchedCollectionStates.keySet(),
+          lazyCollectionStates.keySet(),
+          clusterState.getCollectionStates());
+    }
   }
 
   /**
@@ -574,16 +585,21 @@ public class ZkStateReader implements Closeable {
     Set<String> newLiveNodes;
     try {
       List<String> nodeList = zkClient.getChildren(LIVE_NODES_ZKNODE, watcher, true);
-      log.debug("Updating live nodes from ZooKeeper... ({})", nodeList.size());
       newLiveNodes = new HashSet<>(nodeList);
     } catch (KeeperException.NoNodeException e) {
       newLiveNodes = emptySet();
     }
+    Set<String> oldLiveNodes;
     synchronized (getUpdateLock()) {
+      oldLiveNodes = this.liveNodes;
       this.liveNodes = newLiveNodes;
       if (clusterState != null) {
         clusterState.setLiveNodes(newLiveNodes);
       }
+    }
+    log.info("Updated live nodes from ZooKeeper... ({}) -> ({})", oldLiveNodes.size(), newLiveNodes.size());
+    if (log.isDebugEnabled()) {
+      log.debug("Updated live nodes from ZooKeeper... {} -> {}", new TreeSet<>(oldLiveNodes), new TreeSet<>(newLiveNodes));
     }
   }
 
@@ -991,7 +1007,7 @@ public class ZkStateReader implements Closeable {
       if (EventType.None.equals(event.getType())) {
         return;
       }
-      log.info("A live node change: {}, has occurred - updating... (live nodes size: {})", (event), liveNodes.size());
+      log.debug("A live node change: {}, has occurred - updating...", event);
       refreshAndWatch();
     }
 
