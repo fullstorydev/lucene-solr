@@ -210,8 +210,6 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler 
 
     NamedList results = new NamedList();
     try {
-      // force update the cluster state
-      zkStateReader.updateClusterState();
       CollectionParams.CollectionAction action = CollectionParams.CollectionAction.get(operation);
       if (action == null) {
         throw new SolrException(ErrorCode.BAD_REQUEST, "Unknown operation:" + operation);
