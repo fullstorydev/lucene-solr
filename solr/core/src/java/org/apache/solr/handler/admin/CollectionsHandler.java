@@ -534,19 +534,19 @@ public class CollectionsHandler extends RequestHandlerBase {
         } else {
           NamedList<Object> results = new NamedList<>();
           if (coreContainer.getZkController().getOverseerCompletedMap().contains(requestId)) {
-            DistributedMap.MapEvent mapEvent = coreContainer.getZkController().getOverseerCompletedMap().get(requestId);
+            byte[] mapEntry = coreContainer.getZkController().getOverseerCompletedMap().get(requestId);
             SimpleOrderedMap success = new SimpleOrderedMap();
-            if(mapEvent != null) {
-              rsp.getValues().addAll(SolrResponse.deserialize(mapEvent.getBytes()).getResponse());
+            if(mapEntry != null) {
+              rsp.getValues().addAll(SolrResponse.deserialize(mapEntry).getResponse());
             }
             success.add("state", "completed");
             success.add("msg", "found " + requestId + " in completed tasks");
             results.add("status", success);
           } else if (coreContainer.getZkController().getOverseerFailureMap().contains(requestId)) {
             SimpleOrderedMap success = new SimpleOrderedMap();
-            DistributedMap.MapEvent mapEvent = coreContainer.getZkController().getOverseerFailureMap().get(requestId);
-            if(mapEvent != null) {
-              rsp.getValues().addAll(SolrResponse.deserialize(mapEvent.getBytes()).getResponse());
+            byte[] mapEntry = coreContainer.getZkController().getOverseerFailureMap().get(requestId);
+            if(mapEntry != null) {
+              rsp.getValues().addAll(SolrResponse.deserialize(mapEntry).getResponse());
             }
             success.add("state", "failed");
             success.add("msg", "found " + requestId + " in failed tasks");
