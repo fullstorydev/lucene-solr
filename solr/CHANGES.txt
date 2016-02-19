@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8694: DistributedMap/Queue can create too many Watchers and some code simplification. (Scott Blum via Mark Miller)
 * SOLR-8693: Improve ZkStateReader logging. (Scott Blum via Mark Miller)
 * SOLR-8605: Regular expression queries starting with escaped forward slash caused an exception. (Scott Blum, yonik)
 * Remove pathological error reporting. Don't serialize the entire clusterstate to log.
