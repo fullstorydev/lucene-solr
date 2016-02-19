@@ -10,6 +10,8 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8697: Scope ZK election nodes by session to prevent elections from interfering with each other
+  and other small LeaderElector improvements. (Scott Blum via Mark Miller)
 * SOLR-8696: Start the Overseer before actions that need the overseer on init and when reconnecting after
   zk expiration and improve init logic. (Scott Blum, Mark Miller)
 * SOLR-8695: Ensure ZK watchers are not triggering our watch logic on connection events and
