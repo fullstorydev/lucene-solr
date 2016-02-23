@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* Fix race between becoming leader and canceling ShardLeaderElectionContextBase
 * SOLR-8697: Scope ZK election nodes by session to prevent elections from interfering with each other
   and other small LeaderElector improvements. (Scott Blum via Mark Miller)
 * SOLR-8696: Start the Overseer before actions that need the overseer on init and when reconnecting after
