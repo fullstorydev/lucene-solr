@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8720: ZkController#publishAndWaitForDownStates should use #publishNodeAsDown. (Mark Miller)
 * SOLR-9191: OverseerTaskQueue.peekTopN() fatally flawed (Scott Blum, Noble Paul)
 * SOLR-9034: Atomic updates failed to work when there were copyField targets that had docValues
   enabled. (Karthik Ramachandran, Ishan Chattopadhyaya, yonik)
