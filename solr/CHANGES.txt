@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8720: ZkController#publishAndWaitForDownStates should use #publishNodeAsDown. (Mark Miller)
 * SOLR-8929: Add an idea module for solr/server to enable launching start.jar (Scott Blum, Steve Rowe)
 * SOLR-8875: SolrCloud Overseer clusterState could unexpectedly be null resulting in NPE.
   (Scott Blum via David Smiley)
