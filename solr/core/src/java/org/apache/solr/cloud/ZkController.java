@@ -384,7 +384,7 @@ public final class ZkController {
       }
     }, zkACLProvider);
 
-    this.overseerJobQueue = Overseer.getInQueue(zkClient);
+    this.overseerJobQueue = Overseer.getStateUpdateQueue(zkClient);
     this.overseerCollectionQueue = Overseer.getCollectionQueue(zkClient);
     this.overseerConfigSetQueue = Overseer.getConfigSetQueue(zkClient);
     this.overseerRunningMap = Overseer.getRunningMap(zkClient);

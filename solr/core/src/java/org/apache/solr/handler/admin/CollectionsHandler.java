@@ -178,7 +178,7 @@ public class CollectionsHandler extends RequestHandlerBase {
         result.put(QUEUE_OPERATION, operation.action.toLower());
         ZkNodeProps props = new ZkNodeProps(result);
         if (operation.sendToOCPQueue) handleResponse(operation.action.toLower(), props, rsp, operation.timeOut);
-        else Overseer.getInQueue(coreContainer.getZkController().getZkClient()).offer(Utils.toJSON(props));
+        else Overseer.getStateUpdateQueue(coreContainer.getZkController().getZkClient()).offer(Utils.toJSON(props));
 
       }
     } else {
