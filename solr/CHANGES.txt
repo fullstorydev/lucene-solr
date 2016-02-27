@@ -10,6 +10,8 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8746: Renamed Overseer.getInQueue to getStateUpdateQueue, getInternalQueue to getInternalWorkQueue
+  and added javadocs. (Scott Blum, shalin)
 * SOLR-8748: OverseerTaskProcessor limits number of concurrent tasks to just 10 even though the thread pool
   size is 100. The limit has now been increased to 100. (Scott Blum, shalin)
 * SOLR-8697: Scope ZK election nodes by session to prevent elections from interfering with each other
