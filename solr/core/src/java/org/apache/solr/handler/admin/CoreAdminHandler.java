@@ -958,7 +958,8 @@ public class CoreAdminHandler extends RequestHandlerBase {
           // to accept updates
           CloudDescriptor cloudDescriptor = core.getCoreDescriptor()
               .getCloudDescriptor();
-          
+          String collection = cloudDescriptor.getCollectionName();
+
           if (retry % 15 == 0) {
             if (retry > 0 && log.isInfoEnabled())
               log.info("After " + retry + " seconds, core " + cname + " (" +
@@ -967,7 +968,7 @@ public class CoreAdminHandler extends RequestHandlerBase {
                   waitForState + "; forcing ClusterState update from ZooKeeper");
             
             // force a cluster state update
-            coreContainer.getZkController().getZkStateReader().updateClusterState();
+            coreContainer.getZkController().getZkStateReader().forceUpdateCollection(collection);
           }
 
           if (maxTries == 0) {
@@ -980,7 +981,6 @@ public class CoreAdminHandler extends RequestHandlerBase {
           }
           
           ClusterState clusterState = coreContainer.getZkController().getClusterState();
-          String collection = cloudDescriptor.getCollectionName();
           Slice slice = clusterState.getSlice(collection, cloudDescriptor.getShardId());
           if (slice != null) {
             final Replica replica = slice.getReplicasMap().get(coreNodeName);

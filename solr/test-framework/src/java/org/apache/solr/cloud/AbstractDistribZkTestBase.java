@@ -146,7 +146,6 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
     while (cont) {
       if (verbose) System.out.println("-");
       boolean sawLiveRecovering = false;
-      zkStateReader.updateClusterState();
       ClusterState clusterState = zkStateReader.getClusterState();
       Map<String,Slice> slices = clusterState.getSlicesMap(collection);
       assertNotNull("Could not find collection:" + collection, slices);
@@ -196,7 +195,6 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
     
     while (cont) {
       if (verbose) System.out.println("-");
-      zkStateReader.updateClusterState();
       ClusterState clusterState = zkStateReader.getClusterState();
       if (!clusterState.hasCollection(collection)) break;
       if (cnt == timeoutSeconds) {
@@ -237,7 +235,7 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
   protected void assertAllActive(String collection,ZkStateReader zkStateReader)
       throws KeeperException, InterruptedException {
 
-      zkStateReader.updateClusterState();
+      zkStateReader.forceUpdateCollection(collection);
       ClusterState clusterState = zkStateReader.getClusterState();
       Map<String,Slice> slices = clusterState.getSlicesMap(collection);
       if (slices == null) {
