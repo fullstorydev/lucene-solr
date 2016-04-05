@@ -17,6 +17,7 @@ package org.apache.solr.cloud.overseer;
  * limitations under the License.
  */
 
+import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -35,8 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.Collections.singletonMap;
-
-import java.lang.invoke.MethodHandles;
 
 /**
  * ZkStateWriter is responsible for writing updates to the cluster state stored in ZooKeeper for
@@ -85,6 +84,7 @@ public class ZkStateWriter {
 
     this.reader = zkStateReader;
     this.stats = stats;
+    this.clusterState = zkStateReader.getClusterState();
   }
 
   /**
