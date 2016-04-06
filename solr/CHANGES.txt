@@ -10,6 +10,8 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8948: OverseerTaskQueue.containsTaskWithRequestId encounters json parse error if a
+  SolrResponse node is in the overseer queue. (Jessica Cheng Mallet via shalin)
 * SOLR-8745: Deprecate costly ZkStateReader.updateClusterState(), replace with a narrow
   forceUpdateCollection(collection) (Scott Blum via shalin)
 * SOLR-8722: Don't force a full ZkStateReader refresh on every Overseer operation.
