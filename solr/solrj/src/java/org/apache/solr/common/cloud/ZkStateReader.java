@@ -35,6 +35,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.common.Callable;
 import org.apache.solr.common.SolrException;
@@ -533,6 +534,10 @@ public class ZkStateReader implements Closeable {
       byte[] data = zkClient.getData(CLUSTER_STATE, watcher, stat, true);
       ClusterState loadedData = ClusterState.load(stat.getVersion(), data, Collections.<String>emptySet(), CLUSTER_STATE);
       synchronized (getUpdateLock()) {
+        if (this.legacyClusterStateVersion >= stat.getVersion()) {
+          // Nothing to do, someone else updated same or newer.
+          return;
+        }
         this.legacyCollectionStates = loadedData.getCollectionStates();
         this.legacyClusterStateVersion = stat.getVersion();
       }
@@ -555,6 +560,9 @@ public class ZkStateReader implements Closeable {
     }
   }
 
+  // We don't get a Stat or track versions on getChildren() calls, so force linearization.
+  private final Object refreshCollectionListLock = new Object();
+
   /**
    * Search for any lazy-loadable state format2 collections.
    *
@@ -568,29 +576,32 @@ public class ZkStateReader implements Closeable {
    * {@link ClusterState#getCollections()} method as a safeguard against exposing wrong collection names to the users
    */
   private void refreshCollectionList(Watcher watcher) throws KeeperException, InterruptedException {
-    List<String> children = null;
-    try {
-      children = zkClient.getChildren(COLLECTIONS_ZKNODE, watcher, true);
-    } catch (KeeperException.NoNodeException e) {
-      log.warn("Error fetching collection names");
-      // fall through
-    }
-    if (children == null || children.isEmpty()) {
-      lazyCollectionStates.clear();
-      return;
-    }
+    synchronized (refreshCollectionListLock) {
+      List<String> children = null;
+      try {
+        children = zkClient.getChildren(COLLECTIONS_ZKNODE, watcher, true);
+      } catch (KeeperException.NoNodeException e) {
+        log.warn("Error fetching collection names");
+        // fall through
+      }
+      if (children == null || children.isEmpty()) {
+        lazyCollectionStates.clear();
+        return;
+      }
 
-    // Don't mess with watchedCollections, they should self-manage.
+      // Don't lock getUpdateLock() here, we don't need it and it would cause deadlock.
+      // Don't mess with watchedCollections, they should self-manage.
 
-    // First, drop any children that disappeared.
-    this.lazyCollectionStates.keySet().retainAll(children);
-    for (String coll : children) {
-      // We will create an eager collection for any interesting collections, so don't add to lazy.
-      if (!interestingCollections.contains(coll)) {
-        // Double check contains just to avoid allocating an object.
-        LazyCollectionRef existing = lazyCollectionStates.get(coll);
-        if (existing == null) {
-          lazyCollectionStates.putIfAbsent(coll, new LazyCollectionRef(coll));
+      // First, drop any children that disappeared.
+      this.lazyCollectionStates.keySet().retainAll(children);
+      for (String coll : children) {
+        // We will create an eager collection for any interesting collections, so don't add to lazy.
+        if (!interestingCollections.contains(coll)) {
+          // Double check contains just to avoid allocating an object.
+          LazyCollectionRef existing = lazyCollectionStates.get(coll);
+          if (existing == null) {
+            lazyCollectionStates.putIfAbsent(coll, new LazyCollectionRef(coll));
+          }
         }
       }
     }
@@ -622,19 +633,35 @@ public class ZkStateReader implements Closeable {
     }
   }
 
+  // We don't get a Stat or track versions on getChildren() calls, so force linearization.
+  private final Object refreshLiveNodesLock = new Object();
+  // Ensures that only the latest getChildren fetch gets applied.
+  private final AtomicReference<Set<String>> lastFetchedLiveNodes = new AtomicReference<>();
+
   /**
    * Refresh live_nodes.
    */
   private void refreshLiveNodes(Watcher watcher) throws KeeperException, InterruptedException {
-    Set<String> newLiveNodes;
-    try {
-      List<String> nodeList = zkClient.getChildren(LIVE_NODES_ZKNODE, watcher, true);
-      newLiveNodes = new HashSet<>(nodeList);
-    } catch (KeeperException.NoNodeException e) {
-      newLiveNodes = emptySet();
+    synchronized (refreshLiveNodesLock) {
+      Set<String> newLiveNodes;
+      try {
+        List<String> nodeList = zkClient.getChildren(LIVE_NODES_ZKNODE, watcher, true);
+        newLiveNodes = new HashSet<>(nodeList);
+      } catch (KeeperException.NoNodeException e) {
+        newLiveNodes = emptySet();
+      }
+      lastFetchedLiveNodes.set(newLiveNodes);
     }
-    Set<String> oldLiveNodes;
+
+    // Can't lock getUpdateLock() until we release the other, it would cause deadlock.
+    Set<String> oldLiveNodes, newLiveNodes;
     synchronized (getUpdateLock()) {
+      newLiveNodes = lastFetchedLiveNodes.getAndSet(null);
+      if (newLiveNodes == null) {
+        // Someone else won the race to apply the last update, just exit.
+        return;
+      }
+
       oldLiveNodes = this.liveNodes;
       this.liveNodes = newLiveNodes;
       if (clusterState != null) {
