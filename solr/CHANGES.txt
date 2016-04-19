@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8973: Zookeeper frenzy when a core is first created. (Janmejay Singh, Scott Blum, shalin)
 * SOLR-8914: ZkStateReader's refreshLiveNodes(Watcher) is not thread safe. (Scott Blum, hoss,
   sarowe, Erick Erickson, Mark Miller, shalin)
 * SOLR-8875: SolrCloud Overseer clusterState could unexpectedly be null resulting in NPE.
