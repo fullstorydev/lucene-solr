@@ -47,3 +47,8 @@ solr/contrib/dataimporthandler/test-lib/
 solr/contrib/morphlines-core/test-lib/
 
 solr/core/test-lib/
+
+solr/server/logs/
+solr/server/solrzoo_data/
+solr/server/solr-webapp
+solr/server/start.jar
