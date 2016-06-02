@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8744: Overseer operations performed with fine grained mutual exclusion (noble, Scott Blum)
 * SOLR-8720: ZkController#publishAndWaitForDownStates should use #publishNodeAsDown. (Mark Miller)
 * SOLR-8929: Add an idea module for solr/server to enable launching start.jar (Scott Blum, Steve Rowe)
 * SOLR-8875: SolrCloud Overseer clusterState could unexpectedly be null resulting in NPE.
@@ -32,6 +33,7 @@ See http://lucene.apache.org/solr for more information.
 * special OOMKILLER handling for spaces. (Scott Blum)
 * Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
 * add jolokia jars to solr war (Ian Rose)
+
 
 ======================= 5.5.1 =======================
 
