@@ -35,6 +35,7 @@
     <path refid="test.base.classpath"/>
     <path refid="solr.base.classpath"/>
     <pathelement path="${example}/resources"/>
+    <fileset dir="${common-solr.dir}/contrib/jolokia/lib" includes="*.jar"/>
   </path>
 
   <target name="resolve" depends="ivy-availability-check,ivy-fail,ivy-configure">

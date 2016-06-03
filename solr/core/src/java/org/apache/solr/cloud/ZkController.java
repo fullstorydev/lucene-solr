@@ -273,6 +273,8 @@ public final class ZkController {
             log.info("ZooKeeper session re-connected ... refreshing core states after session expiration.");
 
             try {
+              zkStateReader.createClusterStateWatchersAndUpdate();
+
               // this is troublesome - we dont want to kill anything the old
               // leader accepted
               // though I guess sync will likely get those updates back? But
@@ -283,11 +285,8 @@ public final class ZkController {
 
               // seems we dont need to do this again...
               // Overseer.createClientNodes(zkClient, getNodeName());
-
-              cc.cancelCoreRecoveries();
-
-              registerAllCoresAsDown(registerOnReconnect, false);
-
+              
+              // start the overseer first as following code may need it's processing
               if (!zkRunOnly) {
                 ElectionContext context = new OverseerElectionContext(zkClient,
                     overseer, getNodeName());
@@ -301,7 +300,9 @@ public final class ZkController {
                 overseerElector.joinElection(context, true);
               }
 
-              zkStateReader.createClusterStateWatchersAndUpdate();
+              cc.cancelCoreRecoveries();
+
+              registerAllCoresAsDown(registerOnReconnect, false);
 
               // we have to register as live first to pick up docs in the buffer
               createEphemeralLiveNode();
@@ -375,7 +376,7 @@ public final class ZkController {
       }
     }, zkACLProvider);
 
-    this.overseerJobQueue = Overseer.getInQueue(zkClient);
+    this.overseerJobQueue = Overseer.getStateUpdateQueue(zkClient);
     this.overseerCollectionQueue = Overseer.getCollectionQueue(zkClient);
     this.overseerConfigSetQueue = Overseer.getConfigSetQueue(zkClient);
     this.overseerRunningMap = Overseer.getRunningMap(zkClient);
@@ -643,26 +644,13 @@ public final class ZkController {
   private void init(CurrentCoreDescriptorProvider registerOnReconnect) {
 
     try {
-      boolean createdWatchesAndUpdated = false;
-      Stat stat = zkClient.exists(ZkStateReader.LIVE_NODES_ZKNODE, null, true);
-      if (stat != null && stat.getNumChildren() > 0) {
-        zkStateReader.createClusterStateWatchersAndUpdate();
-        createdWatchesAndUpdated = true;
-        publishAndWaitForDownStates();
-      }
-
       createClusterZkNodes(zkClient);
+      zkStateReader.createClusterStateWatchersAndUpdate();
 
-      createEphemeralLiveNode();
-
-      ShardHandler shardHandler;
-      UpdateShardHandler updateShardHandler;
-      shardHandler = cc.getShardHandlerFactory().getShardHandler();
-      updateShardHandler = cc.getUpdateShardHandler();
-
+      // start the overseer first as following code may need it's processing
       if (!zkRunOnly) {
         overseerElector = new LeaderElector(zkClient);
-        this.overseer = new Overseer(shardHandler, updateShardHandler,
+        this.overseer = new Overseer(cc.getShardHandlerFactory().getShardHandler(), cc.getUpdateShardHandler(),
             CommonParams.CORES_HANDLER_PATH, zkStateReader, this, cloudConfig);
         ElectionContext context = new OverseerElectionContext(zkClient,
             overseer, getNodeName());
@@ -670,10 +658,13 @@ public final class ZkController {
         overseerElector.joinElection(context, false);
       }
 
-      if (!createdWatchesAndUpdated) {
-        zkStateReader.createClusterStateWatchersAndUpdate();
+      Stat stat = zkClient.exists(ZkStateReader.LIVE_NODES_ZKNODE, null, true);
+      if (stat != null && stat.getNumChildren() > 0) {
+        publishAndWaitForDownStates();
       }
 
+      // Do this last to signal we're up.
+      createEphemeralLiveNode();
     } catch (IOException e) {
       log.error("", e);
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
@@ -946,7 +937,7 @@ public final class ZkController {
       }
       
       // make sure we have an update cluster state right away
-      zkStateReader.updateClusterState();
+      zkStateReader.forceUpdateCollection(collection);
       return shardId;
     } finally {
       MDCLoggingContext.clear();
@@ -2432,7 +2423,8 @@ public final class ZkController {
 
     @Override
     public void process(WatchedEvent event) {
-      if (event.getState() == Event.KeeperState.Disconnected || event.getState() == Event.KeeperState.Expired)  {
+      // session events are not change events, and do not remove the watcher
+      if (Event.EventType.None.equals(event.getType())) {
         return;
       }
 
@@ -2562,7 +2554,7 @@ public final class ZkController {
     ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, OverseerAction.DOWNNODE.toLower(),
         ZkStateReader.NODE_NAME_PROP, nodeName);
     try {
-      Overseer.getInQueue(getZkClient()).offer(Utils.toJSON(m));
+      Overseer.getStateUpdateQueue(getZkClient()).offer(Utils.toJSON(m));
     } catch (InterruptedException e) {
       Thread.interrupted();
       log.info("Publish node as down was interrupted.");

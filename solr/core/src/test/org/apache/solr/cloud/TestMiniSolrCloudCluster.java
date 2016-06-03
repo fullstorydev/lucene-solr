@@ -177,7 +177,7 @@ public class TestMiniSolrCloudCluster extends LuceneTestCase {
       assertEquals(1, rsp.getResults().getNumFound());
 
       // remove a server not hosting any replicas
-      zkStateReader.updateClusterState();
+      zkStateReader.forceUpdateCollection(collectionName);
       ClusterState clusterState = zkStateReader.getClusterState();
       HashMap<String, JettySolrRunner> jettyMap = new HashMap<String, JettySolrRunner>();
       for (JettySolrRunner jetty : miniCluster.getJettySolrRunners()) {
@@ -322,7 +322,8 @@ public class TestMiniSolrCloudCluster extends LuceneTestCase {
       try (SolrZkClient zkClient = new SolrZkClient
           (miniCluster.getZkServer().getZkAddress(), AbstractZkTestCase.TIMEOUT, AbstractZkTestCase.TIMEOUT, null);
           ZkStateReader zkStateReader = new ZkStateReader(zkClient)) {
-        
+        zkStateReader.createClusterStateWatchersAndUpdate();
+
         // wait for collection to appear
         AbstractDistribZkTestBase.waitForRecoveriesToFinish(collectionName, zkStateReader, true, true, 330);
 
@@ -369,6 +370,7 @@ public class TestMiniSolrCloudCluster extends LuceneTestCase {
       try (SolrZkClient zkClient = new SolrZkClient
           (miniCluster.getZkServer().getZkAddress(), AbstractZkTestCase.TIMEOUT, AbstractZkTestCase.TIMEOUT, null);
           ZkStateReader zkStateReader = new ZkStateReader(zkClient)) {
+        zkStateReader.createClusterStateWatchersAndUpdate();
         AbstractDistribZkTestBase.waitForRecoveriesToFinish(collectionName, zkStateReader, true, true, 330);
 
         // modify collection
@@ -386,7 +388,7 @@ public class TestMiniSolrCloudCluster extends LuceneTestCase {
         }
 
         // the test itself
-        zkStateReader.updateClusterState();
+        zkStateReader.forceUpdateCollection(collectionName);
         final ClusterState clusterState = zkStateReader.getClusterState();
 
         final HashSet<Integer> leaderIndices = new HashSet<Integer>();
@@ -445,7 +447,7 @@ public class TestMiniSolrCloudCluster extends LuceneTestCase {
         }
         AbstractDistribZkTestBase.waitForRecoveriesToFinish(collectionName, zkStateReader, true, true, 330);
 
-        zkStateReader.updateClusterState();
+        zkStateReader.forceUpdateCollection(collectionName);
 
         // re-query collection
         {

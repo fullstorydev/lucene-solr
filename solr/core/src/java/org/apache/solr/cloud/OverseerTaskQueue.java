@@ -61,7 +61,7 @@ public class OverseerTaskQueue extends DistributedQueue {
     List<String> childNames = zookeeper.getChildren(dir, null, true);
     stats.setQueueLength(childNames.size());
     for (String childName : childNames) {
-      if (childName != null) {
+      if (childName != null && childName.startsWith(PREFIX)) {
         try {
           byte[] data = zookeeper.getData(dir + "/" + childName, null, null, true);
           if (data != null) {
@@ -129,11 +129,13 @@ public class OverseerTaskQueue extends DistributedQueue {
 
     @Override
     public void process(WatchedEvent event) {
-      Event.EventType eventType = event.getType();
-      // None events are ignored
+      // session events are not change events, and do not remove the watcher
+      if (Event.EventType.None.equals(event.getType())) {
+        return;
+      }
       // If latchEventType is not null, only fire if the type matches
-      LOG.info("{} fired on path {} state {} latchEventType {}", eventType, event.getPath(), event.getState(), latchEventType);
-      if (eventType != Event.EventType.None && (latchEventType == null || eventType == latchEventType)) {
+      LOG.info("{} fired on path {} state {} latchEventType {}", event.getType(), event.getPath(), event.getState(), latchEventType);
+      if (latchEventType == null || event.getType() == latchEventType) {
         synchronized (lock) {
           this.event = event;
           lock.notifyAll();
@@ -183,17 +185,14 @@ public class OverseerTaskQueue extends DistributedQueue {
     try {
       // Create and watch the response node before creating the request node;
       // otherwise we may miss the response.
-      String watchID = createData(
-          dir + "/" + response_prefix,
-          null, CreateMode.EPHEMERAL_SEQUENTIAL);
+      String watchID = createResponseNode();
 
       Object lock = new Object();
       LatchWatcher watcher = new LatchWatcher(lock);
       Stat stat = zookeeper.exists(watchID, watcher, true);
 
       // create the request node
-      createData(dir + "/" + PREFIX + watchID.substring(watchID.lastIndexOf("-") + 1),
-          data, CreateMode.PERSISTENT);
+      createRequestNode(data, watchID);
 
       synchronized (lock) {
         if (stat != null && watcher.getWatchedEvent() == null) {
@@ -210,6 +209,18 @@ public class OverseerTaskQueue extends DistributedQueue {
       time.stop();
     }
   }
+
+  void createRequestNode(byte[] data, String watchID) throws KeeperException, InterruptedException {
+    createData(dir + "/" + PREFIX + watchID.substring(watchID.lastIndexOf("-") + 1),
+        data, CreateMode.PERSISTENT);
+  }
+
+  String createResponseNode() throws KeeperException, InterruptedException {
+    return createData(
+            dir + "/" + response_prefix,
+            null, CreateMode.EPHEMERAL_SEQUENTIAL);
+  }
+
 
   public List<QueueEvent> peekTopN(int n, Set<String> excludeSet, long waitMillis)
       throws KeeperException, InterruptedException {

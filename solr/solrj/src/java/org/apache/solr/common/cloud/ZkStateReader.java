@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -226,7 +227,10 @@ public class ZkStateReader implements Closeable {
 
   /**
    * Forcibly refresh cluster state from ZK. Do this only to avoid race conditions because it's expensive.
+   *
+   * @deprecated Don't call this, call {@link #forceUpdateCollection(String)} on a single collection if you must.
    */
+  @Deprecated
   public void updateClusterState() throws KeeperException, InterruptedException {
     synchronized (getUpdateLock()) {
       if (clusterState == null) {
@@ -244,6 +248,49 @@ public class ZkStateReader implements Closeable {
       }
       refreshCollectionList(null);
       refreshLiveNodes(null);
+      constructState();
+    }
+  }
+
+  /**
+   * Forcibly refresh a collection's internal state from ZK. Try to avoid having to resort to this when
+   * a better design is possible.
+   */
+  public void forceUpdateCollection(String collection) throws KeeperException, InterruptedException {
+    synchronized (getUpdateLock()) {
+      if (clusterState == null) {
+        return;
+      }
+
+      ClusterState.CollectionRef ref = clusterState.getCollectionRef(collection);
+      if (ref == null) {
+        // We don't know anything about this collection, maybe it's new?
+        // First try to update the legacy cluster state.
+        refreshLegacyClusterState(null);
+        if (!legacyCollectionStates.containsKey(collection)) {
+          // No dice, see if a new collection just got created.
+          LazyCollectionRef tryLazyCollection = new LazyCollectionRef(collection);
+          if (tryLazyCollection.get() == null) {
+            // No dice, just give up.
+            return;
+          }
+          // What do you know, it exists!
+          lazyCollectionStates.putIfAbsent(collection, tryLazyCollection);
+        }
+      } else if (ref.isLazilyLoaded()) {
+        if (ref.get() != null) {
+          return;
+        }
+        // Edge case: if there's no external collection, try refreshing legacy cluster state in case it's there.
+        refreshLegacyClusterState(null);
+      } else if (legacyCollectionStates.containsKey(collection)) {
+        // Exists, and lives in legacy cluster state, force a refresh.
+        refreshLegacyClusterState(null);
+      } else if (watchedCollectionStates.containsKey(collection)) {
+        // Exists as a watched collection, force a refresh.
+        DocCollection newState = fetchCollectionState(collection, null);
+        updateWatchedCollection(collection, newState);
+      }
       constructState();
     }
   }
@@ -305,8 +352,7 @@ public class ZkStateReader implements Closeable {
             
             @Override
             public void process(WatchedEvent event) {
-              // session events are not change events,
-              // and do not remove the watcher
+              // session events are not change events, and do not remove the watcher
               if (EventType.None.equals(event.getType())) {
                 return;
               }
@@ -358,8 +404,7 @@ public class ZkStateReader implements Closeable {
 
           @Override
           public void process(WatchedEvent event) {
-            // session events are not change events,
-            // and do not remove the watcher
+            // session events are not change events, and do not remove the watcher
             if (EventType.None.equals(event.getType())) {
               return;
             }
@@ -418,11 +463,21 @@ public class ZkStateReader implements Closeable {
     this.clusterState = new ClusterState(liveNodes, result, legacyClusterStateVersion);
     LOG.debug("clusterStateSet: version [{}] legacy [{}] interesting [{}] watched [{}] lazy [{}] total [{}]",
         clusterState.getZkClusterStateVersion(),
-        legacyCollectionStates.keySet(),
-        interestingCollections,
-        watchedCollectionStates.keySet(),
-        lazyCollectionStates.keySet(),
-        clusterState.getCollections());
+        legacyCollectionStates.keySet().size(),
+        interestingCollections.size(),
+        watchedCollectionStates.keySet().size(),
+        lazyCollectionStates.keySet().size(),
+        clusterState.getCollectionStates().size());
+
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("clusterStateSet: version [{}] legacy [{}] interesting [{}] watched [{}] lazy [{}] total [{}]",
+          clusterState.getZkClusterStateVersion(),
+          legacyCollectionStates.keySet(),
+          interestingCollections,
+          watchedCollectionStates.keySet(),
+          lazyCollectionStates.keySet(),
+          clusterState.getCollectionStates());
+    }
   }
 
   /**
@@ -571,6 +626,10 @@ public class ZkStateReader implements Closeable {
       if (clusterState != null) {
         clusterState.setLiveNodes(newLiveNodes);
       }
+    }
+    LOG.info("Updated live nodes from ZooKeeper... ({}) -> ({})", oldLiveNodes.size(), newLiveNodes.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Updated live nodes from ZooKeeper... {} -> {}", new TreeSet<>(oldLiveNodes), new TreeSet<>(newLiveNodes));
     }
   }
 
@@ -839,8 +898,7 @@ public class ZkStateReader implements Closeable {
         return;
       }
 
-      // session events are not change events,
-      // and do not remove the watcher
+      // session events are not change events, and do not remove the watcher
       if (EventType.None.equals(event.getType())) {
         return;
       }
@@ -888,8 +946,7 @@ public class ZkStateReader implements Closeable {
 
     @Override
     public void process(WatchedEvent event) {
-      // session events are not change events,
-      // and do not remove the watcher
+      // session events are not change events, and do not remove the watcher
       if (EventType.None.equals(event.getType())) {
         return;
       }
@@ -926,8 +983,7 @@ public class ZkStateReader implements Closeable {
 
     @Override
     public void process(WatchedEvent event) {
-      // session events are not change events,
-      // and do not remove the watcher
+      // session events are not change events, and do not remove the watcher
       if (EventType.None.equals(event.getType())) {
         return;
       }
@@ -960,8 +1016,7 @@ public class ZkStateReader implements Closeable {
 
     @Override
     public void process(WatchedEvent event) {
-      // session events are not change events,
-      // and do not remove the watcher
+      // session events are not change events, and do not remove the watcher
       if (EventType.None.equals(event.getType())) {
         return;
       }
