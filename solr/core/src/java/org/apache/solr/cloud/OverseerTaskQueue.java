@@ -17,12 +17,12 @@
 package org.apache.solr.cloud;
 
 import java.lang.invoke.MethodHandles;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.google.common.base.Predicate;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.util.stats.TimerContext;
@@ -222,7 +222,7 @@ public class OverseerTaskQueue extends DistributedQueue {
   }
 
 
-  public List<QueueEvent> peekTopN(int n, Set<String> excludeSet, long waitMillis)
+  public List<QueueEvent> peekTopN(int n, final Set<String> excludeSet, long waitMillis)
       throws KeeperException, InterruptedException {
     ArrayList<QueueEvent> topN = new ArrayList<>();
 
@@ -232,13 +232,19 @@ public class OverseerTaskQueue extends DistributedQueue {
     else time = stats.time(dir + "_peekTopN_wait" + waitMillis);
 
     try {
-      for (String headNode : getChildren(waitMillis)) {
+      Predicate<String> filter = new Predicate<String>() {
+        @Override
+        public boolean apply(String child) {
+          String id = dir + "/" + child;
+          return !excludeSet.contains(id);
+        }
+      };
+      for (String headNode : getChildren(waitMillis, filter)) {
         if (topN.size() < n) {
           try {
             String id = dir + "/" + headNode;
-            if (excludeSet.contains(id)) continue;
             QueueEvent queueEvent = new QueueEvent(id,
-                zookeeper.getData(dir + "/" + headNode, null, null, true), null);
+                zookeeper.getData(id, null, null, true), null);
             topN.add(queueEvent);
           } catch (KeeperException.NoNodeException e) {
             // Another client removed the node first, try next
