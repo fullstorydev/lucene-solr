@@ -10,6 +10,7 @@ See http://lucene.apache.org/solr for more information.
 
 ================= FullStory ================
 
+* SOLR-8744: Overseer operations performed with fine grained mutual exclusion (noble, Scott Blum)
 * SOLR-9029: fix rare ZkStateReader visibility race during collection state format update (Scott Blum, hossman)
 * SOLR-9199: ZkController#publishAndWaitForDownStates logic is inefficient (Hrishikesh Gadre)
 * SOLR-8720: ZkController#publishAndWaitForDownStates should use #publishNodeAsDown. (Mark Miller)
@@ -37,6 +38,7 @@ See http://lucene.apache.org/solr for more information.
 * special OOMKILLER handling for spaces. (Scott Blum)
 * Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
 * add jolokia jars to solr war (Ian Rose)
+
 
 ======================= 5.5.1 =======================
 
