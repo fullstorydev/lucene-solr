@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud;
 
+import com.google.common.base.Predicate;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -185,7 +186,7 @@ public class OverseerCollectionConfigSetProcessorTest extends SolrTestCaseJ4 {
         return shardHandlerMock;
       }
     }).anyTimes();
-    workQueueMock.peekTopN(EasyMock.anyInt(), anyObject(Set.class), EasyMock.anyLong());
+    workQueueMock.peekTopN(EasyMock.anyInt(), anyObject(Predicate.class), EasyMock.anyLong());
     expectLastCall().andAnswer(new IAnswer<List>() {
       @Override
       public List answer() throws Throwable {

@@ -16,11 +16,11 @@
  */
 package org.apache.solr.cloud;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Predicates;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.response.SolrResponseBase;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -75,7 +75,7 @@ public class OverseerTaskQueueTest extends DistributedQueueTest {
     tq.createRequestNode(Utils.toJSON(props), watchID);
 
     // Set a SolrResponse as the response node by removing the QueueEvent, as done in OverseerTaskProcessor
-    List<OverseerTaskQueue.QueueEvent> queueEvents = tq.peekTopN(2, Collections.<String>emptySet(), 1000);
+    List<OverseerTaskQueue.QueueEvent> queueEvents = tq.peekTopN(2, Predicates.<String>alwaysFalse(), 1000);
     OverseerTaskQueue.QueueEvent requestId2Event = null;
     for (OverseerTaskQueue.QueueEvent queueEvent : queueEvents) {
       Map<String, Object> eventProps = (Map<String, Object>) Utils.fromJSON(queueEvent.getBytes());

@@ -19,7 +19,6 @@ package org.apache.solr.cloud;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.TreeSet;
 
 import com.google.common.base.Predicate;
@@ -223,7 +222,7 @@ public class OverseerTaskQueue extends DistributedQueue {
   }
 
 
-  public List<QueueEvent> peekTopN(int n, final Set<String> excludeSet, long waitMillis)
+  public List<QueueEvent> peekTopN(int n, final Predicate<String> excludeSet, long waitMillis)
       throws KeeperException, InterruptedException {
     ArrayList<QueueEvent> topN = new ArrayList<>();
 
@@ -236,7 +235,7 @@ public class OverseerTaskQueue extends DistributedQueue {
       for (Pair<String, byte[]> element : peekElements(n, waitMillis, new Predicate<String>() {
         @Override
         public boolean apply(String child) {
-          return !excludeSet.contains(dir + "/" + child);
+          return !excludeSet.apply(dir + "/" + child);
         }
       })) {
         topN.add(new QueueEvent(dir + "/" + element.getKey(),
