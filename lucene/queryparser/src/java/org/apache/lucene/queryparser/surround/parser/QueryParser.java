@@ -44,7 +44,7 @@ import org.apache.lucene.queryparser.surround.query.SrndTruncQuery;
  */
 
 public class QueryParser implements QueryParserConstants {
-  final int minimumPrefixLength = 3;
+  final int minimumPrefixLength = 1;
   final int minimumCharsInTrunc = 3;
   final String truncationErrorMessage = "Too unrestrictive truncation: ";
   final String boostErrorMessage = "Cannot handle boost value: ";

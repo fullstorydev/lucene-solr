@@ -8,6 +8,31 @@ caching, replication, and a web administration interface.
 
 See http://lucene.apache.org/solr for more information.
 
+================= FullStory ================
+
+* SOLR-8744: Overseer operations performed with fine grained mutual exclusion (noble, Scott Blum)
+* SOLR-9029: fix rare ZkStateReader visibility race during collection state format update (Scott Blum, hossman)
+* SOLR-9199: ZkController#publishAndWaitForDownStates logic is inefficient (Hrishikesh Gadre)
+* SOLR-8720: ZkController#publishAndWaitForDownStates should use #publishNodeAsDown. (Mark Miller)
+* SOLR-8929: Add an idea module for solr/server to enable launching start.jar (Scott Blum, Steve Rowe)
+* SOLR-8948: OverseerTaskQueue.containsTaskWithRequestId encounters json parse error if a
+  SolrResponse node is in the overseer queue. (Jessica Cheng Mallet via shalin)
+* SOLR-8745: Deprecate costly ZkStateReader.updateClusterState(), replace with a narrow
+  forceUpdateCollection(collection) (Scott Blum via shalin)
+* SOLR-8722: Don't force a full ZkStateReader refresh on every Overseer operation.
+  (Scott Blum via shalin)
+* SOLR-8746: Renamed Overseer.getInQueue to getStateUpdateQueue, getInternalQueue to getInternalWorkQueue
+  and added javadocs. (Scott Blum, shalin)
+* SOLR-8696: Start the Overseer before actions that need the overseer on init and when reconnecting after
+  zk expiration and improve init logic. (Scott Blum, Mark Miller)
+* SOLR-8693: Improve ZkStateReader logging. (Scott Blum via Mark Miller)
+* Remove pathological error reporting. Don't serialize the entire clusterstate to log.
+* CMSInitiatingOccupancyFraction 50->70 (Scott Blum)
+* special OOMKILLER handling for spaces. (Scott Blum)
+* Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
+* add jolokia jars to solr war (Ian Rose)
+
+
 ======================= 5.5.3 =======================
 
 Consult the LUCENE_CHANGES.txt file for additional, low level, changes in this release.
@@ -146,6 +171,7 @@ Other Changes
 
 * SOLR-8674: Stop ignoring sysprop solr.tests.mergePolicy, and make tests randomly choose between
   setting <mergePolicy> and <mergePolicyFactory>, which was added in SOLR-8621.  (Christine Poerschke)
+
 
 ======================= 5.5.1 =======================
 

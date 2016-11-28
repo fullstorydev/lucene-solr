@@ -19,7 +19,6 @@ package org.apache.solr.cloud;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.TreeSet;
 
 import com.google.common.base.Predicate;
@@ -186,17 +185,14 @@ public class OverseerTaskQueue extends DistributedQueue {
     try {
       // Create and watch the response node before creating the request node;
       // otherwise we may miss the response.
-      String watchID = createData(
-          dir + "/" + response_prefix,
-          null, CreateMode.EPHEMERAL_SEQUENTIAL);
+      String watchID = createResponseNode();
 
       Object lock = new Object();
       LatchWatcher watcher = new LatchWatcher(lock);
       Stat stat = zookeeper.exists(watchID, watcher, true);
 
       // create the request node
-      createData(dir + "/" + PREFIX + watchID.substring(watchID.lastIndexOf("-") + 1),
-          data, CreateMode.PERSISTENT);
+      createRequestNode(data, watchID);
 
       synchronized (lock) {
         if (stat != null && watcher.getWatchedEvent() == null) {
@@ -214,7 +210,19 @@ public class OverseerTaskQueue extends DistributedQueue {
     }
   }
 
-  public List<QueueEvent> peekTopN(int n, final Set<String> excludeSet, long waitMillis)
+  void createRequestNode(byte[] data, String watchID) throws KeeperException, InterruptedException {
+    createData(dir + "/" + PREFIX + watchID.substring(watchID.lastIndexOf("-") + 1),
+        data, CreateMode.PERSISTENT);
+  }
+
+  String createResponseNode() throws KeeperException, InterruptedException {
+    return createData(
+            dir + "/" + response_prefix,
+            null, CreateMode.EPHEMERAL_SEQUENTIAL);
+  }
+
+
+  public List<QueueEvent> peekTopN(int n, final Predicate<String> excludeSet, long waitMillis)
       throws KeeperException, InterruptedException {
     ArrayList<QueueEvent> topN = new ArrayList<>();
 
@@ -227,7 +235,7 @@ public class OverseerTaskQueue extends DistributedQueue {
       for (Pair<String, byte[]> element : peekElements(n, waitMillis, new Predicate<String>() {
         @Override
         public boolean apply(String child) {
-          return !excludeSet.contains(dir + "/" + child);
+          return !excludeSet.apply(dir + "/" + child);
         }
       })) {
         topN.add(new QueueEvent(dir + "/" + element.getKey(),

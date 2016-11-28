@@ -378,7 +378,6 @@ public class CollectionsAPIDistributedZkTest extends AbstractFullDistribZkTestBa
       }
       
       Thread.sleep(200);
-      cloudClient.getZkStateReader().updateClusterState();
     }
 
     assertFalse("Still found collection that should be gone", cloudClient.getZkStateReader().getClusterState().hasCollection("halfdeletedcollection2"));
@@ -557,8 +556,6 @@ public class CollectionsAPIDistributedZkTest extends AbstractFullDistribZkTestBa
   }
   
   private void testNoCollectionSpecified() throws Exception {
-    
-    cloudClient.getZkStateReader().updateClusterState();
     assertFalse(cloudClient.getZkStateReader().getClusterState().hasCollection("corewithnocollection"));
     assertFalse(cloudClient.getZkStateReader().getClusterState().hasCollection("corewithnocollection2"));
     
@@ -582,13 +579,13 @@ public class CollectionsAPIDistributedZkTest extends AbstractFullDistribZkTestBa
     makeRequest(getBaseUrl((HttpSolrClient) clients.get(1)), createCmd);
     
     // in both cases, the collection should have default to the core name
-    cloudClient.getZkStateReader().updateClusterState();
+    cloudClient.getZkStateReader().forceUpdateCollection("corewithnocollection");
+    cloudClient.getZkStateReader().forceUpdateCollection("corewithnocollection2");
     assertTrue(cloudClient.getZkStateReader().getClusterState().hasCollection("corewithnocollection"));
     assertTrue(cloudClient.getZkStateReader().getClusterState().hasCollection("corewithnocollection2"));
   }
 
   private void testNoConfigSetExist() throws Exception {
-    cloudClient.getZkStateReader().updateClusterState();
     assertFalse(cloudClient.getZkStateReader().getClusterState().hasCollection("corewithnocollection3"));
 
     // try and create a SolrCore with no collection name
@@ -609,7 +606,7 @@ public class CollectionsAPIDistributedZkTest extends AbstractFullDistribZkTestBa
     assertTrue(gotExp);
     TimeUnit.MILLISECONDS.sleep(200);
     // in both cases, the collection should have default to the core name
-    cloudClient.getZkStateReader().updateClusterState();
+    cloudClient.getZkStateReader().forceUpdateCollection("corewithnocollection3");
 
     Collection<Slice> slices = cloudClient.getZkStateReader().getClusterState().getActiveSlices("corewithnocollection3");
     assertNull(slices);

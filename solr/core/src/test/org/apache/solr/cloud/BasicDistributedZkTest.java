@@ -584,7 +584,7 @@ public class BasicDistributedZkTest extends AbstractFullDistribZkTestBase {
 
     Thread.sleep(5000);
     ChaosMonkey.start(cloudJettys.get(0).jetty);
-    cloudClient.getZkStateReader().updateClusterState();
+    cloudClient.getZkStateReader().forceUpdateCollection("multiunload2");
     try {
       cloudClient.getZkStateReader().getLeaderRetry("multiunload2", "shard1", 30000);
     } catch (SolrException e) {
@@ -867,7 +867,7 @@ public class BasicDistributedZkTest extends AbstractFullDistribZkTestBase {
     
     // we added a role of none on these creates - check for it
     ZkStateReader zkStateReader = getCommonCloudSolrClient().getZkStateReader();
-    zkStateReader.updateClusterState();
+    zkStateReader.forceUpdateCollection(oneInstanceCollection2);
     Map<String,Slice> slices = zkStateReader.getClusterState().getSlicesMap(oneInstanceCollection2);
     assertNotNull(slices);
     String roles = slices.get("slice1").getReplicasMap().values().iterator().next().getStr(ZkStateReader.ROLES_PROP);

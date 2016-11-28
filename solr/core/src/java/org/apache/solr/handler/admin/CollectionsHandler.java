@@ -194,7 +194,7 @@ public class CollectionsHandler extends RequestHandlerBase {
         if (operation.sendToOCPQueue) {
           response = handleResponse(operation.action.toLower(), zkProps, rsp, operation.timeOut);
         }
-        else Overseer.getInQueue(coreContainer.getZkController().getZkClient()).offer(Utils.toJSON(props));
+        else Overseer.getStateUpdateQueue(coreContainer.getZkController().getZkClient()).offer(Utils.toJSON(props));
         final String collectionName = zkProps.getStr(NAME);
         if (action.equals(CollectionAction.CREATE) && asyncId == null) {
           if (rsp.getException() == null) {
@@ -898,8 +898,6 @@ public class CollectionsHandler extends RequestHandlerBase {
         + (checkLeaderOnly ? "leaders" : "replicas"));
     ZkStateReader zkStateReader = cc.getZkController().getZkStateReader();
     for (int i = 0; i < numRetries; i++) {
-
-      zkStateReader.updateClusterState();
       ClusterState clusterState = zkStateReader.getClusterState();
 
       Collection<Slice> shards = clusterState.getSlices(collectionName);

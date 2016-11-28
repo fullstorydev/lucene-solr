@@ -20,6 +20,7 @@ import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.handler.component.ShardHandler;
 import org.apache.solr.handler.component.ShardHandlerFactory;
+
 import static org.apache.solr.cloud.OverseerConfigSetMessageHandler.CONFIGSETS_ACTION_PREFIX;
 
 /**
@@ -61,8 +62,6 @@ public class OverseerCollectionConfigSetProcessor extends OverseerTaskProcessor 
     super(
         zkStateReader,
         myId,
-        shardHandlerFactory,
-        adminPath,
         stats,
         getOverseerMessageHandlerSelector(zkStateReader, myId, shardHandlerFactory,
             adminPath, stats, overseer, overseerNodePrioritizer),

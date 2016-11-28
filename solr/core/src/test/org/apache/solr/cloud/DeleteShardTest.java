@@ -89,7 +89,6 @@ public class DeleteShardTest extends AbstractFullDistribZkTestBase {
     ClusterState clusterState = zkStateReader.getClusterState();
     int counter = 10;
     while (counter-- > 0) {
-      zkStateReader.updateClusterState();
       clusterState = zkStateReader.getClusterState();
       if (clusterState.getSlice("collection1", shard) == null) {
         break;
@@ -124,7 +123,7 @@ public class DeleteShardTest extends AbstractFullDistribZkTestBase {
 
   protected void setSliceState(String slice, State state) throws SolrServerException, IOException,
       KeeperException, InterruptedException {
-    DistributedQueue inQueue = Overseer.getInQueue(cloudClient.getZkStateReader().getZkClient());
+    DistributedQueue inQueue = Overseer.getStateUpdateQueue(cloudClient.getZkStateReader().getZkClient());
     Map<String, Object> propMap = new HashMap<>();
     propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
     propMap.put(slice, state.toString());
@@ -135,7 +134,6 @@ public class DeleteShardTest extends AbstractFullDistribZkTestBase {
     boolean transition = false;
 
     for (int counter = 10; counter > 0; counter--) {
-      zkStateReader.updateClusterState();
       ClusterState clusterState = zkStateReader.getClusterState();
       State sliceState = clusterState.getSlice("collection1", slice).getState();
       if (sliceState == state) {

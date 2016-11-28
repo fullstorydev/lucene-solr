@@ -446,6 +446,7 @@ enum CoreAdminOperation {
             // to accept updates
             CloudDescriptor cloudDescriptor = core.getCoreDescriptor()
                 .getCloudDescriptor();
+            String collection = cloudDescriptor.getCollectionName();
 
             if (retry % 15 == 0) {
               if (retry > 0 && log.isInfoEnabled())
@@ -455,7 +456,7 @@ enum CoreAdminOperation {
                     waitForState + "; forcing ClusterState update from ZooKeeper");
 
               // force a cluster state update
-              coreContainer.getZkController().getZkStateReader().updateClusterState();
+              coreContainer.getZkController().getZkStateReader().forceUpdateCollection(collection);
             }
 
             if (maxTries == 0) {
@@ -468,7 +469,6 @@ enum CoreAdminOperation {
             }
 
             ClusterState clusterState = coreContainer.getZkController().getClusterState();
-            String collection = cloudDescriptor.getCollectionName();
             Slice slice = clusterState.getSlice(collection, cloudDescriptor.getShardId());
             if (slice != null) {
               final Replica replica = slice.getReplicasMap().get(coreNodeName);
