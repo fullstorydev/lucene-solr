@@ -185,7 +185,7 @@
   <target name="javadocs" description="Calls javadocs-all, javadocs-solrj, and javadocs-test-framework"
           depends="define-lucene-javadoc-url,javadocs-solr-core,javadocs-solrj,javadocs-test-framework,javadocs-contrib"/>
   <target name="documentation" description="Generate all documentation"
-    depends="javadocs,changes-to-html,process-webpages"/>
+    depends="javadocs,process-webpages"/>
   <target name="compile-core" depends="compile-solr-core" unless="solr.core.compiled"/>
   
   <target name="process-webpages" depends="define-lucene-javadoc-url,resolve-pegdown">
@@ -603,10 +603,6 @@
     <make-checksums file="${package.dir}/${fullnamever}.zip"/>
   </target>
 
-  <target name="changes-to-html" depends="define-lucene-javadoc-url">
-    <build-changes changes.product="SOLR"/>
-  </target>
- 
   <target name="sign-artifacts">
     <sign-artifacts-macro artifacts.dir="${package.dir}"/>
   </target>

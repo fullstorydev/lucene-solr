@@ -128,7 +128,7 @@
   </target>
 
   <target name="documentation" description="Generate all documentation"
-    depends="javadocs,changes-to-html,process-webpages"/>
+    depends="javadocs,process-webpages"/>
   <target name="javadoc" depends="javadocs"/>
   <target name="javadocs" description="Generate javadoc" depends="javadocs-lucene-core, javadocs-modules, javadocs-test-framework"/>
 
@@ -473,10 +473,6 @@
   
   <target name="test-modules">
     <modules-crawl target="test" failonerror="true"/>
-  </target>
-
-  <target name="changes-to-html">
-    <build-changes changes.product="LUCENE"/>
   </target>
 
   <target name="pitest-modules" depends="compile-test">
