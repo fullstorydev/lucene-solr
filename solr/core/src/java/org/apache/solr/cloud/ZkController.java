@@ -1811,12 +1811,14 @@ public class ZkController {
     try {
       if (electionNode != null) {
         //this call is from inside the JVM  . not from CoreAdminHandler
-        if (overseerElector.getContext() == null || overseerElector.getContext().leaderSeqPath == null) {
+        ElectionContext ctx = overseerElector.getContext();
+        String path = ctx == null ? null : ctx.leaderSeqPath.get();
+        if (path == null) {
           overseerElector.retryElection(new OverseerElectionContext(zkClient,
               overseer, getNodeName()), joinAtHead);
           return;
         }
-        if (!overseerElector.getContext().leaderSeqPath.endsWith(electionNode)) {
+        if (!path.endsWith(electionNode)) {
           log.warn("Asked to rejoin with wrong election node : {}, current node is {}", electionNode, overseerElector.getContext().leaderSeqPath);
           //however delete it . This is possible when the last attempt at deleting the election node failed.
           if (electionNode.startsWith(getNodeName())) {
@@ -1873,7 +1875,7 @@ public class ZkController {
         ShardLeaderElectionContext context = new ShardLeaderElectionContext(elect, shardId, collectionName,
             coreNodeName, zkProps, this, getCoreContainer());
             
-        context.leaderSeqPath = context.electionPath + LeaderElector.ELECTION_NODE + "/" + electionNode;
+        context.leaderSeqPath.set(context.electionPath + LeaderElector.ELECTION_NODE + "/" + electionNode);
         elect.setup(context);
         electionContexts.put(contextKey, context);
         
@@ -2482,7 +2484,7 @@ public class ZkController {
   public String getLeaderSeqPath(String collection, String coreNodeName) {
     ContextKey key = new ContextKey(collection, coreNodeName);
     ElectionContext context = electionContexts.get(key);
-    return context != null ? context.leaderSeqPath : null;
+    return context != null ? context.leaderSeqPath.get() : null;
   }
 
   /**

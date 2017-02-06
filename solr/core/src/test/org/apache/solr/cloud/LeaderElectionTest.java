@@ -239,7 +239,7 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
     setupTwoCandidates(first, second);
 
     // delete the leader node
-    String path = first.getContext().leaderSeqPath;
+    String path = first.getContext().leaderSeqPath.get();
     zkClient.delete(path, -1, true);
     Thread.sleep(1000);
     assertEquals("new leader was not registered", "http://127.0.0.1/solr/2/", getLeaderUrl("collection2", "slice1"));
