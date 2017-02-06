@@ -181,9 +181,9 @@ public class OverseerTest extends SolrTestCaseJ4 {
                 ZkStateReader.COLLECTION_PROP, collection,
                 ZkStateReader.CORE_NODE_NAME_PROP, coreNodeName);
             LeaderElector elector = new LeaderElector(zkClient);
-            ShardLeaderElectionContextBase ctx = new ShardLeaderElectionContextBase(
+            ShardLeaderElectionContextBase ctx = new LeaderElectionTest.TestLeaderElectionContext(
                 elector, shardId, collection, nodeName + "_" + coreName, props,
-                zkStateReader);
+                zkStateReader, 0);
             elector.setup(ctx);
             electionContext.put(coreName, ctx);
             elector.joinElection(ctx, false);
