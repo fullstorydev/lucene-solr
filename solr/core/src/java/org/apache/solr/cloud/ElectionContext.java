@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.lucene.search.MatchAllDocsQuery;
@@ -65,7 +66,7 @@ public abstract class ElectionContext implements Closeable {
   final ZkNodeProps leaderProps;
   final String id;
   final String leaderPath;
-  volatile String leaderSeqPath;
+  final AtomicReference<String> leaderSeqPath = new AtomicReference<>();
   private SolrZkClient zkClient;
 
   public ElectionContext(final String coreNodeName,
@@ -82,13 +83,14 @@ public abstract class ElectionContext implements Closeable {
   }
   
   public void cancelElection() throws InterruptedException, KeeperException {
-    if (leaderSeqPath != null) {
+    String path = leaderSeqPath.getAndSet(null);
+    if (path != null) {
       try {
-        log.debug("Canceling election {}", leaderSeqPath);
-        zkClient.delete(leaderSeqPath, -1, true);
+        log.debug("Canceling election {}", path);
+        zkClient.delete(path, -1, true);
       } catch (NoNodeException e) {
         // fine
-        log.debug("cancelElection did not find election node to remove {}", leaderSeqPath);
+        log.debug("cancelElection did not find election node to remove {}", path);
       }
     } else {
       log.debug("cancelElection skipped as this context has not been initialized");
@@ -97,16 +99,14 @@ public abstract class ElectionContext implements Closeable {
 
   abstract void runLeaderProcess(boolean weAreReplacement, int pauseBeforeStartMs) throws KeeperException, InterruptedException, IOException;
 
+  abstract ElectionContext copy();
+
   public void checkIfIamLeaderFired() {}
 
   public void joinedElectionFired() {}
-
-  public  ElectionContext copy(){
-    throw new UnsupportedOperationException("copy");
-  }
 }
 
-class ShardLeaderElectionContextBase extends ElectionContext {
+abstract class ShardLeaderElectionContextBase extends ElectionContext {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   protected final SolrZkClient zkClient;
   protected String shardId;
@@ -181,8 +181,13 @@ class ShardLeaderElectionContextBase extends ElectionContext {
 
     try {
       RetryUtil.retryOnThrowable(NodeExistsException.class, 60000, 5000, () -> {
+        String path = leaderSeqPath.get();
+        if (path == null) {
+          // concurrently cancelled; just bail
+          return;
+        }
         synchronized (lock) {
-          log.debug("Creating leader registration node {} after winning as {}", leaderPath, leaderSeqPath);
+          log.debug("Creating leader registration node {} after winning as {}", leaderPath, path);
           List<Op> ops = new ArrayList<>(2);
 
           // We use a multi operation to get the parent nodes version, which will
@@ -190,7 +195,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
           // The setData call used to get the parent version is also the trigger to
           // increment the version. We also do a sanity check that our leaderSeqPath exists.
 
-          ops.add(Op.check(leaderSeqPath, -1));
+          ops.add(Op.check(path, -1));
           ops.add(Op.create(leaderPath, Utils.toJSON(leaderProps), zkClient.getZkACLProvider().getACLsToAdd(leaderPath), CreateMode.EPHEMERAL));
           ops.add(Op.setData(parent, null, -1));
           List<OpResult> results;
@@ -749,9 +754,13 @@ final class OverseerElectionContext extends ElectionContext {
   @Override
   void runLeaderProcess(boolean weAreReplacement, int pauseBeforeStartMs) throws KeeperException,
       InterruptedException {
+    String path = leaderSeqPath.get();
+    if (path == null) {
+      // concurrently cancelled; just bail
+      return;
+    }
     log.info("I am going to be the leader {}", id);
-    final String id = leaderSeqPath
-        .substring(leaderSeqPath.lastIndexOf("/") + 1);
+    final String id = path.substring(path.lastIndexOf("/") + 1);
     ZkNodeProps myProps = new ZkNodeProps(ID, id);
 
     zkClient.makePath(leaderPath, Utils.toJSON(myProps),
