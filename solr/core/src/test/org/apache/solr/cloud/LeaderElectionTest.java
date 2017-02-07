@@ -239,12 +239,17 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
     setupTwoCandidates(first, second);
 
     // delete the leader node
-    String path = first.getContext().leaderSeqPath.get();
+    ElectionContext ctx = first.getContext();
+    String path = ctx.leaderSeqPath.get();
     zkClient.delete(path, -1, true);
     Thread.sleep(1000);
     assertEquals("new leader was not registered", "http://127.0.0.1/solr/2/", getLeaderUrl("collection2", "slice1"));
     // also make sure that the leader noticed it was no longer leader and created a new candidate node
-    assertFalse("leader did not see its revocation", Objects.equals(path, first.getContext().leaderSeqPath));
+    ElectionContext newCtx = first.getContext();
+    assertNotSame("leader did not see its revocation", ctx, newCtx);
+    String newPath = newCtx.leaderSeqPath.get();
+    assertNotNull("leader did not create new candidate node", newPath);
+    assertFalse("leader did not create new candidate node?", Objects.equals(path, newPath));
   }
 
   private void setupTwoCandidates(LeaderElector first, LeaderElector second) throws Exception {

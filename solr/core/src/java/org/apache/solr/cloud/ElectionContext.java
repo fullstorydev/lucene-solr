@@ -179,18 +179,18 @@ abstract class ShardLeaderElectionContextBase extends ElectionContext {
     ZkCmdExecutor zcmd = new ZkCmdExecutor(30000);
     zcmd.ensureExists(parent, zkClient);
     final byte[] json = Utils.toJSON(leaderProps);
-    final String path = leaderSeqPath.get();
-    if (path == null) {
-      // concurrently cancelled; just bail
-      return;
-    }
     try {
       RetryUtil.retryOnThrowable(NodeExistsException.class, 60000, 5000, new RetryCmd() {
         
         @Override
         public void execute() throws InterruptedException, KeeperException {
+          String path = leaderSeqPath.get();
+          if (path == null) {
+            // concurrently cancelled; just bail
+            return;
+          }
           synchronized (lock) {
-            log.info("Creating leader registration node {} after winning as {}", leaderPath, leaderSeqPath);
+            log.info("Creating leader registration node {} after winning as {}", leaderPath, path);
             List<Op> ops = new ArrayList<>(2);
 
             // We use a multi operation to get the parent nodes version, which will

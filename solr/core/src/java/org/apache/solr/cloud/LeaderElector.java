@@ -138,16 +138,15 @@ public  class LeaderElector {
     if (leaderSeqNodeName.equals(seqs.get(0))) {
       // I am the leader - watch my node in case leadership is somehow revoked
       try {
-        ElectionWatcher watcher = new ElectionWatcher(path, path, getSeq(path), context);
-        if (zkClient.exists(path, watcher, true) == null) {
-          // our node disappeared! try again
-          log.warn("Our node is no longer in line to be leader");
-          retryElection(context, false);
-          return;
-        }
-        log.info("Watching path {} to know if I lose leadership", context.leaderSeqPath);
+        zkClient.getData(path, new ElectionWatcher(path, path, getSeq(path), context), null, true);
+        log.info("Watching path {} to know if I lose leadership", path);
       } catch (KeeperException.SessionExpiredException e) {
         throw e;
+      } catch (KeeperException.NoNodeException e) {
+        // our node disappeared! try again
+        log.warn("Our node is no longer in line to be leader");
+        retryElection(context, false);
+        return;
       } catch (KeeperException e) {
         // we couldn't set our watch for some other reason, retry
         log.warn("Failed setting watch", e);
@@ -175,14 +174,13 @@ public  class LeaderElector {
       }
       try {
         String watchedNode = holdElectionPath + "/" + toWatch;
-        ElectionWatcher watcher = new ElectionWatcher(path, watchedNode, getSeq(path), context);
-        if (zkClient.exists(watchedNode, watcher, true) == null) {
-          // the previous node disappeared, check if we are the leader again
-          checkIfIamLeader(context, true);
-        }
+        zkClient.getData(watchedNode, new ElectionWatcher(path, watchedNode, getSeq(path), context), null, true);
         log.info("Watching path {} to know if I could be the leader", watchedNode);
       } catch (KeeperException.SessionExpiredException e) {
         throw e;
+      } catch (KeeperException.NoNodeException e) {
+        // the previous node disappeared, check if we are the leader again
+        checkIfIamLeader(context, true);
       } catch (KeeperException e) {
         // we couldn't set our watch for some other reason, retry
         log.warn("Failed setting watch", e);

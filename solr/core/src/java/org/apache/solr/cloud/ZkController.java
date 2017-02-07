@@ -1819,7 +1819,7 @@ public class ZkController {
           return;
         }
         if (!path.endsWith(electionNode)) {
-          log.warn("Asked to rejoin with wrong election node : {}, current node is {}", electionNode, overseerElector.getContext().leaderSeqPath);
+          log.warn("Asked to rejoin with wrong election node : {}, current node is {}", electionNode, path);
           //however delete it . This is possible when the last attempt at deleting the election node failed.
           if (electionNode.startsWith(getNodeName())) {
             try {
