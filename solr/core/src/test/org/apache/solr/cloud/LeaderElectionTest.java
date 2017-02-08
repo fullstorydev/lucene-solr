@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -82,14 +83,21 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
     seqToThread = Collections.synchronizedMap(new HashMap<Integer,Thread>());
   }
   
-  class TestLeaderElectionContext extends ShardLeaderElectionContextBase {
-    private long runLeaderDelay = 0;
+  static class TestLeaderElectionContext extends ShardLeaderElectionContextBase {
+    private final ZkStateReader zkStateReader;
+    private final long runLeaderDelay;
 
     public TestLeaderElectionContext(LeaderElector leaderElector,
         String shardId, String collection, String coreNodeName, ZkNodeProps props,
         ZkStateReader zkStateReader, long runLeaderDelay) {
-      super (leaderElector, shardId, collection, coreNodeName, props, zkStateReader);
+      super(leaderElector, shardId, collection, coreNodeName, props, zkStateReader);
+      this.zkStateReader = zkStateReader;
       this.runLeaderDelay = runLeaderDelay;
+    }
+
+    @Override
+    public TestLeaderElectionContext copy() {
+      return new TestLeaderElectionContext(leaderElector, shardId, collection, id, leaderProps, zkStateReader, runLeaderDelay);
     }
 
     @Override
@@ -204,8 +212,8 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
     LeaderElector elector = new LeaderElector(zkClient);
     ZkNodeProps props = new ZkNodeProps(ZkStateReader.BASE_URL_PROP,
         "http://127.0.0.1/solr/", ZkStateReader.CORE_NAME_PROP, "");
-    ElectionContext context = new ShardLeaderElectionContextBase(elector,
-        "shard2", "collection1", "dummynode1", props, zkStateReader);
+    ElectionContext context = new TestLeaderElectionContext(elector,
+        "shard2", "collection1", "dummynode1", props, zkStateReader, 0);
     elector.setup(context);
     elector.joinElection(context, false);
     assertEquals("http://127.0.0.1/solr/",
@@ -215,28 +223,54 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
   @Test
   public void testCancelElection() throws Exception {
     LeaderElector first = new LeaderElector(zkClient);
+    LeaderElector second = new LeaderElector(zkClient);
+    setupTwoCandidates(first, second);
+
+    // cancel first allows second to become leader
+    first.getContext().cancelElection();
+    Thread.sleep(1000);
+    assertEquals("new leader was not registered", "http://127.0.0.1/solr/2/", getLeaderUrl("collection2", "slice1"));
+  }
+
+  @Test
+  public void testLeadershipRevoked() throws Exception {
+    LeaderElector first = new LeaderElector(zkClient);
+    LeaderElector second = new LeaderElector(zkClient);
+    setupTwoCandidates(first, second);
+
+    // delete the leader node
+    ElectionContext ctx = first.getContext();
+    String path = ctx.leaderSeqPath.get();
+    zkClient.delete(path, -1, true);
+    Thread.sleep(1000);
+    assertEquals("new leader was not registered", "http://127.0.0.1/solr/2/", getLeaderUrl("collection2", "slice1"));
+    // also make sure that the leader noticed it was no longer leader and created a new candidate node
+    ElectionContext newCtx = first.getContext();
+    assertNotSame("leader did not see its revocation", ctx, newCtx);
+    String newPath = newCtx.leaderSeqPath.get();
+    assertNotNull("leader did not create new candidate node", newPath);
+    assertFalse("leader did not create new candidate node?", Objects.equals(path, newPath));
+  }
+
+  private void setupTwoCandidates(LeaderElector first, LeaderElector second) throws Exception {
     ZkNodeProps props = new ZkNodeProps(ZkStateReader.BASE_URL_PROP,
         "http://127.0.0.1/solr/", ZkStateReader.CORE_NAME_PROP, "1");
-    ElectionContext firstContext = new ShardLeaderElectionContextBase(first,
-        "slice1", "collection2", "dummynode1", props, zkStateReader);
+    ElectionContext firstContext = new TestLeaderElectionContext(first,
+        "slice1", "collection2", "dummynode1", props, zkStateReader, 0);
     first.setup(firstContext);
     first.joinElection(firstContext, false);
 
     Thread.sleep(1000);
     assertEquals("original leader was not registered", "http://127.0.0.1/solr/1/", getLeaderUrl("collection2", "slice1"));
 
-    LeaderElector second = new LeaderElector(zkClient);
     props = new ZkNodeProps(ZkStateReader.BASE_URL_PROP,
         "http://127.0.0.1/solr/", ZkStateReader.CORE_NAME_PROP, "2");
-    ElectionContext context = new ShardLeaderElectionContextBase(second,
-        "slice1", "collection2", "dummynode2", props, zkStateReader);
+    ElectionContext context = new TestLeaderElectionContext(second,
+        "slice1", "collection2", "dummynode2", props, zkStateReader, 0);
     second.setup(context);
     second.joinElection(context, false);
     Thread.sleep(1000);
     assertEquals("original leader should have stayed leader", "http://127.0.0.1/solr/1/", getLeaderUrl("collection2", "slice1"));
-    firstContext.cancelElection();
-    Thread.sleep(1000);
-    assertEquals("new leader was not registered", "http://127.0.0.1/solr/2/", getLeaderUrl("collection2", "slice1"));
   }
 
   private String getLeaderUrl(final String collection, final String slice)

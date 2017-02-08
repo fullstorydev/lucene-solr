@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -69,8 +70,6 @@ public  class LeaderElector {
 
   private volatile ElectionContext context;
 
-  private ElectionWatcher watcher;
-
   private Map<ContextKey,ElectionContext> electionContexts;
   private ContextKey contextKey;
 
@@ -106,9 +105,15 @@ public  class LeaderElector {
     List<String> seqs = zkClient.getChildren(holdElectionPath, null, true);
     sortSeqs(seqs);
 
-    String leaderSeqNodeName = context.leaderSeqPath.substring(context.leaderSeqPath.lastIndexOf('/') + 1);
+    String path = context.leaderSeqPath.get();
+    if (path == null) {
+      // context was concurrently cancelled; just bail
+      return;
+    }
+    String leaderSeqNodeName = path.substring(path.lastIndexOf('/') + 1);
     if (!seqs.contains(leaderSeqNodeName)) {
       log.warn("Our node is no longer in line to be leader");
+      retryElection(context, false);
       return;
     }
 
@@ -131,7 +136,25 @@ public  class LeaderElector {
     }
 
     if (leaderSeqNodeName.equals(seqs.get(0))) {
-      // I am the leader
+      // I am the leader - watch my node in case leadership is somehow revoked
+      try {
+        zkClient.getData(path, new ElectionWatcher(path, path, getSeq(path), context), null, true);
+        log.info("Watching path {} to know if I lose leadership", path);
+      } catch (KeeperException.SessionExpiredException e) {
+        throw e;
+      } catch (KeeperException.NoNodeException e) {
+        // our node disappeared! try again
+        log.warn("Our node is no longer in line to be leader");
+        retryElection(context, false);
+        return;
+      } catch (KeeperException e) {
+        // we couldn't set our watch for some other reason, retry
+        log.warn("Failed setting watch", e);
+        checkIfIamLeader(context, true);
+        return;
+      }
+
+      // Now we can run the leader process
       try {
         runIamLeaderProcess(context, replacement);
       } catch (KeeperException.NodeExistsException e) {
@@ -139,6 +162,7 @@ public  class LeaderElector {
         retryElection(context, false);
         return;
       }
+
     } else {
       // I am not the leader - watch the node below me
       String toWatch = seqs.get(0);
@@ -150,7 +174,7 @@ public  class LeaderElector {
       }
       try {
         String watchedNode = holdElectionPath + "/" + toWatch;
-        zkClient.getData(watchedNode, watcher = new ElectionWatcher(context.leaderSeqPath, watchedNode, getSeq(context.leaderSeqPath), context), null, true);
+        zkClient.getData(watchedNode, new ElectionWatcher(path, watchedNode, getSeq(path), context), null, true);
         log.info("Watching path {} to know if I could be the leader", watchedNode);
       } catch (KeeperException.SessionExpiredException e) {
         throw e;
@@ -261,7 +285,7 @@ public  class LeaderElector {
         }
 
         log.info("Joined leadership election with path: {}", leaderSeqPath);
-        context.leaderSeqPath = leaderSeqPath;
+        context.leaderSeqPath.set(leaderSeqPath);
         cont = false;
       } catch (ConnectionLossException e) {
         // we don't know if we made our node or not...
@@ -307,24 +331,17 @@ public  class LeaderElector {
     }
     checkIfIamLeader(context, replacement);
 
-    return getSeq(context.leaderSeqPath);
+    return getSeq(leaderSeqPath);
   }
 
   private class ElectionWatcher implements Watcher {
     final String myNode,watchedNode;
     final ElectionContext context;
 
-    private boolean canceled = false;
-
     private ElectionWatcher(String myNode, String watchedNode, int seq, ElectionContext context) {
       this.myNode = myNode;
       this.watchedNode = watchedNode;
       this.context = context;
-    }
-
-    void cancel() {
-      canceled = true;
-
     }
 
     @Override
@@ -333,7 +350,7 @@ public  class LeaderElector {
       if (EventType.None.equals(event.getType())) {
         return;
       }
-      if (canceled) {
+      if (!Objects.equals(context.leaderSeqPath.get(), myNode)) {
         log.info("This watcher is not active anymore {}", myNode);
         try {
           zkClient.delete(myNode, -1, true);
@@ -379,15 +396,12 @@ public  class LeaderElector {
   }
 
   void retryElection(ElectionContext context, boolean joinAtHead) throws KeeperException, InterruptedException, IOException {
-    ElectionWatcher watcher = this.watcher;
     ElectionContext ctx = context.copy();
     if (electionContexts != null) {
       electionContexts.put(contextKey, ctx);
     }
-    if (watcher != null) watcher.cancel();
     this.context.cancelElection();
     this.context = ctx;
     joinElection(ctx, true, joinAtHead);
   }
-
 }
