@@ -51,12 +51,13 @@ public class NodeMutator {
     Set<String> collections = clusterState.getCollections();
     for (String collection : collections) {
 
+      boolean needToUpdateCollection = false;
       Map<String,Slice> slicesCopy = new LinkedHashMap<>(clusterState.getSlicesMap(collection));
 
       Set<Entry<String,Slice>> entries = slicesCopy.entrySet();
       for (Entry<String,Slice> entry : entries) {
         Slice slice = clusterState.getSlice(collection, entry.getKey());
-        Map<String,Replica> newReplicas = new HashMap<String,Replica>();
+        Map<String,Replica> newReplicas = new LinkedHashMap<>();
 
         Collection<Replica> replicas = slice.getReplicas();
         for (Replica replica : replicas) {
@@ -65,6 +66,7 @@ public class NodeMutator {
           if (rNodeName.equals(nodeName)) {
             log.info("Update replica state for " + replica + " to " + Replica.State.DOWN.toString());
             props.put(ZkStateReader.STATE_PROP, Replica.State.DOWN.toString());
+            needToUpdateCollection = true;
           }
 
           Replica newReplica = new Replica(replica.getName(), props);
@@ -76,7 +78,9 @@ public class NodeMutator {
 
       }
 
-      zkWriteCommands.add(new ZkWriteCommand(collection, clusterState.getCollection(collection).copyWithSlices(slicesCopy)));
+      if (needToUpdateCollection) {
+        zkWriteCommands.add(new ZkWriteCommand(collection, clusterState.getCollection(collection).copyWithSlices(slicesCopy)));
+      }
     }
 
     return zkWriteCommands;
