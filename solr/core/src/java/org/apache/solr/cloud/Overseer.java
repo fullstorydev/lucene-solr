@@ -78,7 +78,8 @@ import static org.apache.solr.common.params.CollectionParams.CollectionAction.BA
 public class Overseer implements Closeable {
   public static final String QUEUE_OPERATION = "operation";
 
-  public static final int STATE_UPDATE_DELAY = 1500;  // delay between cloud state updates
+  public static final int STATE_UPDATE_DELAY = 2000;  // delay between cloud state updates
+  public static final int STATE_UPDATE_BATCH_SIZE = 10000;
 
   public static final int NUM_RESPONSES_TO_STORE = 10000;
   

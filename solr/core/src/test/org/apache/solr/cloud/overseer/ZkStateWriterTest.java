@@ -72,7 +72,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
 
       ZkWriteCommand c2 = new ZkWriteCommand("c2",
           new DocCollection("c2", new HashMap<String, Slice>(), new HashMap<String, Object>(), DocRouter.DEFAULT, 0, ZkStateReader.COLLECTIONS_ZKNODE + "/c2"));
-      assertTrue("Different (new) collection create cannot be batched together with another create", writer.maybeFlushBefore(c2));
+      assertFalse("Different (new) collection create can be batched together with another create", writer.maybeFlushBefore(c2));
 
       // simulate three state changes on same collection, all should be batched together before
       assertFalse(writer.maybeFlushBefore(c1));
@@ -83,13 +83,13 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
       assertFalse(writer.maybeFlushAfter(c1));
       assertFalse(writer.maybeFlushAfter(c1));
 
-      // simulate three state changes on two different collections with stateFormat=2, none should be batched
+      // simulate three state changes on two different collections with stateFormat=2, all should be batched
       assertFalse(writer.maybeFlushBefore(c1));
       // flushAfter has to be called as it updates the internal batching related info
       assertFalse(writer.maybeFlushAfter(c1));
-      assertTrue(writer.maybeFlushBefore(c2));
+      assertFalse(writer.maybeFlushBefore(c2));
       assertFalse(writer.maybeFlushAfter(c2));
-      assertTrue(writer.maybeFlushBefore(c1));
+      assertFalse(writer.maybeFlushBefore(c1));
       assertFalse(writer.maybeFlushAfter(c1));
 
       // create a collection in stateFormat = 1 i.e. inside the main cluster state
@@ -98,7 +98,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
       clusterState = writer.enqueueUpdate(clusterState, c3, null);
 
       // simulate three state changes in c3, all should be batched
-      for (int i=0; i<3; i++) {
+      for (int i = 0; i < 3; i++) {
         assertFalse(writer.maybeFlushBefore(c3));
         assertFalse(writer.maybeFlushAfter(c3));
       }
@@ -161,7 +161,7 @@ public class ZkStateWriterTest extends SolrTestCaseJ4 {
     }
   }
 
-  public void testSingleExternalCollection() throws Exception{
+  public void testSingleExternalCollection() throws Exception {
     String zkDir = createTempDir("testSingleExternalCollection").toFile().getAbsolutePath();
 
     ZkTestServer server = new ZkTestServer(zkDir);
