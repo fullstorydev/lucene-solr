@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -106,6 +107,7 @@ public abstract class ElectionContext implements Closeable {
 
 abstract class ShardLeaderElectionContextBase extends ElectionContext {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  protected final ZkStateReader zkStateReader;
   protected final SolrZkClient zkClient;
   protected String shardId;
   protected String collection;
@@ -122,6 +124,7 @@ abstract class ShardLeaderElectionContextBase extends ElectionContext {
         + "/leader_elect/" + shardId, ZkStateReader.getShardLeadersPath(
         collection, shardId), props, zkStateReader.getZkClient());
     this.leaderElector = leaderElector;
+    this.zkStateReader = zkStateReader;
     this.zkClient = zkStateReader.getZkClient();
     this.shardId = shardId;
     this.collection = collection;
@@ -221,17 +224,47 @@ abstract class ShardLeaderElectionContextBase extends ElectionContext {
         throw (OutOfMemoryError) t;
       }
       throw new SolrException(ErrorCode.SERVER_ERROR, "Could not register as the leader because creating the ephemeral registration node in ZooKeeper failed", t);
-    } 
-    
+    }
+
     assert shardId != null;
-    ZkNodeProps m = ZkNodeProps.fromKeyVals(Overseer.QUEUE_OPERATION,
-        OverseerAction.LEADER.toLower(), ZkStateReader.SHARD_ID_PROP, shardId,
-        ZkStateReader.COLLECTION_PROP, collection, ZkStateReader.BASE_URL_PROP,
-        leaderProps.getProperties().get(ZkStateReader.BASE_URL_PROP),
-        ZkStateReader.CORE_NAME_PROP,
-        leaderProps.getProperties().get(ZkStateReader.CORE_NAME_PROP),
-        ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
-    Overseer.getStateUpdateQueue(zkClient).offer(Utils.toJSON(m));
+
+    boolean needToUpdateState = true;
+    if (zkStateReader.getClusterState().getSlice(collection, shardId).getReplicasMap().size() < 2) {
+      Replica leader = zkStateReader.getLeader(collection, shardId);
+      // TODO: We need stronger signal for when it is safe to skip the state update. If all nodes are
+      // running this version of the code, it should be fine. But it is possible that the cluster is
+      // upgrading from "always change state" to this "conditionally change state" logic. In that case,
+      // before shutting down, it would have submitted a change to the overseer that will mark the
+      // shard as inactive. If the overseer is heavily loaded, it is possible for the new version to
+      // start up, see the correct state in ZK, and decide to do nothing. Later, the overseer will
+      // process the queued item and change the state to inactive, which is an incorrect state that
+      // will obviously induce index and query errors. The right answer is probably to add a flag to
+      // the replica state so that we can distinguish this transition case and make the right call.
+
+      // TODO: are these the right things to check?
+      if (Objects.equals(leader.getProperties().get(ZkStateReader.BASE_URL_PROP),
+              leaderProps.getProperties().get(ZkStateReader.BASE_URL_PROP))
+          && Objects.equals(leader.getProperties().get(ZkStateReader.CORE_NAME_PROP),
+            leaderProps.getProperties().get(ZkStateReader.CORE_NAME_PROP))
+          && Objects.equals(leader.getProperties().get(ZkStateReader.NODE_NAME_PROP),
+            leaderProps.getProperties().get(ZkStateReader.NODE_NAME_PROP))
+          && Replica.State.ACTIVE.toString().equalsIgnoreCase(
+              String.valueOf(leader.getProperties().get(ZkStateReader.STATE_PROP)))) {
+        // leader node already matches any state update we'd make, so we can skip the update
+        needToUpdateState = false;
+      }
+    }
+
+    if (needToUpdateState) {
+      ZkNodeProps m = ZkNodeProps.fromKeyVals(Overseer.QUEUE_OPERATION,
+          OverseerAction.LEADER.toLower(), ZkStateReader.SHARD_ID_PROP, shardId,
+          ZkStateReader.COLLECTION_PROP, collection, ZkStateReader.BASE_URL_PROP,
+          leaderProps.getProperties().get(ZkStateReader.BASE_URL_PROP),
+          ZkStateReader.CORE_NAME_PROP,
+          leaderProps.getProperties().get(ZkStateReader.CORE_NAME_PROP),
+          ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
+      Overseer.getStateUpdateQueue(zkClient).offer(Utils.toJSON(m));
+    }
   }
 
   public LeaderElector getLeaderElector() {
@@ -313,10 +346,12 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
       int leaderVoteWait = cc.getZkController().getLeaderVoteWait();
       
       log.info("Running the leader process for shard={} and weAreReplacement={} and leaderVoteWait={}", shardId, weAreReplacement, leaderVoteWait);
-      // clear the leader in clusterstate
-      ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, OverseerAction.LEADER.toLower(),
-          ZkStateReader.SHARD_ID_PROP, shardId, ZkStateReader.COLLECTION_PROP, collection);
-      Overseer.getStateUpdateQueue(zkClient).offer(Utils.toJSON(m));
+      if (zkController.getClusterState().getSlice(collection, shardId).getReplicasMap().size() > 1) {
+        // Clear the leader in clusterstate. We only need to worry about this if there is actually more than one replica.
+        ZkNodeProps m = new ZkNodeProps(Overseer.QUEUE_OPERATION, OverseerAction.LEADER.toLower(),
+            ZkStateReader.SHARD_ID_PROP, shardId, ZkStateReader.COLLECTION_PROP, collection);
+        Overseer.getStateUpdateQueue(zkClient).offer(Utils.toJSON(m));
+      }
 
       boolean allReplicasInLine = false;
       if (!weAreReplacement) {
