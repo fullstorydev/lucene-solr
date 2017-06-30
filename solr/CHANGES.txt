@@ -15,7 +15,7 @@ See http://lucene.apache.org/solr for more information.
 * SOLR-10619: Optimize using cache for DistributedQueue in case of single-consumer (Cao Manh Dat, Scott Blum)
 * SOLR-10524: Better ZkStateWriter batching (Cao Manh Dat, Noble Paul, shalin, Scott Blum)
 * SOLR-10277: On 'downnode', lots of wasteful mutations are done to ZK. (Joshua Humphries, Scott Blum, Varun Thacker, shalin)
-* Leader revocation (Scott Blum, Joshua Humphries) --  NEEDS PUBLIC JIRA
+* SOLR-10276: Update ZK leader election so that leader notices if its leadership is revoked (Joshua Humphries, Scott Blum)
 * SOLR-10420: Solr 6.x leaking one SolrZkClient instance per second (Scott Blum, Cao Manh Dat, Markus Jelsma, Steve Rowe)
 * SOLR-8744: Overseer operations performed with fine grained mutual exclusion (noble, Scott Blum)
 * SOLR-9029: fix rare ZkStateReader visibility race during collection state format update (Scott Blum, hossman)
