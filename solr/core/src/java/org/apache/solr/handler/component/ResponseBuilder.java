@@ -145,6 +145,10 @@ public class ResponseBuilder
     return -1;
   }
 
+  public boolean isDistrib() {
+    return isDistrib;
+  }
+
   public void addRequest(SearchComponent me, ShardRequest sreq) {
     outgoing.add(sreq);
     if ((sreq.purpose & ShardRequest.PURPOSE_PRIVATE) == 0) {
