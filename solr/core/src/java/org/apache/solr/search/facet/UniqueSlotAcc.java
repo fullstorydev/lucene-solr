@@ -50,11 +50,18 @@ abstract class UniqueSlotAcc extends SlotAcc {
   }
 
   @Override
+  public void close() throws IOException {
+    reset();
+  }
+
+  @Override
   public void reset() {
     counts = null;
-    for (FixedBitSet bits : arr) {
+    for (int i = 0; i < arr.length; i++) {
+      FixedBitSet bits = arr[i];
       if (bits == null) continue;
-      bits.clear(0, bits.length());
+      FixedBitSetPool.getPool().put(bits);
+      arr[i] = null;
     }
   }
 
@@ -210,7 +217,7 @@ class UniqueSinglevaluedSlotAcc extends UniqueSlotAcc {
 
     FixedBitSet bits = arr[slotNum];
     if (bits == null) {
-      bits = new FixedBitSet(nTerms);
+      bits = FixedBitSetPool.getPool().get(nTerms);
       arr[slotNum] = bits;
     }
     bits.set(ord);
@@ -264,7 +271,7 @@ class UniqueMultiDvSlotAcc extends UniqueSlotAcc {
 
     FixedBitSet bits = arr[slotNum];
     if (bits == null) {
-      bits = new FixedBitSet(nTerms);
+      bits = FixedBitSetPool.getPool().get(nTerms);
       arr[slotNum] = bits;
     }
 
@@ -307,7 +314,7 @@ class UniqueMultivaluedSlotAcc extends UniqueSlotAcc implements UnInvertedField.
   public void collect(int doc, int slotNum) throws IOException {
     bits = arr[slotNum];
     if (bits == null) {
-      bits = new FixedBitSet(nTerms);
+      bits = FixedBitSetPool.getPool().get(nTerms);
       arr[slotNum] = bits;
     }
     docToTerm.getBigTerms(doc + currentDocBase, this);  // this will call back to our Callback.call(int termNum)
@@ -316,6 +323,7 @@ class UniqueMultivaluedSlotAcc extends UniqueSlotAcc implements UnInvertedField.
 
   @Override
   public void close() throws IOException {
+    super.close();
     if (docToTerm != null) {
       docToTerm.close();
       docToTerm = null;
