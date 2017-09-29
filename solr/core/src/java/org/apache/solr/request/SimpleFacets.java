@@ -493,13 +493,16 @@ public class SimpleFacets {
               
             topLevel.put("processEmpty", true);
 
-            FacetProcessor fproc = FacetProcessor.createProcessor(rb.req, topLevel, // rb.getResults().docSet
-                                                                    docs );
-            //TODO do we handle debug?  Should probably already be handled by the legacy code
-            fproc.process();
+            Object res;
+            try (FacetProcessor fproc = FacetProcessor.createProcessor(rb.req, topLevel, // rb.getResults().docSet
+                                                                    docs )) {
+              //TODO do we handle debug?  Should probably already be handled by the legacy code
+              fproc.process();
 
-            //Go through the response to build the expected output for SimpleFacets
-            Object res = fproc.getResponse();
+              //Go through the response to build the expected output for SimpleFacets
+              res = fproc.getResponse();
+            }
+
             counts = new NamedList<Integer>();
             if(res != null) {
               SimpleOrderedMap<Object> som = (SimpleOrderedMap<Object>)res;

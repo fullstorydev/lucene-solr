@@ -80,26 +80,26 @@ public class FacetModule extends SearchComponent {
       fcontext.flags |= FacetContext.IS_SHARD;
     }
 
-    FacetProcessor fproc = facetState.facetRequest.createFacetProcessor(fcontext);
-    if (rb.isDebug()) {
-      FacetDebugInfo fdebug = new FacetDebugInfo();
-      fcontext.setDebugInfo(fdebug);
-      fdebug.setReqDescription(facetState.facetRequest.getFacetDescription());
-      fdebug.setProcessor(fproc.getClass().getSimpleName());
-     
-      final RTimer timer = new RTimer();
-      fproc.process();
-      long timeElapsed = (long) timer.getTime();
-      fdebug.setElapse(timeElapsed);
-      fdebug.putInfoItem("domainSize", (long)fcontext.base.size());
-      rb.req.getContext().put("FacetDebugInfo", fdebug);
-    } else {
-      fproc.process();
-    }
-    
-    rb.rsp.add("facets", fproc.getResponse());
-  }
+    try(FacetProcessor fproc = facetState.facetRequest.createFacetProcessor(fcontext)) {
+      if (rb.isDebug()) {
+        FacetDebugInfo fdebug = new FacetDebugInfo();
+        fcontext.setDebugInfo(fdebug);
+        fdebug.setReqDescription(facetState.facetRequest.getFacetDescription());
+        fdebug.setProcessor(fproc.getClass().getSimpleName());
 
+        final RTimer timer = new RTimer();
+        fproc.process();
+        long timeElapsed = (long) timer.getTime();
+        fdebug.setElapse(timeElapsed);
+        fdebug.putInfoItem("domainSize", (long)fcontext.base.size());
+        rb.req.getContext().put("FacetDebugInfo", fdebug);
+      } else {
+        fproc.process();
+      }
+
+      rb.rsp.add("facets", fproc.getResponse());
+    }
+  }
 
   @Override
   public void prepare(ResponseBuilder rb) throws IOException {

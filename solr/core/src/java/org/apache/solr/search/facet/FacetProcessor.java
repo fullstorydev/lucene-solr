@@ -45,7 +45,7 @@ import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.RTimer;
 
-public class FacetProcessor<FacetRequestT extends FacetRequest>  {
+public class FacetProcessor<FacetRequestT extends FacetRequest> implements AutoCloseable {
   protected SimpleOrderedMap<Object> response;
   protected FacetContext fcontext;
   protected FacetRequestT freq;
@@ -62,7 +62,7 @@ public class FacetProcessor<FacetRequestT extends FacetRequest>  {
   public void process() throws IOException {
     handleDomainChanges();
   }
-  
+
   /** factory method for invoking json facet framework as whole */
   public static FacetProcessor<?> createProcessor(SolrQueryRequest req, 
       Map<String, Object> params, DocSet docs){
@@ -214,6 +214,20 @@ public class FacetProcessor<FacetRequestT extends FacetRequest>  {
     }
   }
 
+  @Override
+  public void close() throws IOException {
+    if (countAcc != null) {
+      countAcc.close();
+    }
+    if (accs != null) {
+      for (SlotAcc acc : accs) {
+        if (acc != null) {
+          acc.close();
+        }
+      }
+    }
+  }
+
   protected void processStats(SimpleOrderedMap<Object> bucket, DocSet docs, int docCount) throws IOException {
     if (docCount == 0 && !freq.processEmpty || freq.getFacetStats().size() == 0) {
       bucket.add("count", docCount);
@@ -240,26 +254,27 @@ public class FacetProcessor<FacetRequestT extends FacetRequest>  {
     for (Map.Entry<String,FacetRequest> sub : freq.getSubFacets().entrySet()) {
       // make a new context for each sub-facet since they can change the domain
       FacetContext subContext = fcontext.sub(filter, domain);
-      FacetProcessor subProcessor = sub.getValue().createFacetProcessor(subContext);
-      if (fcontext.getDebugInfo() != null) {   // if fcontext.debugInfo != null, it means rb.debug() == true
-        FacetDebugInfo fdebug = new FacetDebugInfo();
-        subContext.setDebugInfo(fdebug);
-        fcontext.getDebugInfo().addChild(fdebug);
-        
-        fdebug.setReqDescription(sub.getValue().getFacetDescription());
-        fdebug.setProcessor(subProcessor.getClass().getSimpleName());
-        if (subContext.filter != null) fdebug.setFilter(subContext.filter.toString());
-      
-        final RTimer timer = new RTimer();
-        subProcessor.process();
-        long timeElapsed = (long) timer.getTime();
-        fdebug.setElapse(timeElapsed);
-        fdebug.putInfoItem("domainSize", (long)subContext.base.size());
-      } else {
-        subProcessor.process();
-      }
+      try (FacetProcessor subProcessor = sub.getValue().createFacetProcessor(subContext)) {
+        if (fcontext.getDebugInfo() != null) {   // if fcontext.debugInfo != null, it means rb.debug() == true
+          FacetDebugInfo fdebug = new FacetDebugInfo();
+          subContext.setDebugInfo(fdebug);
+          fcontext.getDebugInfo().addChild(fdebug);
 
-      response.add( sub.getKey(), subProcessor.getResponse() );
+          fdebug.setReqDescription(sub.getValue().getFacetDescription());
+          fdebug.setProcessor(subProcessor.getClass().getSimpleName());
+          if (subContext.filter != null) fdebug.setFilter(subContext.filter.toString());
+
+          final RTimer timer = new RTimer();
+          subProcessor.process();
+          long timeElapsed = (long) timer.getTime();
+          fdebug.setElapse(timeElapsed);
+          fdebug.putInfoItem("domainSize", (long)subContext.base.size());
+        } else {
+          subProcessor.process();
+        }
+
+        response.add( sub.getKey(), subProcessor.getResponse() );
+      }
     }
   }
 

@@ -200,6 +200,27 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     return response;
   }
 
+  @Override
+  public void close() throws IOException {
+    super.close();
+    if (indexOrderAcc != null) {
+      indexOrderAcc.close();
+    }
+    if (collectAcc != null) {
+      collectAcc.close();
+    }
+    if (sortAcc != null) {
+      sortAcc.close();
+    }
+    if (otherAccs != null) {
+      for (SlotAcc acc : otherAccs) {
+        if (acc != null) {
+          acc.close();
+        }
+      }
+    }
+  }
+
   // This is used to create accs for second phase (or to create accs for all aggs)
   @Override
   protected void createAccs(int docCount, int slotCount) throws IOException {
@@ -782,6 +803,7 @@ class FacetFieldProcessorStream extends FacetFieldProcessor implements Closeable
       closed = true;
       // fcontext.base.decref();  // OFF-HEAP
     }
+    super.close();
   }
 
 
