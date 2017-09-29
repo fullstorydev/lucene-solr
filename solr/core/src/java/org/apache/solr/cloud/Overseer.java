@@ -80,6 +80,7 @@ public class Overseer implements Closeable {
 
   public static final int STATE_UPDATE_DELAY = 2000;  // delay between cloud state updates
   public static final int STATE_UPDATE_BATCH_SIZE = 10000;
+  public static final int STATE_UPDATE_MAX_QUEUE = 20000;
 
   public static final int NUM_RESPONSES_TO_STORE = 10000;
   
@@ -932,7 +933,7 @@ public class Overseer implements Closeable {
    */
   static DistributedQueue getStateUpdateQueue(final SolrZkClient zkClient, Stats zkStats) {
     createOverseerNode(zkClient);
-    return new DistributedQueue(zkClient, "/overseer/queue", zkStats);
+    return new DistributedQueue(zkClient, "/overseer/queue", zkStats, STATE_UPDATE_MAX_QUEUE);
   }
 
   /**

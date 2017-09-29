@@ -39,6 +39,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +70,8 @@ public class DistributedQueue {
 
   final Overseer.Stats stats;
 
+  final int maxQueueSize;
+
   /**
    * A lock that guards all of the mutable state that follows.
    */
@@ -97,6 +100,10 @@ public class DistributedQueue {
   }
 
   public DistributedQueue(SolrZkClient zookeeper, String dir, Overseer.Stats stats) {
+    this(zookeeper, dir, stats, 0);
+  }
+
+  public DistributedQueue(SolrZkClient zookeeper, String dir, Overseer.Stats stats, int maxQueueSize) {
     this.dir = dir;
 
     ZkCmdExecutor cmdExecutor = new ZkCmdExecutor(zookeeper.getZkClientTimeout());
@@ -111,6 +118,7 @@ public class DistributedQueue {
 
     this.zookeeper = zookeeper;
     this.stats = stats;
+    this.maxQueueSize = maxQueueSize;
   }
 
   /**
@@ -236,6 +244,18 @@ public class DistributedQueue {
     try {
       while (true) {
         try {
+          if (maxQueueSize > 0) {
+            // If a max queue size is set, check it before creating a new queue item.
+            Stat stat = zookeeper.exists(dir, null, true);
+            if (stat == null) {
+              // jump to the code below, which tries to create dir if it doesn't exist
+              throw new KeeperException.NoNodeException();
+            }
+            if (stat.getNumChildren() >= maxQueueSize) {
+              throw new IllegalStateException("queue is full");
+            }
+          }
+
           // Explicitly set isDirty here so that synchronous same-thread calls behave as expected.
           // This will get set again when the watcher actually fires, but that's ok.
           zookeeper.create(dir + "/" + PREFIX, data, CreateMode.PERSISTENT_SEQUENTIAL, true);
