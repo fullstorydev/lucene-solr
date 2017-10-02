@@ -38,6 +38,8 @@ import org.apache.solr.handler.component.ShardRequest;
 import org.apache.solr.handler.component.ShardResponse;
 import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.Stat;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
@@ -72,6 +74,7 @@ import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.getCurrentArguments;
+import static org.easymock.EasyMock.isNull;
 import static org.easymock.EasyMock.replay;
 import static org.easymock.EasyMock.reset;
 import static org.easymock.EasyMock.verify;
@@ -355,7 +358,20 @@ public class OverseerCollectionConfigSetProcessorTest extends SolrTestCaseJ4 {
         return zkMap.containsKey(key);
       }
     }).anyTimes();
-    
+
+    solrZkClientMock.exists(anyObject(String.class),isNull(Watcher.class),anyBoolean());
+    expectLastCall().andAnswer(new IAnswer<Stat>() {
+      @Override
+      public Stat answer() throws Throwable {
+        String key = (String) getCurrentArguments()[0];
+        if (zkMap.containsKey(key)) {
+          return new Stat();
+        } else {
+          return null;
+        }
+      }
+    }).anyTimes();
+
     zkMap.put("/configs/myconfig", null);
     
     return liveNodes;
