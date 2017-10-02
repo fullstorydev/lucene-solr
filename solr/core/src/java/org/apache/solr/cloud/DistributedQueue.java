@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -70,8 +71,6 @@ public class DistributedQueue {
 
   final Overseer.Stats stats;
 
-  final int maxQueueSize;
-
   /**
    * A lock that guards all of the mutable state that follows.
    */
@@ -94,6 +93,11 @@ public class DistributedQueue {
   private boolean isDirty = true;
 
   private int watcherCount = 0;
+
+  private final int maxQueueSize;
+
+  /** If {@link #maxQueueSize} is set, the number of items we can queue without rechecking the server. */
+  private final AtomicInteger offerPermits = new AtomicInteger(0);
 
   public DistributedQueue(SolrZkClient zookeeper, String dir) {
     this(zookeeper, dir, new Overseer.Stats());
@@ -245,14 +249,20 @@ public class DistributedQueue {
       while (true) {
         try {
           if (maxQueueSize > 0) {
-            // If a max queue size is set, check it before creating a new queue item.
-            Stat stat = zookeeper.exists(dir, null, true);
-            if (stat == null) {
-              // jump to the code below, which tries to create dir if it doesn't exist
-              throw new KeeperException.NoNodeException();
-            }
-            if (stat.getNumChildren() >= maxQueueSize) {
-              throw new IllegalStateException("queue is full");
+            if (offerPermits.get() <= 0 || offerPermits.getAndDecrement() <= 0) {
+              // If a max queue size is set, check it before creating a new queue item.
+              Stat stat = zookeeper.exists(dir, null, true);
+              if (stat == null) {
+                // jump to the code below, which tries to create dir if it doesn't exist
+                throw new KeeperException.NoNodeException();
+              }
+              int remainingCapacity = maxQueueSize - stat.getNumChildren();
+              if (remainingCapacity <= 0) {
+                throw new IllegalStateException("queue is full");
+              }
+
+              // Allow this client to push up to 1% of the remaining queue capacity without rechecking.
+              offerPermits.set(maxQueueSize - stat.getNumChildren() / 100);
             }
           }
 
