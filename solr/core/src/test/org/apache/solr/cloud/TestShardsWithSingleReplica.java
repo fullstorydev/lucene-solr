@@ -39,7 +39,7 @@ public class TestShardsWithSingleReplica extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    // Horrible copy-patsa.
+    // Horrible copy-pasta.
     System.setProperty("solr.test.sys.prop1", "propone");
     System.setProperty("solr.test.sys.prop2", "proptwo");
 
