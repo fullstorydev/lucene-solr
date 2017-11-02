@@ -264,7 +264,7 @@ public class DistributedQueue {
               }
 
               // Allow this client to push up to 1% of the remaining queue capacity without rechecking.
-              offerPermits.set(maxQueueSize - stat.getNumChildren() / 100);
+              offerPermits.set(remainingCapacity / 100);
             }
           }
 
