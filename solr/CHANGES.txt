@@ -16,6 +16,18 @@ In this release, there is an example Solr server including a bundled
 servlet container in the directory named "example".
 See the Quick Start guide at http://lucene.apache.org/solr/quickstart.html
 
+================= FullStory ================
+
+* SOLR-10276: Update ZK leader election so that leader notices if its leadership is revoked (Joshua Humphries, Scott Blum)
+* SOLR-10285: Skip LEADER messages when there are leader only shards (Cao Manh Dat, Joshua Humphries)
+* SOLR-11423: Overseer queue needs a hard cap (maximum size) that clients respect (Scott Blum, Joshua Humphries)
+* SOLR-11025: fix OverseerTest.testShardLeaderChange() failures (Scott Blum, shalin, Steve Rowe)
+* expose things from DebugComponent and ResponseBuilder to enable stats component as a plugin (Joshua Humphries)
+* fs.ignoreconflicts (Scott Blum)
+* Remove pathological error reporting. Don't serialize the entire clusterstate to log.
+* special OOMKILLER handling for spaces. (Scott Blum)
+* Reduced the minimum length required for trailing wildcards on the surround query parser. (Bruce Johnson)
+
 ==================  6.6.2 ==================
 
 Consult the LUCENE_CHANGES.txt file for additional, low level, changes in this release.
