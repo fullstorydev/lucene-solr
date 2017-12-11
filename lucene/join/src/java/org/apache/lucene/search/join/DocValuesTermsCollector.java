@@ -33,10 +33,10 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.util.LegacyNumericUtils;
 
-abstract class DocValuesTermsCollector<DV> extends SimpleCollector {
+public abstract class DocValuesTermsCollector<DV> extends SimpleCollector {
   
   @FunctionalInterface
-  static interface Function<R> {
+  public static interface Function<R> {
       R apply(LeafReader t) throws IOException  ;
   }
   
@@ -55,7 +55,7 @@ abstract class DocValuesTermsCollector<DV> extends SimpleCollector {
   static Function<BinaryDocValues> binaryDocValues(String field) {
       return (ctx) -> DocValues.getBinary(ctx, field);
   }
-  static Function<SortedSetDocValues> sortedSetDocValues(String field) {
+  public static Function<SortedSetDocValues> sortedSetDocValues(String field) {
     return (ctx) -> DocValues.getSortedSet(ctx, field);
   }
   
@@ -91,7 +91,7 @@ abstract class DocValuesTermsCollector<DV> extends SimpleCollector {
   }
   
   /** this adapter is quite weird. ords are per doc index, don't use ords across different docs*/
-  static Function<SortedSetDocValues> sortedNumericAsSortedSetDocValues(String field, FieldType.LegacyNumericType numTyp) {
+  public static Function<SortedSetDocValues> sortedNumericAsSortedSetDocValues(String field, FieldType.LegacyNumericType numTyp) {
     return (ctx) -> {
       final SortedNumericDocValues numerics = DocValues.getSortedNumeric(ctx, field);
       final BytesRefBuilder bytes = new BytesRefBuilder();
