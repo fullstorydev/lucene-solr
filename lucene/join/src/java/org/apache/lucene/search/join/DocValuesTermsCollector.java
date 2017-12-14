@@ -77,7 +77,7 @@ public abstract class DocValuesTermsCollector<DV> extends SimpleCollector {
     };
   }
   
-  static LongConsumer coder(BytesRefBuilder bytes, LegacyNumericType type, String fieldName){
+  public static LongConsumer coder(BytesRefBuilder bytes, LegacyNumericType type, String fieldName){
     switch(type){
       case INT: 
         return (l) -> LegacyNumericUtils.intToPrefixCoded((int) l, 0, bytes);
