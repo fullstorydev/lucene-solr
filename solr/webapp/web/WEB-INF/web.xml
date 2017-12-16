@@ -80,6 +80,11 @@
     <servlet-class>org.apache.solr.servlet.LoadAdminUiServlet</servlet-class>
   </servlet>
   
+  <servlet>
+    <servlet-name>Statz</servlet-name>
+    <servlet-class>org.apache.solr.servlet.StatzServlet</servlet-class>
+  </servlet>
+
   <!-- Remove in Solr 5.0 -->
   <!-- This sends SC_MOVED_PERMANENTLY (301) for resources that changed in 4.0 -->
   <servlet>
@@ -117,6 +122,11 @@
       <param-value>org.apache.solr.rest.SolrSchemaRestApi</param-value>
     </init-param>
   </servlet>
+
+  <servlet-mapping>
+    <servlet-name>Statz</servlet-name>
+    <url-pattern>/admin/statz</url-pattern>
+  </servlet-mapping>
 
   <servlet-mapping>
     <servlet-name>RedirectOldAdminUI</servlet-name>
