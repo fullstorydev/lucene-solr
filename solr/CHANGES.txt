@@ -18,6 +18,7 @@ See the Quick Start guide at http://lucene.apache.org/solr/quickstart.html
 
 ================= FullStory ================
 
+* Serve VM level stats on an easy http handler (Scott Blum)
 * Expose DocValuesTermsCollector (Jaime Yap)
 * SOLR-10276: Update ZK leader election so that leader notices if its leadership is revoked (Joshua Humphries, Scott Blum)
 * SOLR-10285: Skip LEADER messages when there are leader only shards (Cao Manh Dat, Joshua Humphries)
