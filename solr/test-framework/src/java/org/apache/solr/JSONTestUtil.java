@@ -130,6 +130,42 @@ public class JSONTestUtil {
     }
     return null;
   }
+
+  /**
+   * Same as {@link #match} except will seek both the input and expected prior to doing the matching.
+   * Instead of just seeking the input Object.
+   */
+  public static String matchSeekBoth(String path, String input, String expected, double delta) throws Exception {
+    Object inputObj = failRepeatedKeys ? new NoDupsObjectBuilder(new JSONParser(input)).getVal() : ObjectBuilder.fromJSON(input);
+    Object expectObj = failRepeatedKeys ? new NoDupsObjectBuilder(new JSONParser(expected)).getVal() : ObjectBuilder.fromJSON(expected);
+    return matchObjSeekBoth(path, inputObj, expectObj, delta);
+  }
+
+  /**
+   * Same as {@link #matchObj} except will seek both the input and expected Objects prior to doing the matching.
+   * Instead of just seeking the input Object.
+   */
+  public static String matchObjSeekBoth(String path, Object input, Object expected, double delta) {
+    // Seek 1
+    CollectionTester inputTester = new CollectionTester(input,delta);
+    boolean reversed = path.startsWith("!");
+    String positivePath = reversed ? path.substring(1) : path;
+    if (!inputTester.seek(positivePath) ^ reversed) {
+      return "Path not found: " + path;
+    }
+
+    // Seek 2
+    CollectionTester outputTester = new CollectionTester(expected,delta);
+    if (!outputTester.seek(positivePath) ^ reversed) {
+      return "Path not found: " + path;
+    }
+
+    // Do match.
+    if (expected != null && (!inputTester.match(outputTester.val) ^ reversed)) {
+      return inputTester.err + " @ " + inputTester.getPath();
+    }
+    return null;
+  }
 }
 
 
