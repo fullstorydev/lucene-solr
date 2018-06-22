@@ -488,7 +488,9 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
    */
   protected void indexDoc(SolrInputDocument doc) throws IOException, SolrServerException {
     controlClient.add(doc);
-
+    if (shardCount == 0) {//mostly for temp debugging
+      return;
+    }
     int which = (doc.getField(id).toString().hashCode() & 0x7fffffff) % clients.size();
     SolrClient client = clients.get(which);
     client.add(doc);
@@ -605,6 +607,10 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
     params.set("distrib", "false");
     final QueryResponse controlRsp = controlClient.query(params);
     validateControlData(controlRsp);
+
+    if (shardCount == 0) {//mostly for temp debugging
+      return controlRsp;
+    }
 
     params.remove("distrib");
     if (setDistribParams) setDistributedParams(params);
@@ -877,6 +883,15 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
     if (a instanceof List && b instanceof List) {
       return compare(((List) a).toArray(), ((List) b).toArray(), flags, handle);
 
+    }
+
+    // equivalent integer numbers
+    if ((a instanceof Integer || a instanceof Long) && (b instanceof Integer || b instanceof Long)) {
+      if (((Number)a).longValue() == ((Number)b).longValue()) {
+        return null;
+      } else {
+        return ":" + a + "!=" + b;
+      }
     }
 
     if ((flags & FUZZY) != 0) {
