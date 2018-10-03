@@ -80,10 +80,16 @@
     <servlet-class>org.apache.solr.servlet.LoadAdminUiServlet</servlet-class>
   </servlet>
   
+  <!-- Fullstory additions -->
   <servlet>
     <servlet-name>Statz</servlet-name>
     <servlet-class>org.apache.solr.servlet.StatzServlet</servlet-class>
   </servlet>
+  <servlet>
+    <servlet-name>QuitQuitQuit</servlet-name>
+    <servlet-class>org.apache.solr.servlet.QuitQuitQuitServlet</servlet-class>
+  </servlet>
+  <!-- Fullstory additions -->
 
   <!-- Remove in Solr 5.0 -->
   <!-- This sends SC_MOVED_PERMANENTLY (301) for resources that changed in 4.0 -->
@@ -123,10 +129,16 @@
     </init-param>
   </servlet>
 
+  <!-- Fullstory additions -->
   <servlet-mapping>
     <servlet-name>Statz</servlet-name>
     <url-pattern>/admin/statz</url-pattern>
   </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>QuitQuitQuit</servlet-name>
+    <url-pattern>/quitquitquit</url-pattern>
+  </servlet-mapping>
+  <!-- Fullstory additions -->
 
   <servlet-mapping>
     <servlet-name>RedirectOldAdminUI</servlet-name>
