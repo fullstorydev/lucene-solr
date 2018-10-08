@@ -79,10 +79,15 @@
     <servlet-name>LoadAdminUI</servlet-name>
     <servlet-class>org.apache.solr.servlet.LoadAdminUiServlet</servlet-class>
   </servlet>
-  
+
   <servlet>
     <servlet-name>Statz</servlet-name>
     <servlet-class>org.apache.solr.servlet.StatzServlet</servlet-class>
+  </servlet>
+
+  <servlet>
+    <servlet-name>PrometheusStatz</servlet-name>
+    <servlet-class>org.apache.solr.servlet.PrometheusStatzServlet</servlet-class>
   </servlet>
 
   <!-- Remove in Solr 5.0 -->
@@ -126,6 +131,11 @@
   <servlet-mapping>
     <servlet-name>Statz</servlet-name>
     <url-pattern>/admin/statz</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>PrometheusStatz</servlet-name>
+    <url-pattern>/admin/prometheusMetrics</url-pattern>
   </servlet-mapping>
 
   <servlet-mapping>
