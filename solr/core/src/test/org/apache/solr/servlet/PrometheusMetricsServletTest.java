@@ -17,9 +17,9 @@
  package org.apache.solr.servlet;
  import java.io.PrintWriter;
  import org.junit.Test;
- public class PrometheusStatzServletTest {
+ public class PrometheusMetricsServletTest {
   @Test
-  public void testWriteStatz() throws Exception {
-    PrometheusStatzServlet.writeStats(new PrintWriter(System.out));
+  public void testWriteMetrics() throws Exception {
+    PrometheusMetricsServlet.writeStats(new PrintWriter(System.out));
   }
 }

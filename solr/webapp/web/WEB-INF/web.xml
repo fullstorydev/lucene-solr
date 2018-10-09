@@ -86,8 +86,8 @@
   </servlet>
 
   <servlet>
-    <servlet-name>PrometheusStatz</servlet-name>
-    <servlet-class>org.apache.solr.servlet.PrometheusStatzServlet</servlet-class>
+    <servlet-name>PrometheusMetrics</servlet-name>
+    <servlet-class>org.apache.solr.servlet.PrometheusMetricsServlet</servlet-class>
   </servlet>
 
   <!-- Remove in Solr 5.0 -->
@@ -134,8 +134,8 @@
   </servlet-mapping>
 
   <servlet-mapping>
-    <servlet-name>PrometheusStatz</servlet-name>
-    <url-pattern>/admin/prometheusMetrics</url-pattern>
+    <servlet-name>PrometheusMetrics</servlet-name>
+    <url-pattern>/metrics<url-pattern>
   </servlet-mapping>
 
   <servlet-mapping>

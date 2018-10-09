@@ -36,7 +36,7 @@ import org.apache.commons.io.output.CloseShieldOutputStream;
  /**
  * FullStory: a simple servlet to produce a few stats formatted for Prometheus.
  */
-public final class PrometheusStatzServlet extends BaseSolrServlet {
+public final class PrometheusMetricsServlet extends BaseSolrServlet {
    public static void writePromDoc(PrintWriter writer, String name, String purpose, String type) {
      writer.printf("# HELP %s %s", name, purpose);
      writer.println();
@@ -57,30 +57,30 @@ public final class PrometheusStatzServlet extends BaseSolrServlet {
     }
   }
    static void writeStats(PrintWriter pw) {
-    Statz statz = new Statz();
+    Metrics statz = new Metrics();
     statz.write(pw);
     pw.flush();
   }
-   static class Statz {
-    Map<String, GcStatz> gc;
-    HeapStatz heap;
-    HeapStatz nonHeap;
-    OsStatz os;
-     Statz() {
+   static class Metrics {
+    Map<String, GcMetrics> gc;
+    HeapMetrics heap;
+    HeapMetrics nonHeap;
+    OsMetrics os;
+     Metrics() {
       this.gc = new LinkedHashMap<>();
       for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
-        this.gc.put(gcBean.getName(), new GcStatz(gcBean, gcBean.getName()));
+        this.gc.put(gcBean.getName(), new GcMetrics(gcBean, gcBean.getName()));
       }
       MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
-      this.heap = new HeapStatz(memoryBean.getHeapMemoryUsage(), "heap");
-      this.nonHeap = new HeapStatz(memoryBean.getNonHeapMemoryUsage(), "non_heap");
-      this.os = new OsStatz();
+      this.heap = new HeapMetrics(memoryBean.getHeapMemoryUsage(), "heap");
+      this.nonHeap = new HeapMetrics(memoryBean.getNonHeapMemoryUsage(), "non_heap");
+      this.os = new OsMetrics();
     }
     
     public void write(PrintWriter writer) {
-       for (Map.Entry<String, GcStatz> entry : this.gc.entrySet()) {
+       for (Map.Entry<String, GcMetrics> entry : this.gc.entrySet()) {
          String key = entry.getKey();
-         GcStatz value = entry.getValue();
+         GcMetrics value = entry.getValue();
 
          value.write(writer);
        }
@@ -92,11 +92,11 @@ public final class PrometheusStatzServlet extends BaseSolrServlet {
 
 
   }
-   static class GcStatz {
+   static class GcMetrics {
     long collectionCount;
     long collectionTime;
     String description;
-     GcStatz(GarbageCollectorMXBean gcBean, String desc) {
+     GcMetrics(GarbageCollectorMXBean gcBean, String desc) {
       this.collectionCount = gcBean.getCollectionCount();
       this.collectionTime = gcBean.getCollectionTime();
       this.description = desc;
@@ -113,11 +113,11 @@ public final class PrometheusStatzServlet extends BaseSolrServlet {
        writer.println();
     }
   }
-   static class HeapStatz {
+   static class HeapMetrics {
     long committed;
     long used;
     String description;
-     HeapStatz(MemoryUsage memoryUsage, String desc) {
+     HeapMetrics(MemoryUsage memoryUsage, String desc) {
       this.committed = memoryUsage.getCommitted();
       this.used = memoryUsage.getUsed();
       this.description = desc;
@@ -134,9 +134,9 @@ public final class PrometheusStatzServlet extends BaseSolrServlet {
        writer.println();
     }
   }
-   static class OsStatz {
+   static class OsMetrics {
     long openFileDescriptorCount;
-     OsStatz() {
+     OsMetrics() {
       UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
       this.openFileDescriptorCount = osBean.getOpenFileDescriptorCount();
     }
