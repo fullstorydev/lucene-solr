@@ -62,89 +62,77 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     pw.flush();
   }
    static class Metrics {
-    Map<String, GcMetrics> gc;
-    HeapMetrics heap;
-    HeapMetrics nonHeap;
-    OsMetrics os;
-     Metrics() {
+    Map<String, GarbageCollectorMXBean> gc;
+    MemoryUsage heap;
+    MemoryUsage nonHeap;
+    UnixOperatingSystemMXBean osBean;
+
+    Metrics() {
       this.gc = new LinkedHashMap<>();
       for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
-        this.gc.put(gcBean.getName(), new GcMetrics(gcBean, gcBean.getName()));
+        this.gc.put(gcBean.getName(), gcBean);
       }
+
       MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
-      this.heap = new HeapMetrics(memoryBean.getHeapMemoryUsage(), "heap");
-      this.nonHeap = new HeapMetrics(memoryBean.getNonHeapMemoryUsage(), "non_heap");
-      this.os = new OsMetrics();
+      this.heap = memoryBean.getHeapMemoryUsage();
+      this.nonHeap = memoryBean.getNonHeapMemoryUsage();
+      this.osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     }
     
     public void write(PrintWriter writer) {
-       for (Map.Entry<String, GcMetrics> entry : this.gc.entrySet()) {
-         String key = entry.getKey();
-         GcMetrics value = entry.getValue();
-
-         value.write(writer);
-       }
-
-       this.heap.write(writer);
-       this.nonHeap.write(writer);
-       this.os.write(writer);
-    }
-
-
-  }
-   static class GcMetrics {
-    long collectionCount;
-    long collectionTime;
-    String description;
-     GcMetrics(GarbageCollectorMXBean gcBean, String desc) {
-      this.collectionCount = gcBean.getCollectionCount();
-      this.collectionTime = gcBean.getCollectionTime();
-      this.description = desc;
-    }
-    public void write(PrintWriter writer) {
-      String name = this.description.replaceAll(" ", "");
-      String cname = "collection_count_" + name;
-      String ctime = "collection_time_" + name;
-      writePromDoc(writer, cname, "", "count");
-       writer.printf("%s %d", cname, this.collectionCount);
-       writer.println();
-      writePromDoc(writer, ctime, "", "timer");
-       writer.printf("%s %d", ctime, this.collectionTime);
-       writer.println();
-    }
-  }
-   static class HeapMetrics {
-    long committed;
-    long used;
-    String description;
-     HeapMetrics(MemoryUsage memoryUsage, String desc) {
-      this.committed = memoryUsage.getCommitted();
-      this.used = memoryUsage.getUsed();
-      this.description = desc;
-    }
-    public void write(PrintWriter writer) {
-      String cmem_name = "committed_memory_" + this.description + "_count";
-      String umem_name = "used_memory_" + this.description + "_count";
-
-      writePromDoc(writer, cmem_name, "", "count" );
-           writer.printf("%s %d", cmem_name, this.committed);
-       writer.println();
-      writePromDoc(writer, umem_name, "", "count" );
-       writer.printf("%s %d", umem_name, this.used);
-       writer.println();
-    }
-  }
-   static class OsMetrics {
-    long openFileDescriptorCount;
-     OsMetrics() {
-      UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-      this.openFileDescriptorCount = osBean.getOpenFileDescriptorCount();
-    }
-    public void write(PrintWriter writer) {
-       writePromDoc(writer, "open file descriptors", "", "count");
-      writer.printf("open_file_descriptor_count %d", this.openFileDescriptorCount);
+      // G1 Young Generation
+      GarbageCollectorMXBean youngGcBean = this.gc.get("G1 Young Generation");
+      String cname = "collection_count_young_generation";
+      String ctime = "collection_time_young_generation";
+      writePromDoc(writer, cname, "", "gauge");
+      writer.printf("%s %d", cname, youngGcBean.getCollectionCount());
       writer.println();
+      writePromDoc(writer, ctime, "", "timer");
+      writer.printf("%s %d", ctime, youngGcBean.getCollectionTime());
+      writer.println();
+
+      // G1 Old Generation
+      GarbageCollectorMXBean oldGcBean = this.gc.get("G1 Young Generation");
+      cname = "collection_count_old_generation";
+      ctime = "collection_time_old_generation";
+      writePromDoc(writer, cname, "", "gauge");
+      writer.printf("%s %d", cname, oldGcBean.getCollectionCount());
+      writer.println();
+      writePromDoc(writer, ctime, "", "timer");
+      writer.printf("%s %d", ctime, oldGcBean.getCollectionTime());
+      writer.println();
+
+      // Write heap memory stats
+      String cmem_name = "committed_memory_heap";
+      String umem_name = "used_memory_heap";
+
+      writePromDoc(writer, cmem_name, "", "gauge");
+      writer.printf("%s %d", cmem_name, this.heap.getCommitted());
+      writer.println();
+      writePromDoc(writer, umem_name, "", "gauge");
+
+      writer.printf("%s %d", umem_name, this.heap.getUsed());
+      writer.println();
+
+      // Write non_heap memory stats
+      cmem_name = "committed_memory_non_heap";
+      umem_name = "used_memory_non_heap";
+
+      writePromDoc(writer, cmem_name, "", "gauge");
+      writer.printf("%s %d", cmem_name, this.nonHeap.getCommitted());
+      writer.println();
+      writePromDoc(writer, umem_name, "", "gauge");
+
+      writer.printf("%s %d", umem_name, this.nonHeap.getUsed());
+      writer.println();
+
+       // Write OS stats
+       long openFiles = osBean.getOpenFileDescriptorCount();
+       writePromDoc(writer, "open file descriptors", "", "gauge");
+       writer.printf("open_file_descriptors %d", openFiles);
+       writer.println();
     }
+
 
   }
 }
