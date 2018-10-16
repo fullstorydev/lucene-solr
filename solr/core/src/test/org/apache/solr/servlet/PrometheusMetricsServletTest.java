@@ -20,9 +20,9 @@ import java.io.PrintWriter;
 
 import org.junit.Test;
 
-public class StatzServletTest {
+public class PrometheusMetricsServletTest {
   @Test
-  public void testWriteStatz() throws Exception {
-    StatzServlet.writeStats(new PrintWriter(System.out));
+  public void testWriteMetrics() throws Exception {
+    PrometheusMetricsServlet.writeStats(new PrintWriter(System.out));
   }
 }

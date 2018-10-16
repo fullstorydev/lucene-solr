@@ -79,11 +79,15 @@
     <servlet-name>LoadAdminUI</servlet-name>
     <servlet-class>org.apache.solr.servlet.LoadAdminUiServlet</servlet-class>
   </servlet>
-  
+
   <!-- Fullstory additions -->
   <servlet>
     <servlet-name>Statz</servlet-name>
     <servlet-class>org.apache.solr.servlet.StatzServlet</servlet-class>
+  </servlet>
+  <servlet>
+    <servlet-name>PrometheusMetrics</servlet-name>
+    <servlet-class>org.apache.solr.servlet.PrometheusMetricsServlet</servlet-class>
   </servlet>
   <servlet>
     <servlet-name>QuitQuitQuit</servlet-name>
@@ -133,6 +137,10 @@
   <servlet-mapping>
     <servlet-name>Statz</servlet-name>
     <url-pattern>/admin/statz</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>PrometheusMetrics</servlet-name>
+    <url-pattern>/metrics</url-pattern>
   </servlet-mapping>
   <servlet-mapping>
     <servlet-name>QuitQuitQuit</servlet-name>
