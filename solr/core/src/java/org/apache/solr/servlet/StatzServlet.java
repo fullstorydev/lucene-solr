@@ -31,8 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.sun.management.UnixOperatingSystemMXBean;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.noggit.JSONUtil;
 import org.noggit.JSONWriter;
 
@@ -43,18 +41,11 @@ public final class StatzServlet extends BaseSolrServlet {
 
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-
-    Writer out = null;
-    try {
-      response.setCharacterEncoding("UTF-8");
-      response.setContentType("application/json");
-
-      // Protect container owned streams from being closed by us, see SOLR-8933
-      out = new OutputStreamWriter(new CloseShieldOutputStream(response.getOutputStream()), StandardCharsets.UTF_8);
-      writeStats(new PrintWriter(out));
-    } finally {
-      IOUtils.closeQuietly(out);
-    }
+    Writer out = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
+    response.setCharacterEncoding("UTF-8");
+    response.setContentType("application/json");
+    PrintWriter pw = new PrintWriter(out);
+    writeStats(pw);
   }
 
   static void writeStats(PrintWriter pw) {

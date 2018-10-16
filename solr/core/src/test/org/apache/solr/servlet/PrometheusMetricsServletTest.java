@@ -14,10 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- package org.apache.solr.servlet;
- import java.io.PrintWriter;
- import org.junit.Test;
- public class PrometheusMetricsServletTest {
+package org.apache.solr.servlet;
+
+import java.io.PrintWriter;
+
+import org.junit.Test;
+
+public class PrometheusMetricsServletTest {
   @Test
   public void testWriteMetrics() throws Exception {
     PrometheusMetricsServlet.writeStats(new PrintWriter(System.out));
