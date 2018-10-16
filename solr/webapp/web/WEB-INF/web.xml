@@ -142,12 +142,11 @@
     <servlet-name>QuitQuitQuit</servlet-name>
     <url-pattern>/quitquitquit</url-pattern>
   </servlet-mapping>
-  <!-- Fullstory additions -->
-
   <servlet-mapping>
     <servlet-name>PrometheusMetrics</servlet-name>
     <url-pattern>/metrics<url-pattern>
   </servlet-mapping>
+  <!-- Fullstory additions -->
 
   <servlet-mapping>
     <servlet-name>RedirectOldAdminUI</servlet-name>
