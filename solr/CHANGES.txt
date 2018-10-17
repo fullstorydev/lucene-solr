@@ -18,6 +18,8 @@ See the Quick Start guide at http://lucene.apache.org/solr/quickstart.html
 
 ================= FullStory ================
 
+* Add support for prometheus metrics (Emily Bragg)
+* Add /solr/quitquitquit handler (Scott Blum)
 * SOLR-11551: Standardize CoreAdmin API success/failure status codes (Jason Gerlowski, Steve Rowe)
 * Serve VM level stats on an easy http handler (Scott Blum)
 * Expose DocValuesTermsCollector (Jaime Yap)
