@@ -37,6 +37,6 @@ public final class QuitQuitQuitServlet extends BaseSolrServlet {
     PrintWriter w = resp.getWriter();
     w.write("OK");
     w.flush();
-    sun.misc.Signal.raise(new Signal("TERM"));
+    sun.misc.Signal.raise(new Signal("KILL"));
   }
 }
