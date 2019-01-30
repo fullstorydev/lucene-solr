@@ -21,22 +21,41 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import sun.misc.Signal;
 
 /**
  * FullStory: a servlet to remotely kill Solr.
- * PUT: raises SIGTERM
+ *
+ * <p>PUT: raises SIGTERM. Tasks will be scheduled (on a daemon thread, so as not
+ * to delay JVM termination) to call {@code System.exit(1)} after 60 seconds and
+ * then {@code Runtime.halt(1)} after 90 seconds, to make sure that the JVM does
+ * eventually terminate, regardless of the state of non-daemon threads and
+ * shutdown handlers.
  */
 public final class QuitQuitQuitServlet extends BaseSolrServlet {
 
+  private static final ScheduledExecutorService sched =
+      Executors.newScheduledThreadPool(1, r -> {
+        Thread th = new Thread(r);
+        th.setDaemon(true);
+        return th;
+      });
+
   @Override
-  protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+  protected void doPut(HttpServletRequest req, HttpServletResponse resp)
+      throws ServletException, IOException {
     resp.setStatus(HttpServletResponse.SC_OK);
     resp.setContentLength(2);
     PrintWriter w = resp.getWriter();
     w.write("OK");
     w.flush();
-    sun.misc.Signal.raise(new Signal("KILL"));
+
+    sched.schedule(() -> System.exit(1), 60, TimeUnit.SECONDS);
+    sched.schedule(() -> Runtime.getRuntime().halt(1), 90, TimeUnit.SECONDS);
+    sched.execute(() -> Signal.raise(new Signal("TERM")));
   }
 }
