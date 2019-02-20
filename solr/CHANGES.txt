@@ -28,10 +28,20 @@ Velocity 1.7 and Velocity Tools 2.0
 Apache ZooKeeper 3.4.13
 Jetty 9.4.14.v20181114
 
+Upgrade Notes
+----------------------
+
+* SOLR-12708: When requesting the status of an async request via REQUESTSTATUS collections API, the response will
+  include the list of internal async requests (if any) in the "success" or "failed" keys (in addition
+  to them being included outside those keys for backwards compatibility). See SOLR-12708 for more 
+  details
+
 Bug Fixes
 ----------------------
 
 * SOLR-13349: High CPU usage in Solr due to Java 8 bug (Erick Erickson)
+
+* SOLR-12708: Async collection actions should not hide internal failures (Mano Kovacs, Varun Thacker, Tomás Fernández Löbbe)
 
 ==================  7.7.1 ==================
 
