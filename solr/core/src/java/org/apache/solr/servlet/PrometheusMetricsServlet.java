@@ -56,10 +56,10 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       String name = gcBean.getName().toLowerCase().replace(" ", "_");
       String cname = "collection_count_" + name;
       String ctime = "collection_time_" + name;
-      writePromDoc(writer, cname, gcBean.getName() + " collection count", "gauge");
+      writePromDoc(writer, cname, gcBean.getName() + " collection count", "counter");
       writer.printf("%s %d", cname, gcBean.getCollectionCount());
       writer.println();
-      writePromDoc(writer, ctime, gcBean.getName() + " collection time", "timer");
+      writePromDoc(writer, ctime, gcBean.getName() + " collection time", "counter");
       writer.printf("%s %d", ctime, gcBean.getCollectionTime());
       writer.println();
     }
