@@ -1126,9 +1126,6 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
                 if(cmd.getReq().getParams().getBool(CommonParams.FAIL_ON_VERSION_CONFLICTS, true) == false) {
                   return true;
                 }
-                if (cmd.getReq().getParams().getBool("fs.ignoreconflicts", false)) {
-                  return true;
-                }
                 throw new SolrException(ErrorCode.CONFLICT, "version conflict for " + cmd.getPrintableId()
                     + " expected=" + versionOnUpdate + " actual=" + foundVersion);
               }
