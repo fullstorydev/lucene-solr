@@ -30,17 +30,18 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
 
-private enum PromType {
-    counter,
-    gauge
-}
-
 /**
  * FullStory: a simple servlet to produce a few prometheus metrics.
  */
 public final class PrometheusMetricsServlet extends BaseSolrServlet {
+
+    private enum PromType {
+        counter,
+        gauge
+    }
+
     private static void writeProm(PrintWriter writer, String inName, PromType type, String desc, long value) {
-        String name = inName.toLowerCase().replace(" ", "_")
+        String name = inName.toLowerCase().replace(" ", "_");
         writer.printf("# HELP %s %s", name, desc);
         writer.println();
         writer.printf("# TYPE %s %s", name, type);
