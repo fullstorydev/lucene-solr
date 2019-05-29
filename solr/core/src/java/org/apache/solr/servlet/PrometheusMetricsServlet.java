@@ -16,6 +16,8 @@
  */
 package org.apache.solr.servlet;
 
+import com.sun.management.UnixOperatingSystemMXBean;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -28,77 +30,57 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
 
-import com.sun.management.UnixOperatingSystemMXBean;
+private enum PromType {
+    counter,
+    gauge
+}
 
 /**
  * FullStory: a simple servlet to produce a few prometheus metrics.
  */
 public final class PrometheusMetricsServlet extends BaseSolrServlet {
-  private static void writePromDoc(PrintWriter writer, String name, String purpose, String type) {
-    writer.printf("# HELP %s %s", name, purpose);
-    writer.println();
-    writer.printf("# TYPE %s %s", name, type);
-    writer.println();
-  }
-
-  @Override
-  public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    Writer out = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
-    response.setCharacterEncoding("UTF-8");
-    response.setContentType("application/json");
-    PrintWriter pw = new PrintWriter(out);
-    writeStats(pw);
-  }
-
-  static void writeStats(PrintWriter writer) {
-    // GC stats
-    for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
-      String name = gcBean.getName().toLowerCase().replace(" ", "_");
-      String cname = "collection_count_" + name;
-      String ctime = "collection_time_" + name;
-      writePromDoc(writer, cname, gcBean.getName() + " collection count", "counter");
-      writer.printf("%s %d", cname, gcBean.getCollectionCount());
-      writer.println();
-      writePromDoc(writer, ctime, gcBean.getName() + " collection time", "counter");
-      writer.printf("%s %d", ctime, gcBean.getCollectionTime());
-      writer.println();
+    private static void writeProm(PrintWriter writer, String inName, PromType type, String desc, long value) {
+        String name = inName.toLowerCase().replace(" ", "_")
+        writer.printf("# HELP %s %s", name, desc);
+        writer.println();
+        writer.printf("# TYPE %s %s", name, type);
+        writer.println();
+        writer.printf("%s %d", name, value);
+        writer.println();
     }
 
-    // Write heap memory stats
-    MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
-    MemoryUsage heap = memoryBean.getHeapMemoryUsage();
-    MemoryUsage nonHeap = memoryBean.getNonHeapMemoryUsage();
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Writer out = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json");
+        PrintWriter pw = new PrintWriter(out);
+        writeStats(pw);
+    }
 
-    String cmem_name = "committed_memory_heap";
-    String umem_name = "used_memory_heap";
+    static void writeStats(PrintWriter writer) {
+        // GC stats
+        for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
+            writeProm(writer, "collection_count_" + gcBean.getName(), PromType.counter, "the number of GC invocations for " + gcBean.getName(), gcBean.getCollectionCount());
+            writeProm(writer, "colleciton_time_" + gcBean.getName(), PromType.counter, "the total number of milliseconds of time spent in gc for " + gcBean.getName(), gcBean.getCollectionTime());
+        }
 
-    writePromDoc(writer, cmem_name, "committed memory heap", "gauge");
-    writer.printf("%s %d", cmem_name, heap.getCommitted());
-    writer.println();
-    writePromDoc(writer, umem_name, "used memory heap", "gauge");
+        // Write heap memory stats
+        MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
 
-    writer.printf("%s %d", umem_name, heap.getUsed());
-    writer.println();
+        MemoryUsage heap = memoryBean.getHeapMemoryUsage();
+        writeProm(writer, "committed_memory_heap", PromType.gauge, "amount of memory in bytes that is committed for the Java virtual machine to use in the heap", heap.getCommitted());
+        writeProm(writer, "used_memory_heap", PromType.gauge, "amount of used memory in bytes in the heap", heap.getUsed());
 
-    // Write non_heap memory stats
-    cmem_name = "committed_memory_non_heap";
-    umem_name = "used_memory_non_heap";
 
-    writePromDoc(writer, cmem_name, "committed memory non-heap", "gauge");
-    writer.printf("%s %d", cmem_name, nonHeap.getCommitted());
-    writer.println();
-    writePromDoc(writer, umem_name, "used memory non-heap", "gauge");
+        MemoryUsage nonHeap = memoryBean.getNonHeapMemoryUsage();
+        writeProm(writer, "committed_memory_nonheap", PromType.gauge, "amount of memory in bytes that is committed for the Java virtual machine to use in the heap", nonHeap.getCommitted());
+        writeProm(writer, "used_memory_nonheap", PromType.gauge, "amount of used memory in bytes in the heap", nonHeap.getUsed());
 
-    writer.printf("%s %d", umem_name, nonHeap.getUsed());
-    writer.println();
+        // Write OS stats
+        UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        writeProm(writer, "open_file_descriptors", PromType.gauge, "the number of open file descriptors on the filesystem", osBean.getOpenFileDescriptorCount());
 
-    // Write OS stats
-    UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-    long openFiles = osBean.getOpenFileDescriptorCount();
-    writePromDoc(writer, "open file descriptors", "open file descriptors", "gauge");
-    writer.printf("open_file_descriptors %d", openFiles);
-    writer.println();
-
-    writer.flush();
-  }
+        writer.flush();
+    }
 }
