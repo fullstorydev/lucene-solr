@@ -40,7 +40,7 @@ private enum PromType {
  */
 public final class PrometheusMetricsServlet extends BaseSolrServlet {
     private static void writeProm(PrintWriter writer, String inName, PromType type, String desc, long value) {
-        String name = inName.toLowerCase().replace(" ", "_")
+        String name = inName.toLowerCase().replace(" ", "_");
         writer.printf("# HELP %s %s", name, desc);
         writer.println();
         writer.printf("# TYPE %s %s", name, type);
