@@ -63,6 +63,7 @@ import static java.util.Collections.unmodifiableSet;
 import static org.apache.solr.common.util.Utils.fromJSON;
 
 public class ZkStateReader implements Closeable {
+  public static final int STATE_UPDATE_DELAY = Integer.getInteger("solr.OverseerStateUpdateDelay", 2000);  // delay between cloud state updates
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   public static final String BASE_URL_PROP = "base_url";
@@ -117,7 +118,7 @@ public class ZkStateReader implements Closeable {
 
   public static final String SHARD_LEADERS_ZKNODE = "leaders";
   public static final String ELECTION_NODE = "election";
-  
+
   /** Collections tracked in the legacy (shared) state format, reflects the contents of clusterstate.json. */
   private Map<String, ClusterState.CollectionRef> legacyCollectionStates = emptyMap();
 
@@ -143,6 +144,8 @@ public class ZkStateReader implements Closeable {
   private ConcurrentHashMap<String, CollectionWatch> collectionWatches = new ConcurrentHashMap<>();
 
   private final ExecutorService notifications = ExecutorUtil.newMDCAwareCachedThreadPool("watches");
+
+  private static final long LAZY_CACHE_TIME = TimeUnit.NANOSECONDS.convert(STATE_UPDATE_DELAY, TimeUnit.MILLISECONDS);
 
   private static class CollectionWatch {
 
@@ -623,19 +626,36 @@ public class ZkStateReader implements Closeable {
   }
 
   private class LazyCollectionRef extends ClusterState.CollectionRef {
-
     private final String collName;
+    private long lastUpdateTime;
+    private DocCollection cachedDocCollection;
 
     public LazyCollectionRef(String collName) {
       super(null);
       this.collName = collName;
+      this.lastUpdateTime = -1;
     }
 
     @Override
-    public DocCollection get() {
+    public synchronized DocCollection get(boolean allowCached) {
       gets.incrementAndGet();
-      // TODO: consider limited caching
-      return getCollectionLive(ZkStateReader.this, collName);
+      if (!allowCached || lastUpdateTime < 0 || System.nanoTime() - lastUpdateTime > LAZY_CACHE_TIME) {
+        boolean shouldFetch = true;
+        if (cachedDocCollection != null) {
+          Stat exists = null;
+          try {
+            exists = zkClient.exists(getCollectionPath(collName), null, true);
+          } catch (Exception e) {}
+          if (exists != null && exists.getVersion() == cachedDocCollection.getZNodeVersion()) {
+            shouldFetch = false;
+          }
+        }
+        if (shouldFetch) {
+          cachedDocCollection = getCollectionLive(ZkStateReader.this, collName);
+          lastUpdateTime = System.nanoTime();
+        }
+      }
+      return cachedDocCollection;
     }
 
     @Override

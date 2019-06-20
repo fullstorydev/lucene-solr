@@ -64,7 +64,7 @@ import static org.apache.solr.common.params.CommonParams.ID;
 public class Overseer implements Closeable {
   public static final String QUEUE_OPERATION = "operation";
 
-  public static final int STATE_UPDATE_DELAY = 2000;  // delay between cloud state updates
+  public static final int STATE_UPDATE_DELAY = ZkStateReader.STATE_UPDATE_DELAY;
   public static final int STATE_UPDATE_BATCH_SIZE = 10000;
   public static final int STATE_UPDATE_MAX_QUEUE = 20000;
 
