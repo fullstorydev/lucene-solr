@@ -8,3 +8,4 @@
 * SOLR-13468: autoscaling/suggestions should be able to give suggestions from config sent as a payload (Generally available from SOLR 8.2)(noble)
 * SOLR-13484: autoscaling/diagnostics API should be able to give diagnostics output from config sent as a payload (Generally available from SOLR 8.2) (noble)
 * SOLR-13493: /autoscaling/suggestions to be able to filter by type (Generally available from SOLR 8.2) (noble)
+* SOLR-13534 : Dynamic loading to support loading jars from a URL (Generally available from SOLR 8.2) (noble)
