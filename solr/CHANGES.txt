@@ -21,7 +21,6 @@ See the Quick Start guide at http://lucene.apache.org/solr/quickstart.html
 * SOLR-8327: Cluster state caching to avoid live fetch from ZK of cluster state for forwarding requests on nodes
   that do not host any replica of the collection (Jessica Cheng Mallet, John Gallagher, Noble Paul, Ishan Chattopadhyaya)
 * Add support for prometheus metrics (Emily Bragg)
-* Add /solr/quitquitquit handler (Scott Blum)
 * SOLR-11551: Standardize CoreAdmin API success/failure status codes (Jason Gerlowski, Steve Rowe)
 * Serve VM level stats on an easy http handler (Scott Blum)
 * Expose DocValuesTermsCollector (Jaime Yap)
