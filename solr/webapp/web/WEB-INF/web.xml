@@ -56,6 +56,13 @@
     </init-param>
   </servlet>
 
+  <!-- Fullstory additions -->
+  <servlet>
+    <servlet-name>PrometheusMetrics</servlet-name>
+    <servlet-class>org.apache.solr.servlet.PrometheusMetricsServlet</servlet-class>
+  </servlet>
+  <!-- Fullstory additions -->
+
   <servlet-mapping>
     <servlet-name>LoadAdminUI</servlet-name>
     <url-pattern>/index.html</url-pattern>
@@ -65,6 +72,13 @@
     <servlet-name>SolrRestApi</servlet-name>
     <url-pattern>/schema/*</url-pattern>
   </servlet-mapping>
+
+  <!-- Fullstory additions -->
+  <servlet-mapping>
+    <servlet-name>PrometheusMetrics</servlet-name>
+    <url-pattern>/metrics</url-pattern>
+  </servlet-mapping>
+  <!-- Fullstory additions -->
   
   <mime-mapping>
     <extension>.xsl</extension>
