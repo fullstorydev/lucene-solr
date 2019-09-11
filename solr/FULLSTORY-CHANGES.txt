@@ -1,5 +1,6 @@
 ================= FullStory ================
 (Some of these changes are available in public Solr, if we update to the specified version )
+* FullStory: Add simple PrometheusMetricsServlet (Clay Goddard)
 * SOLR-13718: SPLITSHARD (async) with failures in underlying sub-operations can result in data loss (Generally available from 8.3)(Ishan Chattopadhyaya)
 * SOLR-12291: prematurely reporting not yet finished async Collections API call as completed when collection's replicas are collocated at least at one node (Generally available from 8.1)
 * SOLR-12708: Async collection actions should not hide internal failures (Mano Kovacs, Varun Thacker, Tomás Fernández Löbbe)
