@@ -272,7 +272,8 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
       if(!isLegacyCloud) {
         // wait for all replica entries to be created
-        Map<String, Replica> replicas = ocmh.waitToSeeReplicasInState(collectionName, coresToCreate.keySet());
+        Map<String, Replica> replicas =
+            ocmh.waitToSeeReplicasInState(ocmh.cloudManager.getClusterStateProvider(), collectionName, coresToCreate.keySet());
         for (Map.Entry<String, ShardRequest> e : coresToCreate.entrySet()) {
           ShardRequest sreq = e.getValue();
           sreq.params.set(CoreAdminParams.CORE_NODE_NAME, replicas.get(e.getKey()).getName());

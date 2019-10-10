@@ -49,6 +49,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.PolicyHelper;
+import org.apache.solr.client.solrj.impl.ZkClientClusterStateProvider;
 import org.apache.solr.cloud.ActiveReplicaWatcher;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
@@ -250,7 +251,7 @@ public class AddReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
         }
       }
       params.set(CoreAdminParams.CORE_NODE_NAME,
-          ocmh.waitToSeeReplicasInState(collectionName, Collections.singletonList(createReplica.coreName)).get(createReplica.coreName).getName());
+          ocmh.waitToSeeReplicasInState(new ZkClientClusterStateProvider(zkStateReader), collectionName, Collections.singletonList(createReplica.coreName)).get(createReplica.coreName).getName());
     }
 
     String configName = zkStateReader.readConfigName(collectionName);

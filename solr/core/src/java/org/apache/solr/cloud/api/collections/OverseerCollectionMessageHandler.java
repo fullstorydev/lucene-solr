@@ -91,6 +91,7 @@ import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.AlreadyExistsException;
 import org.apache.solr.client.solrj.cloud.autoscaling.BadVersionException;
+import org.apache.solr.client.solrj.impl.ClusterStateProvider;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient.RemoteSolrException;
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest;
@@ -680,12 +681,14 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     commandMap.get(DELETE).call(zkStateReader.getClusterState(), new ZkNodeProps(props), results);
   }
 
-  Map<String, Replica> waitToSeeReplicasInState(String collectionName, Collection<String> coreNames) throws InterruptedException {
+  Map<String, Replica> waitToSeeReplicasInState(ClusterStateProvider clusterStateProvider, String collectionName, Collection<String> coreNames)
+      throws InterruptedException, IOException {
+
     assert coreNames.size() > 0;
     Map<String, Replica> result = new HashMap<>();
     TimeOut timeout = new TimeOut(Integer.getInteger("solr.waitToSeeReplicasInStateTimeoutSeconds", 120), TimeUnit.SECONDS, timeSource); // could be a big cluster
     while (true) {
-      DocCollection coll = zkStateReader.getClusterState().getCollection(collectionName);
+      DocCollection coll = clusterStateProvider.getClusterState().getCollection(collectionName);
       for (String coreName : coreNames) {
         if (result.containsKey(coreName)) continue;
         for (Slice slice : coll.getSlices()) {
