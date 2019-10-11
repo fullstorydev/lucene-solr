@@ -1368,6 +1368,13 @@ public class CloudSolrClient extends SolrClient {
      */
     @Deprecated
     public Builder() {}
+
+    /**
+     * Provide an already created {@link ClusterStateProvider} instance
+     */
+    public Builder(ClusterStateProvider stateProvider) {
+      this.stateProvider = stateProvider;
+    }
     
     /**
      * Provide a series of Solr URLs to be used when configuring {@link CloudSolrClient} instances.
