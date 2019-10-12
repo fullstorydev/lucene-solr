@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.apache.solr.SolrTestCaseJ4;
@@ -61,7 +62,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Base class for SolrCloud tests
- *
+ * <p>
  * Derived tests should call {@link #configureCluster(int)} in a {@code BeforeClass}
  * static method or {@code Before} setUp method.  This configures and starts a {@link MiniSolrCloudCluster}, available
  * via the {@code cluster} variable.  Cluster shutdown is handled automatically if using {@code BeforeClass}.
@@ -80,13 +81,12 @@ import org.slf4j.LoggerFactory;
 public class SolrCloudTestCase extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  
+
   public static final int DEFAULT_TIMEOUT = 45; // this is an important timeout for test stability - can't be too short
 
   private static class Config {
     final String name;
     final Path path;
-
     private Config(String name, Path path) {
       this.name = name;
       this.path = path;
@@ -101,7 +101,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
     private final int nodeCount;
     private final Path baseDir;
     private String solrxml = MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML;
-    private JettyConfig jettyConfig = buildJettyConfig("/solr");
+    private JettyConfig.Builder jettyConfigBuilder = JettyConfig.builder().setContext("/solr");
     private Optional<String> securityJson = Optional.empty();
 
     private List<Config> configs = new ArrayList<>();
@@ -109,6 +109,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
 
     /**
      * Create a builder
+     *
      * @param nodeCount the number of nodes in the cluster
      * @param baseDir   a base directory for the cluster
      */
@@ -118,10 +119,10 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
     }
 
     /**
-     * Use a {@link JettyConfig} to configure the cluster's jetty servers
+     * Use a JettyConfig.Builder to configure the cluster's jetty servers
      */
-    public Builder withJettyConfig(JettyConfig jettyConfig) {
-      this.jettyConfig = jettyConfig;
+    public Builder withJettyConfig(Consumer<JettyConfig.Builder> fun) {
+      fun.accept(jettyConfigBuilder);
       return this;
     }
 
@@ -204,6 +205,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
      * @throws Exception if an error occurs on startup
      */
     public MiniSolrCloudCluster build() throws Exception {
+      JettyConfig jettyConfig = jettyConfigBuilder.build();
       MiniSolrCloudCluster cluster = new MiniSolrCloudCluster(nodeCount, baseDir, solrxml, jettyConfig, null, securityJson);
       CloudSolrClient client = cluster.getSolrClient();
       for (Config config : configs) {
@@ -420,7 +422,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
 
   /**
    * Get the {@link CoreStatus} data for a {@link Replica}
-   *
+   * <p>
    * This assumes that the replica is hosted on a live node.
    */
   protected static CoreStatus getCoreStatus(Replica replica) throws IOException, SolrServerException {
@@ -431,6 +433,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
   }
 
   protected NamedList waitForResponse(Predicate<NamedList> predicate, SolrRequest request, int intervalInMillis, int numRetries, String messageOnFail) {
+    log.info("waitForResponse: {}", request);
     int i = 0;
     for (; i < numRetries; i++) {
       try {
@@ -450,6 +453,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
   /**
    * Ensure that the given number of solr instances are running. If less instances are found then new instances are
    * started. If extra instances are found then they are stopped.
+   *
    * @param nodeCount the number of Solr instances that should be running at the end of this method
    * @throws Exception on error
    */
@@ -458,7 +462,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
     List<JettySolrRunner> jettys = cluster.getJettySolrRunners();
     List<JettySolrRunner> copyOfJettys = new ArrayList<>(jettys);
     int numJetties = copyOfJettys.size();
-    for (int i = nodeCount; i < numJetties; i++)  {
+    for (int i = nodeCount; i < numJetties; i++) {
       cluster.stopJettySolrRunner(copyOfJettys.get(i));
     }
     for (int i = copyOfJettys.size(); i < nodeCount; i++) {

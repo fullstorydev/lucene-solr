@@ -22,3 +22,5 @@
 --release 8.4--
 
 * SOLR-13787: Annotations based framework to write V2 APIs (Generally available from SOLR 8.4) (noble)
+
+* SOLR-13821 : Package Store (Generally available from SOLR 8.4) (noble)

@@ -16,6 +16,9 @@
  */
 package org.apache.solr.common.params;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -193,7 +196,7 @@ public interface CommonParams {
   String OK = "OK";
   String FAILURE = "FAILURE";
 
-  Set<String> ADMIN_PATHS = Set.of(
+  Set<String> ADMIN_PATHS =  Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
       CORES_HANDLER_PATH,
       COLLECTIONS_HANDLER_PATH,
       HEALTH_CHECK_HANDLER_PATH,
@@ -206,7 +209,7 @@ public interface CommonParams {
       AUTOSCALING_PATH,
       AUTOSCALING_HISTORY_PATH,
       AUTOSCALING_DIAGNOSTICS_PATH,
-      AUTOSCALING_SUGGESTIONS_PATH);
+      AUTOSCALING_SUGGESTIONS_PATH)));
   String APISPEC_LOCATION = "apispec/";
   String INTROSPECT = "/_introspect";
 

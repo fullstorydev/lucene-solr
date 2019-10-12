@@ -16,18 +16,21 @@
  */
 package org.apache.solr.client.solrj.embedded;
 
-import org.eclipse.jetty.servlet.ServletHolder;
-
 import javax.servlet.Filter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
+
+import org.eclipse.jetty.servlet.ServletHolder;
 
 public class JettyConfig {
 
   public final int port;
 
   public final String context;
+
+  public final boolean enableV2;
+
 
   public final boolean stopAtShutdown;
   
@@ -42,7 +45,7 @@ public class JettyConfig {
   public final int portRetryTime;
 
   private JettyConfig(int port, int portRetryTime, String context, boolean stopAtShutdown, Long waitForLoadingCoresToFinishMs, Map<ServletHolder, String> extraServlets,
-                      Map<Class<? extends Filter>, String> extraFilters, SSLConfig sslConfig) {
+                      Map<Class<? extends Filter>, String> extraFilters, SSLConfig sslConfig, boolean enableV2) {
     this.port = port;
     this.context = context;
     this.stopAtShutdown = stopAtShutdown;
@@ -51,6 +54,7 @@ public class JettyConfig {
     this.extraFilters = extraFilters;
     this.sslConfig = sslConfig;
     this.portRetryTime = portRetryTime;
+    this.enableV2 = enableV2;
   }
 
   public static Builder builder() {
@@ -72,12 +76,18 @@ public class JettyConfig {
 
     int port = 0;
     String context = "/solr";
+    boolean enableV2 = true;
     boolean stopAtShutdown = true;
     Long waitForLoadingCoresToFinishMs = 300000L;
     Map<ServletHolder, String> extraServlets = new TreeMap<>();
     Map<Class<? extends Filter>, String> extraFilters = new LinkedHashMap<>();
     SSLConfig sslConfig = null;
     int portRetryTime = 60;
+
+    public Builder enableV2(boolean flag){
+      this.enableV2 = flag;
+      return this;
+    }
 
     public Builder setPort(int port) {
       this.port = port;
@@ -133,7 +143,7 @@ public class JettyConfig {
 
 
     public JettyConfig build() {
-      return new JettyConfig(port, portRetryTime, context, stopAtShutdown, waitForLoadingCoresToFinishMs, extraServlets, extraFilters, sslConfig);
+      return new JettyConfig(port, portRetryTime, context, stopAtShutdown, waitForLoadingCoresToFinishMs, extraServlets, extraFilters, sslConfig, enableV2);
     }
 
   }

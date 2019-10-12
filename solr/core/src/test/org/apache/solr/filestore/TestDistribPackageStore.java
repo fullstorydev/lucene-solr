@@ -33,7 +33,6 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.BaseHttpSolrClient.RemoteExecutionException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.V2Request;
 import org.apache.solr.client.solrj.response.V2Response;
@@ -51,7 +50,7 @@ import org.apache.zookeeper.server.ByteBufferInputStream;
 import static org.apache.solr.common.util.Utils.JAVABINCONSUMER;
 import static org.apache.solr.core.TestDynamicLoading.getFileContent;
 
-@LogLevel("org.apache.solr.filestore.PackageStoreAPI=DEBUG;org.apache.solr.filestore.DistribPackageStore=DEBUG")
+@LogLevel("org.apache.solr.filestore=DEBUG")
 public class TestDistribPackageStore extends SolrCloudTestCase {
 
   public void testPackageStoreManagement() throws Exception {
@@ -72,7 +71,7 @@ public class TestDistribPackageStore extends SolrCloudTestCase {
             "j+Rflxi64tXdqosIhbusqi6GTwZq8znunC/dzwcWW0/dHlFGKDurOaE1Nz9FSPJuXbHkVLj638yZ0Lp1ssnoYA=="
         );
         fail("should have failed because of wrong signature ");
-      } catch (RemoteExecutionException e) {
+      } catch (HttpSolrClient.RemoteExecutionException e) {
         assertTrue(e.getMessage().contains("Signature does not match"));
       }
 
