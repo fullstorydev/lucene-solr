@@ -38,6 +38,10 @@ Bug fixes
 * SOLR-12291: prematurely reporting not yet finished async Collections API call as completed 
   when collection's replicas are collocated at least at one node (Varun Thacker, Mikhail Khludnev)
 
+* SOLR-13793: HttpSolrCall now maintains internal request count (_forwardedCount) for remote queries and limits them to
+  the number of replicas. This avoids making too many cascading calls to remote servers, which, if not restricted, can
+  bring down nodes containing the said collection (Kesharee Nandan Vishwakarma, Ishan Chattopadhyaya)
+
 ==================  7.7.2 ==================
 
 Consult the LUCENE_CHANGES.txt file for additional, low level, changes in this release.
