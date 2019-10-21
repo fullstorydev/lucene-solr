@@ -14,4 +14,11 @@
 * SOLR-13484: autoscaling/diagnostics API should be able to give diagnostics output from config sent as a payload (Generally available from SOLR 8.2) (noble)
 * SOLR-13493: /autoscaling/suggestions to be able to filter by type (Generally available from SOLR 8.2) (noble)
 * SOLR-13534 : Dynamic loading to support loading jars from a URL (Generally available from SOLR 8.2) (noble)
+
+--release 8.3--
+
 * SOLR-13834: ZkController#getSolrCloudManager() creates a new instance of ZkStateReader (Generally available from SOLR 8.3) (Clay, noble)
+
+--release 8.4--
+
+* SOLR-13787: Annotations based framework to write V2 APIs (Generally available from SOLR 8.4) (noble)
