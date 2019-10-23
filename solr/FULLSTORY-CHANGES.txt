@@ -24,3 +24,7 @@
 * SOLR-13787: Annotations based framework to write V2 APIs (Generally available from SOLR 8.4) (noble)
 
 * SOLR-13821 : Package Store (Generally available from SOLR 8.4) (noble)
+
+* SOLR-13822: A Package management system with the following features. A packages.json in ZK to store
+  the configuration, APIs to read/edit them and isolated classloaders to load the classes from
+  hose packages if the 'class' attribute is prefixed with `<package-name>:` (noble)

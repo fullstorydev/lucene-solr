@@ -40,6 +40,8 @@
     <dependency org="org.slf4j" name="slf4j-api" rev="${/org.slf4j/slf4j-api}" conf="compile"/>
     <dependency org="org.slf4j" name="jcl-over-slf4j" rev="${/org.slf4j/jcl-over-slf4j}" conf="compile"/>
 
+    <dependency org="com.fasterxml.jackson.core" name="jackson-annotations" rev="${/com.fasterxml.jackson.core/jackson-annotations}" conf="compile"/>
+
     <dependency org="org.apache.logging.log4j" name="log4j-slf4j-impl" rev="${/org.apache.logging.log4j/log4j-slf4j-impl}" conf="test"/>
 
     <dependency org="org.mockito" name="mockito-core" rev="${/org.mockito/mockito-core}" conf="test"/>

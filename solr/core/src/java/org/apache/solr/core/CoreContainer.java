@@ -96,6 +96,7 @@ import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.solr.metrics.SolrCoreMetricManager;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricProducer;
+import org.apache.solr.pkg.PackageLoader;
 import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.search.SolrFieldCacheBean;
 import org.apache.solr.security.AuthenticationPlugin;
@@ -214,6 +215,7 @@ public class CoreContainer {
   protected volatile AutoscalingHistoryHandler autoscalingHistoryHandler;
 
   private PackageStoreAPI packageStoreAPI;
+  private PackageLoader packageLoader;
 
 
   // Bits for the state variable.
@@ -514,6 +516,10 @@ public class CoreContainer {
     return replayUpdatesExecutor;
   }
 
+  public PackageLoader getPackageLoader() {
+    return packageLoader;
+  }
+
   public PackageStoreAPI getPackageStoreAPI() {
     return packageStoreAPI;
   }
@@ -662,7 +668,11 @@ public class CoreContainer {
 
     if (isZooKeeperAware()) {
       metricManager.loadClusterReporters(metricReporters, this);
+      packageLoader = new PackageLoader(this);
+      containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().editAPI), Collections.EMPTY_MAP);
+      containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().readAPI), Collections.EMPTY_MAP);
     }
+
 
     // setup executor to load cores in parallel
     ExecutorService coreLoadExecutor = MetricUtils.instrumentedExecutorService(
@@ -1250,9 +1260,9 @@ public class CoreContainer {
    * @param coreConfig
    *          core config for the core to create
    * @return if possible
-   * @throws SolrException
-   *           rethrows the original exception if we will not attempt to recover, throws a new SolrException with the
-   *           original exception as a suppressed exception if there is a second problem creating the solr core.
+   * @throws SolrException rethrows the original exception if we will not attempt to recover, throws a new SolrException with the
+   *                       original exception as a suppressed exception if there is a second problem creating the solr core.
+   * @see CoreInitFailedAction
    */
   private SolrCore processCoreCreateException(SolrException original, CoreDescriptor dcore, ConfigSet coreConfig) {
     // Traverse full chain since CIE may not be root exception
