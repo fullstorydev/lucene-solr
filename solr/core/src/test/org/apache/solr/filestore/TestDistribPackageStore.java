@@ -49,9 +49,30 @@ import org.apache.zookeeper.server.ByteBufferInputStream;
 
 import static org.apache.solr.common.util.Utils.JAVABINCONSUMER;
 import static org.apache.solr.core.TestDynamicLoading.getFileContent;
+import static org.apache.solr.pkg.TestPackages.postFileAndWait;
 
 @LogLevel("org.apache.solr.filestore=DEBUG")
 public class TestDistribPackageStore extends SolrCloudTestCase {
+
+  public void testFsJar() throws Exception {
+    MiniSolrCloudCluster cluster =
+        configureCluster(4)
+            .withJettyConfig(jetty -> jetty.enableV2(true))
+            .addConfig("conf", configset("cloud-minimal"))
+            .configure();
+    try {
+
+      byte[] derFile = readFile("cryptokeys/pub_key512.der");
+      cluster.getZkClient().makePath("/keys/exe", true);
+      cluster.getZkClient().create("/keys/exe/pub_key512.der", derFile, CreateMode.PERSISTENT, true);
+
+      postFileAndWait(cluster, "runtimecode/fs-solr.jar",  "/fs/7.7.2/fs-solr.jar",
+          "rWoFOCVjI0mfCfAc9/4OtuZDj4lROmKEuFpe+ij/cTOhp5OJGm0ALDigA/CKD02bEd1rE7WqUGWwU6Wa82erxw==");
+
+    } finally {
+      cluster.shutdown();
+    }
+  }
 
   public void testPackageStoreManagement() throws Exception {
     MiniSolrCloudCluster cluster =

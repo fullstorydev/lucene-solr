@@ -52,7 +52,7 @@ public class PackageLoader implements AutoCloseable {
   private final CoreContainer coreContainer;
   private final Map<String, Package> packageClassLoaders = new ConcurrentHashMap<>();
 
-  private PackageAPI.Packages myCopy;
+  private PackageAPI.Packages myCopy =  new PackageAPI.Packages();
 
   private PackageAPI packageAPI;
 
@@ -60,8 +60,7 @@ public class PackageLoader implements AutoCloseable {
   public PackageLoader(CoreContainer coreContainer) {
     this.coreContainer = coreContainer;
     packageAPI = new PackageAPI(coreContainer, this);
-    myCopy = packageAPI.pkgs;
-
+    refreshPackageConf();
   }
 
   public PackageAPI getPackageAPI() {
@@ -76,7 +75,7 @@ public class PackageLoader implements AutoCloseable {
     return Collections.EMPTY_MAP;
   }
 
-  public void refreshPackageConf() {
+  void refreshPackageConf() {
     log.info("{} updated to version {}", ZkStateReader.SOLR_PKGS_PATH, packageAPI.pkgs.znodeVersion);
 
     List<Package> updated = new ArrayList<>();
@@ -93,7 +92,7 @@ public class PackageLoader implements AutoCloseable {
       } else {
         Package p = packageClassLoaders.remove(e.getKey());
         if (p != null) {
-          //other classes are holding to a reference to this objecec
+          //other classes are holding to a reference to this object
           // they should know that this is removed
           p.markDeleted();
           IOUtils.closeQuietly((Closeable) p);
@@ -103,9 +102,10 @@ public class PackageLoader implements AutoCloseable {
     for (SolrCore core : coreContainer.getCores()) {
       core.getPackageListeners().packagesUpdated(updated);
     }
+    myCopy = packageAPI.pkgs;
   }
 
-  public Map<String, List<PackageAPI.PkgVersion>> getModified(PackageAPI.Packages old, PackageAPI.Packages newPkgs) {
+  private Map<String, List<PackageAPI.PkgVersion>> getModified(PackageAPI.Packages old, PackageAPI.Packages newPkgs) {
     Map<String, List<PackageAPI.PkgVersion>> changed = new HashMap<>();
     for (Map.Entry<String, List<PackageAPI.PkgVersion>> e : newPkgs.packages.entrySet()) {
       List<PackageAPI.PkgVersion> versions = old.packages.get(e.getKey());
@@ -131,7 +131,7 @@ public class PackageLoader implements AutoCloseable {
 
   }
 
-  public void notifyListeners(String pkg) {
+  void notifyListeners(String pkg) {
     Package p = packageClassLoaders.get(pkg);
     if (p != null) {
       List<Package> l = Collections.singletonList(p);

@@ -115,6 +115,8 @@ public interface PackageStore {
 
     boolean isDir();
 
+    long size();
+
 
   }
 

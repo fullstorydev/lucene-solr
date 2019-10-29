@@ -47,6 +47,7 @@ import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
+import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
@@ -247,27 +248,36 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             if (componentName != null) {
               Map map = (Map) val.get(parts.get(1));
               if (map != null) {
-                Object o = map.get(componentName);
-                val.put(parts.get(1), makeMap(componentName, o));
-                if (req.getParams().getBool("meta", false)) {
-                  // meta=true is asking for the package info of the plugin
-                  // We go through all the listeners and see if there is one registered for this plugin
-                  List<PackageListeners.Listener> listeners = req.getCore().getPackageListeners().getListeners();
-                  for (PackageListeners.Listener listener :
-                      listeners) {
-                    PluginInfo info = listener.pluginInfo();
-                    if(info == null) continue;
-                    if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
-                      if (o instanceof Map) {
-                        Map m1 = (Map) o;
-                        m1.put("_packageinfo_", listener.getPackageVersion());
-                      }
-                    }
-                  }
-                }
+                fillPackageInfo(componentName, map);
+                val.put(parts.get(1), makeMap(componentName, map.get(componentName)));
               }
             }
             resp.add("config", val);
+          }
+        }
+      }
+    }
+
+    private void fillPackageInfo(String componentName, Map map) {
+      Object o = map.get(componentName);
+      if (req.getParams().getBool("meta", false)) {
+        // meta=true is asking for the package info of the plugin
+        // We go through all the listeners and see if there is one registered for this plugin
+        List<PackageListeners.Listener> listeners = req.getCore().getPackageListeners().getListeners();
+        for (PackageListeners.Listener listener :
+            listeners) {
+          PluginInfo info = listener.pluginInfo();
+          if(info == null) continue;
+          if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
+            if (o instanceof Map) {
+              Map m1 = (Map) o;
+              m1.put("_packageinfo_", listener.getPackageVersion());
+            } else if(o instanceof MapWriter){
+              map.put(componentName, (MapWriter) ew -> {
+                ((MapWriter) o).writeMap(ew);
+                ew.put("_packageinfo_", listener.getPackageVersion());
+              });
+            }
           }
         }
       }

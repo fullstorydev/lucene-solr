@@ -66,20 +66,13 @@ public class DistribPackageStore implements PackageStore {
 
   }
 
-  private String myNode() {
-    return coreContainer.getZkController().getNodeName();
-  }
-
-
-
-
 
   @Override
   public Path getRealpath(String path) {
     if (File.separatorChar == '\\') {
       path = path.replace('/', File.separatorChar);
     }
-    if (path.charAt(0) != File.separatorChar) {
+    if (!path.isEmpty() && path.charAt(0) != File.separatorChar) {
       path = File.separator + path;
     }
     return new File(this.coreContainer.getResourceLoader().getInstancePath() +
@@ -284,6 +277,11 @@ public class DistribPackageStore implements PackageStore {
         }
 
         @Override
+        public long size() {
+          return realPath().toFile().length();
+        }
+
+        @Override
         public void writeMap(EntryWriter ew) throws IOException {
           MetaData metaData = readMetaData();
           ew.put(CommonParams.NAME, getSimpleName());
@@ -291,6 +289,8 @@ public class DistribPackageStore implements PackageStore {
             ew.put("dir", true);
             return;
           }
+
+          ew.put("size", size());
           ew.put("timestamp", getTimeStamp());
           if(metaData != null)
             metaData.writeMap(ew);

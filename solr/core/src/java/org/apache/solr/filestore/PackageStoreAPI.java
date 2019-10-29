@@ -150,6 +150,7 @@ public class PackageStoreAPI {
         try {
           ByteBuffer buf = SimplePostTool.inputStreamToByteArray(stream.getStream());
           String sha512 = DigestUtils.sha512Hex(new ByteBufferInputStream(buf));
+          log.info("Uploading content with size :{}, sha512: {} ",buf.limit(), sha512);
           List<String> signatures = readSignatures(req, buf);
           Map<String, Object> vals = new HashMap<>();
           vals.put(MetaData.SHA512, sha512);
@@ -177,7 +178,7 @@ public class PackageStoreAPI {
     }
 
     private List<String> readSignatures(SolrQueryRequest req, ByteBuffer buf)
-        throws SolrException {
+        throws SolrException, IOException {
       String[] signatures = req.getParams().getParams("sig");
       if (signatures == null || signatures.length == 0) return null;
       List<String> sigs = Arrays.asList(signatures);
@@ -186,7 +187,7 @@ public class PackageStoreAPI {
     }
 
     public void validate(List<String> sigs,
-                         ByteBuffer buf) throws SolrException {
+                         ByteBuffer buf) throws SolrException, IOException {
       Map<String, byte[]> keys = CloudUtil.getTrustedKeys(
           coreContainer.getZkController().getZkClient(), "exe");
       if (keys == null || keys.isEmpty()) {
@@ -202,7 +203,9 @@ public class PackageStoreAPI {
       }
       for (String sig : sigs) {
         if (cryptoKeys.verify(sig, buf) == null) {
-          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Signature does not match any public key : " + sig);
+          String sha512 = DigestUtils.sha512Hex(new ByteBufferInputStream(buf));
+          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,  "Signature does not match any public key : " + sig + " sha512 : "+ sha512
+          + " size: "+ buf.limit() + " sighash: "+ sig.hashCode() );
         }
 
       }

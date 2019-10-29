@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -23,7 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.solr.common.MapSerializable;
+import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.util.DOMUtil;
@@ -40,7 +41,7 @@ import static org.apache.solr.schema.FieldType.CLASS_NAME;
  * An Object which represents a Plugin of any type 
  *
  */
-public class PluginInfo implements MapSerializable {
+public class PluginInfo implements MapWriter {
   public final String name, className, type, pkgName;
   public final NamedList initArgs;
   public final Map<String, String> attributes;
@@ -88,6 +89,11 @@ public class PluginInfo implements MapSerializable {
     attributes = unmodifiableMap(DOMUtil.toMap(node.getAttributes()));
     children = loadSubPlugins(node);
     isFromSolrConfig = true;
+  }
+
+  @Override
+  public void writeMap(EntryWriter ew) throws IOException {
+    toMap(new LinkedHashMap<>()).forEach(ew.getBiConsumer());
   }
 
   public PluginInfo(String type, Map<String,Object> map) {
