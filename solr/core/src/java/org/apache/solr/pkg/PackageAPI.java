@@ -74,6 +74,7 @@ public class PackageAPI {
     try {
       pkgs = readPkgsFromZk(null, null);
     } catch (KeeperException |InterruptedException e ) {
+      pkgs = new Packages();
       //ignore
     }
     try {
