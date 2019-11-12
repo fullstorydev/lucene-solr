@@ -19,7 +19,6 @@ package org.apache.solr.pkg;
 
 import java.lang.invoke.MethodHandles;
 
-import org.apache.solr.common.SolrException;
 import org.apache.solr.core.PluginBag;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.RequestParams;
@@ -44,9 +43,7 @@ public class PackagePluginHolder<T> extends PluginBag.PluginHolder<T> {
     this.pluginMeta = pluginMeta;
     this.info = info;
 
-    PackageLoader.Package pkg = core.getCoreContainer().getPackageLoader().getPackage(info.pkgName);
-    if (pkg == null) throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "No such package : " + info.pkgName);
-    reload(pkg);
+    reload(core.getCoreContainer().getPackageLoader().getPackage(info.pkgName));
     core.getPackageListeners().addListener(new PackageListeners.Listener() {
       @Override
       public String packageName() {

@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.solr.api.Command;
 import org.apache.solr.api.EndPoint;
@@ -34,7 +33,9 @@ import org.apache.solr.api.PayloadObj;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.request.beans.Package;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.annotation.JsonProperty;
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ReflectMapWriter;
@@ -43,6 +44,7 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.solr.filestore.PackageStoreAPI;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.util.SolrJacksonAnnotationInspector;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -54,13 +56,16 @@ import static org.apache.solr.common.cloud.ZkStateReader.SOLR_PKGS_PATH;
 import static org.apache.solr.security.PermissionNameProvider.Name.PACKAGE_EDIT_PERM;
 import static org.apache.solr.security.PermissionNameProvider.Name.PACKAGE_READ_PERM;
 
+/**This implements the public end points (/api/cluster/package) of package API.
+ *
+ */
 public class PackageAPI {
   public static final String PACKAGES = "packages";
   public final boolean enablePackages = Boolean.parseBoolean(System.getProperty("enable.packages", "false"));
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   final CoreContainer coreContainer;
-  private ObjectMapper mapper = new ObjectMapper();
+  private final ObjectMapper mapper = new ObjectMapper();
   private final PackageLoader packageLoader;
   Packages pkgs;
 
@@ -70,13 +75,9 @@ public class PackageAPI {
   public PackageAPI(CoreContainer coreContainer, PackageLoader loader) {
     this.coreContainer = coreContainer;
     this.packageLoader = loader;
+    mapper.setAnnotationIntrospector(SolrJacksonAnnotationInspector.INSTANCE);
+    pkgs = new Packages();
     SolrZkClient zkClient = coreContainer.getZkController().getZkClient();
-    try {
-      pkgs = readPkgsFromZk(null, null);
-    } catch (KeeperException |InterruptedException e ) {
-      pkgs = new Packages();
-      //ignore
-    }
     try {
       registerListener(zkClient);
     } catch (KeeperException | InterruptedException e) {
@@ -124,10 +125,11 @@ public class PackageAPI {
 
 
   private Packages readPkgsFromZk(byte[] data, Stat stat) throws KeeperException, InterruptedException {
+
     if (data == null || stat == null) {
       stat = new Stat();
       data = coreContainer.getZkController().getZkClient()
-          .getData(SOLR_PKGS_PATH, null, stat, true);
+          .getData(ZkStateReader.CLUSTER_PROPS, null, stat, true);
 
     }
     Packages packages = null;

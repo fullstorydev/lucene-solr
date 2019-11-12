@@ -15,32 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.solr.client.solrj.request.beans;
-
-import java.util.List;
-
-import org.apache.solr.common.annotation.JsonProperty;
-import org.apache.solr.common.util.ReflectMapWriter;
-
-/**Just a container class for POJOs used in Package APIs
- *
+/**
+ * Annotations mapping to Jackson
  */
-public class Package {
-  public static class AddVersion implements ReflectMapWriter {
-    @JsonProperty(value = "package", required = true)
-    public String pkg;
-    @JsonProperty(required = true)
-    public String version;
-    @JsonProperty(required = true)
-    public List<String> files;
+package org.apache.solr.common.annotation;
 
-  }
 
-  public static class DelVersion implements ReflectMapWriter {
-    @JsonProperty(value = "package", required = true)
-    public String pkg;
-    @JsonProperty(required = true)
-    public String version;
-
-  }
-}
