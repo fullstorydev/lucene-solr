@@ -157,6 +157,10 @@ public class PackageStoreAPI {
           if (signatures != null) {
             vals.put("sig", signatures);
           }
+          PackageStore.FileType type = packageStore.getType(path, true);
+          if(type != PackageStore.FileType.NOFILE) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,  "Path already exists "+ path);
+          }
           packageStore.put(new PackageStore.FileEntry(buf, new MetaData(vals), path));
           rsp.add(CommonParams.FILE, path);
         } catch (IOException e) {
@@ -203,9 +207,8 @@ public class PackageStoreAPI {
       }
       for (String sig : sigs) {
         if (cryptoKeys.verify(sig, buf) == null) {
-          String sha512 = DigestUtils.sha512Hex(new ByteBufferInputStream(buf));
-          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,  "Signature does not match any public key : " + sig + " sha512 : "+ sha512
-          + " size: "+ buf.limit() + " sighash: "+ sig.hashCode() );
+          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Signature does not match any public key : " + sig +" len: "+buf.limit()+  " content sha512: "+
+              DigestUtils.sha512Hex(new ByteBufferInputStream(buf)));
         }
 
       }
