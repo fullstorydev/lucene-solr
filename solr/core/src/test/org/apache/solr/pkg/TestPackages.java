@@ -56,6 +56,7 @@ import static org.apache.solr.common.params.CommonParams.JAVABIN;
 import static org.apache.solr.common.params.CommonParams.WT;
 import static org.apache.solr.core.TestDynamicLoading.getFileContent;
 import static org.apache.solr.filestore.TestDistribPackageStore.readFile;
+import static org.apache.solr.filestore.TestDistribPackageStore.waitForAllNodesHaveFile;
 
 @LogLevel("org.apache.solr.pkg.PackageLoader=DEBUG;org.apache.solr.pkg.PackageAPI=DEBUG")
 public class TestPackages extends SolrCloudTestCase {
@@ -295,6 +296,17 @@ public class TestPackages extends SolrCloudTestCase {
       verifyCmponent(cluster.getSolrClient(),
           COLLECTION_NAME, "requestHandler", "/runtime",
           "mypkg", "2.1" );
+      //we create a new node. This node does not have the packages. But it should download it from another node
+      JettySolrRunner jetty = cluster.startJettySolrRunner();
+      //create a new replica for this collection. it should end up
+      CollectionAdminRequest.addReplicaToShard(COLLECTION_NAME, "shard1")
+          .setNrtReplicas(1)
+          .setNode(jetty.getNodeName())
+          .process(cluster.getSolrClient());
+      cluster.waitForActiveCollection(COLLECTION_NAME, 2, 5);
+      waitForAllNodesHaveFile(cluster,FILE3,
+          Utils.makeMap(":files:" + FILE3 + ":name", "runtimelibs_v3.jar"),
+          false);
 
     } finally {
       cluster.shutdown();

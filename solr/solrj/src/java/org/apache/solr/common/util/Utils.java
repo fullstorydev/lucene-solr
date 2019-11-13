@@ -245,11 +245,15 @@ public class Utils {
   }
 
   public static Object fromJSON(byte[] utf8) {
+    return fromJSON(utf8, 0, utf8.length);
+  }
+
+  public static Object fromJSON(byte[] utf8, int offset, int length) {
     // convert directly from bytes to chars
     // and parse directly from that instead of going through
     // intermediate strings or readers
     CharArr chars = new CharArr();
-    ByteUtils.UTF8toUTF16(utf8, 0, utf8.length, chars);
+    ByteUtils.UTF8toUTF16(utf8, offset, length, chars);
     JSONParser parser = new JSONParser(chars.getArray(), chars.getStart(), chars.length());
     parser.setFlags(parser.getFlags() |
         JSONParser.ALLOW_MISSING_COLON_COMMA_BEFORE_OBJECT |
