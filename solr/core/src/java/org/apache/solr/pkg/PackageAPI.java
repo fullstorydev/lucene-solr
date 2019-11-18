@@ -56,8 +56,8 @@ import static org.apache.solr.common.cloud.ZkStateReader.SOLR_PKGS_PATH;
 import static org.apache.solr.security.PermissionNameProvider.Name.PACKAGE_EDIT_PERM;
 import static org.apache.solr.security.PermissionNameProvider.Name.PACKAGE_READ_PERM;
 
-/**This implements the public end points (/api/cluster/package) of package API.
- *
+/**
+ * This implements the public end points (/api/cluster/package) of package API.
  */
 public class PackageAPI {
   public static final String PACKAGES = "packages";
@@ -79,7 +79,7 @@ public class PackageAPI {
     SolrZkClient zkClient = coreContainer.getZkController().getZkClient();
     try {
       pkgs = readPkgsFromZk(null, null);
-    } catch (KeeperException |InterruptedException e ) {
+    } catch (KeeperException | InterruptedException e) {
       pkgs = new Packages();
       //ignore
     }
@@ -202,7 +202,7 @@ public class PackageAPI {
     @Override
     public String toString() {
       try {
-        return Utils.writeJson(this, new StringWriter(), false).toString() ;
+        return Utils.writeJson(this, new StringWriter(), false).toString();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -228,6 +228,7 @@ public class PackageAPI {
         return;
       }
 
+      packageLoader.notifyListeners(p);
       for (String s : coreContainer.getPackageStoreAPI().shuffledNodes()) {
         Utils.executeGET(coreContainer.getUpdateShardHandler().getDefaultHttpClient(),
             coreContainer.getZkController().zkStateReader.getBaseUrlForNodeName(s).replace("/solr", "/api") + "/cluster/package?wt=javabin&omitHeader=true&refreshPackage=" + p,
@@ -260,7 +261,17 @@ public class PackageAPI {
             log.error("Error deserializing packages.json", e);
             packages = new Packages();
           }
-          packages.packages.computeIfAbsent(add.pkg, Utils.NEW_ARRAYLIST_FUN).add(new PkgVersion(add));
+          List list = packages.packages.computeIfAbsent(add.pkg, Utils.NEW_ARRAYLIST_FUN);
+          for (Object o : list) {
+            if (o instanceof PkgVersion) {
+              PkgVersion version = (PkgVersion) o;
+              if (Objects.equals(version.version, add.version)) {
+                payload.addError("Version '" + add.version + "' exists already");
+                return null;
+              }
+            }
+          }
+          list.add(new PkgVersion(add));
           packages.znodeVersion = stat.getVersion() + 1;
           finalState[0] = packages;
           return Utils.toJSON(packages);

@@ -55,7 +55,7 @@ public class CacheConfig implements MapSerializable {
 
   private String cacheImpl;
 
-  private Object[] persistence = new Object[1];
+  Object[] persistence = new Object[1];
 
   private String regenImpl;
 
@@ -144,7 +144,7 @@ public class CacheConfig implements MapSerializable {
     Class<? extends SolrCache> clazz = core.getResourceLoader().findClass(cacheImpl, SolrCache.class);
     try {
       SolrCache cache = clazz.getConstructor().newInstance();
-      persistence[0] = cache.init(args, persistence[0], regenerator);
+      initCache(cache);
       return cache;
     } catch (Exception e) {
       SolrException.log(log, "Error instantiating cache", e);
@@ -152,6 +152,10 @@ public class CacheConfig implements MapSerializable {
       // in some cases (like an OOM) we probably should try to continue.
       return null;
     }
+  }
+
+  void initCache(SolrCache cache) {
+    persistence[0] = cache.init(args, persistence[0], regenerator);
   }
 
   @Override

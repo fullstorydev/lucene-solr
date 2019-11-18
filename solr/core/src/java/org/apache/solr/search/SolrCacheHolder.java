@@ -43,10 +43,13 @@ public class SolrCacheHolder<K, V> implements SolrCache<K, V> {
       protected void reload(PackageLoader.Package pkg) {
         super.reload(pkg);
         delegate = (SolrCache) get();
+        factory.initCache(delegate);
         if (metricsInitializer != null) metricsInitializer.run();
       }
     };
-    delegate = (SolrCache<K, V>) holder.get();
+    SolrCache<K, V> inst = (SolrCache<K, V>) holder.get();
+    factory.initCache(inst);
+    this.delegate = inst;
   }
 
   public int size() {
