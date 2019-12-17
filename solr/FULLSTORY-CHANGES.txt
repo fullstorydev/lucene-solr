@@ -28,3 +28,7 @@
 * SOLR-13822: A Package management system with the following features. A packages.json in ZK to store
   the configuration, APIs to read/edit them and isolated classloaders to load the classes from
   hose packages if the 'class' attribute is prefixed with `<package-name>:` (noble)
+
+* SOLR-13662: A CLI based Package Manager ("bin/solr package help" for more details).
+  (Ishan Chattopadhyaya)
+
