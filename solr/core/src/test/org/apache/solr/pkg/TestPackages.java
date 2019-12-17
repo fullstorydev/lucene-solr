@@ -26,6 +26,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -33,14 +34,17 @@ import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.client.solrj.request.RequestWriter;
+import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.request.V2Request;
 import org.apache.solr.client.solrj.request.beans.Package;
+import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.cloud.ConfigRequest;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.MapWriterMap;
 import org.apache.solr.common.NavigableObject;
+import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
@@ -49,6 +53,8 @@ import org.apache.solr.filestore.TestDistribPackageStore;
 import org.apache.solr.util.LogLevel;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.Stat;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.solr.common.cloud.ZkStateReader.SOLR_PKGS_PATH;
@@ -59,11 +65,21 @@ import static org.apache.solr.filestore.TestDistribPackageStore.readFile;
 import static org.apache.solr.filestore.TestDistribPackageStore.waitForAllNodesHaveFile;
 
 @LogLevel("org.apache.solr.pkg.PackageLoader=DEBUG;org.apache.solr.pkg.PackageAPI=DEBUG")
+//@org.apache.lucene.util.LuceneTestCase.AwaitsFix(bugUrl="https://issues.apache.org/jira/browse/SOLR-13822") // leaks files
 public class TestPackages extends SolrCloudTestCase {
+
+  @Before
+  public void setup() {
+    System.setProperty("enable.packages", "true");
+  }
+
+  @After
+  public void teardown() {
+    System.clearProperty("enable.packages");
+  }
 
   @Test
   public void testPluginLoading() throws Exception {
-    System.setProperty("enable.packages", "true");
     MiniSolrCloudCluster cluster =
         configureCluster(4)
             .withJettyConfig(jetty -> jetty.enableV2(true))
@@ -73,6 +89,8 @@ public class TestPackages extends SolrCloudTestCase {
       String FILE1 = "/mypkg/runtimelibs.jar";
       String FILE2 = "/mypkg/runtimelibs_v2.jar";
       String FILE3 = "/mypkg/runtimelibs_v3.jar";
+      String URP1 = "/mypkg/testurpv1.jar";
+      String URP2 = "/mypkg/testurpv2.jar";
       String COLLECTION_NAME = "testPluginLoadingColl";
       byte[] derFile = readFile("cryptokeys/pub_key512.der");
       cluster.getZkClient().makePath("/keys/exe", true);
@@ -80,10 +98,13 @@ public class TestPackages extends SolrCloudTestCase {
       postFileAndWait(cluster, "runtimecode/runtimelibs.jar.bin", FILE1,
           "L3q/qIGs4NaF6JiO0ZkMUFa88j0OmYc+I6O7BOdNuMct/xoZ4h73aZHZGc0+nmI1f/U3bOlMPINlSOM6LK3JpQ==");
 
+      postFileAndWait(cluster, "runtimecode/testurp_v1.jar.bin", URP1,
+          "h6UmMzuPqu4hQFGLBMJh/6kDSEXpJlgLsQDXx0KuxXWkV5giilRP57K3towiJRh2J+rqihqIghNCi3YgzgUnWQ==");
+
       Package.AddVersion add = new Package.AddVersion();
       add.version = "1.0";
       add.pkg = "mypkg";
-      add.files = Arrays.asList(new String[]{FILE1});
+      add.files = Arrays.asList(new String[]{FILE1, URP1});
       V2Request req = new V2Request.Builder("/cluster/package")
           .forceV2(true)
           .withMethod(SolrRequest.METHOD.POST)
@@ -112,6 +133,7 @@ public class TestPackages extends SolrCloudTestCase {
           "'create-requesthandler' : { 'name' : '/runtime', 'class': 'mypkg:org.apache.solr.core.RuntimeLibReqHandler' }," +
           "'create-searchcomponent' : { 'name' : 'get', 'class': 'mypkg:org.apache.solr.core.RuntimeLibSearchComponent'  }," +
           "'create-queryResponseWriter' : { 'name' : 'json1', 'class': 'mypkg:org.apache.solr.core.RuntimeLibResponseWriter' }" +
+          "'create-updateProcessor' : { 'name' : 'myurp', 'class': 'mypkg:org.apache.solr.update.TestVersionedURP' }" +
           "}";
       cluster.getSolrClient().request(new ConfigRequest(payload) {
         @Override
@@ -132,7 +154,20 @@ public class TestPackages extends SolrCloudTestCase {
           COLLECTION_NAME, "requestHandler", "/runtime",
           "mypkg", "1.0" );
 
+      verifyCmponent(cluster.getSolrClient(),
+          COLLECTION_NAME, "updateProcessor", "myurp",
+          "mypkg", "1.0" );
 
+      UpdateRequest ur = new UpdateRequest();
+      ur.add(new SolrInputDocument("id", "1"));
+      ur.setParam("processor", "myurp");
+      ur.process(cluster.getSolrClient(), COLLECTION_NAME);
+      cluster.getSolrClient().commit(COLLECTION_NAME, true, true);
+
+      QueryResponse result = cluster.getSolrClient()
+          .query(COLLECTION_NAME, new SolrQuery( "id:1"));
+
+      assertEquals("Version 1", result.getResults().get(0).getFieldValue("TestVersionedURP.Ver_s"));
 
       executeReq( "/" + COLLECTION_NAME + "/runtime?wt=javabin", cluster.getRandomJetty(random()),
           Utils.JAVABINCONSUMER,
@@ -152,9 +187,11 @@ public class TestPackages extends SolrCloudTestCase {
       postFileAndWait(cluster, "runtimecode/runtimelibs_v2.jar.bin", FILE2,
           "j+Rflxi64tXdqosIhbusqi6GTwZq8znunC/dzwcWW0/dHlFGKDurOaE1Nz9FSPJuXbHkVLj638yZ0Lp1ssnoYA==");
 
+      postFileAndWait(cluster, "runtimecode/testurp_v2.jar.bin", URP2,
+          "P/ptFXRvQMd4oKPvadSpd+A9ffwY3gcex5GVFVRy3df0/OF8XT5my8rQz7FZva+2ORbWxdXS8NKwNrbPVHLGXw==");
       //add the version using package API
       add.version = "1.1";
-      add.files = Arrays.asList(new String[]{FILE2});
+      add.files = Arrays.asList(new String[]{FILE2,URP2});
       req.process(cluster.getSolrClient());
 
       verifyCmponent(cluster.getSolrClient(),
@@ -169,6 +206,11 @@ public class TestPackages extends SolrCloudTestCase {
           COLLECTION_NAME, "requestHandler", "/runtime",
           "mypkg", "1.1" );
 
+      verifyCmponent(cluster.getSolrClient(),
+          COLLECTION_NAME, "updateProcessor", "myurp",
+          "mypkg", "1.1" );
+
+
       executeReq( "/" + COLLECTION_NAME + "/get?wt=json", cluster.getRandomJetty(random()),
           Utils.JSONCONSUMER,
           Utils.makeMap(  "Version","2"));
@@ -179,7 +221,7 @@ public class TestPackages extends SolrCloudTestCase {
           "a400n4T7FT+2gM0SC6+MfSOExjud8MkhTSFylhvwNjtWwUgKdPFn434Wv7Qc4QEqDVLhQoL3WqYtQmLPti0G4Q==");
 
       add.version = "2.1";
-      add.files = Arrays.asList(new String[]{FILE3});
+      add.files = Arrays.asList(new String[]{FILE3, URP2});
       req.process(cluster.getSolrClient());
 
       //now let's verify that the classes are updated
@@ -198,6 +240,18 @@ public class TestPackages extends SolrCloudTestCase {
       executeReq( "/" + COLLECTION_NAME + "/runtime?wt=json", cluster.getRandomJetty(random()),
           Utils.JSONCONSUMER,
           Utils.makeMap("Version","2"));
+
+      //insert a doc with urp
+      ur = new UpdateRequest();
+      ur.add(new SolrInputDocument("id", "2"));
+      ur.setParam("processor", "myurp");
+      ur.process(cluster.getSolrClient(), COLLECTION_NAME);
+      cluster.getSolrClient().commit(COLLECTION_NAME, true, true);
+
+      result = cluster.getSolrClient()
+          .query(COLLECTION_NAME, new SolrQuery( "id:2"));
+
+      assertEquals("Version 2", result.getResults().get(0).getFieldValue("TestVersionedURP.Ver_s"));
 
 
       Package.DelVersion delVersion = new Package.DelVersion();
@@ -249,7 +303,7 @@ public class TestPackages extends SolrCloudTestCase {
       }.process(cluster.getSolrClient()) ;
 
       add.version = "2.1";
-      add.files = Arrays.asList(new String[]{FILE3});
+      add.files = Arrays.asList(new String[]{FILE3, URP2});
       req.process(cluster.getSolrClient());
 
       //the collections mypkg is set to use version 1.1
@@ -478,7 +532,7 @@ public class TestPackages extends SolrCloudTestCase {
     }
   }
 
-  public static void postFileAndWait(MiniSolrCloudCluster cluster, String fname, String path, String sig) throws Exception {
+  static void postFileAndWait(MiniSolrCloudCluster cluster, String fname, String path, String sig) throws Exception {
     ByteBuffer fileContent = getFileContent(fname);
     String sha512 = DigestUtils.sha512Hex(fileContent.array());
 

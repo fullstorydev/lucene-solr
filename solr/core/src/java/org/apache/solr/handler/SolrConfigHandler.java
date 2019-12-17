@@ -47,7 +47,6 @@ import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
-import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
@@ -171,8 +170,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
       this.method = httpMethod;
       path = (String) req.getContext().get("path");
       if (path == null) path = getDefaultPath();
-      parts = StrUtils.splitSmart(path, '/');
-      if (parts.get(0).isEmpty()) parts.remove(0);
+      parts = StrUtils.splitSmart(path, '/', true);
     }
 
     private String getDefaultPath() {
@@ -248,36 +246,27 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             if (componentName != null) {
               Map map = (Map) val.get(parts.get(1));
               if (map != null) {
-                fillPackageInfo(componentName, map);
-                val.put(parts.get(1), makeMap(componentName, map.get(componentName)));
+                Object o = map.get(componentName);
+                val.put(parts.get(1), makeMap(componentName, o));
+                if (req.getParams().getBool("meta", false)) {
+                  // meta=true is asking for the package info of the plugin
+                  // We go through all the listeners and see if there is one registered for this plugin
+                  List<PackageListeners.Listener> listeners = req.getCore().getPackageListeners().getListeners();
+                  for (PackageListeners.Listener listener :
+                      listeners) {
+                    PluginInfo info = listener.pluginInfo();
+                    if(info == null) continue;
+                    if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
+                      if (o instanceof Map) {
+                        Map m1 = (Map) o;
+                        m1.put("_packageinfo_", listener.getPackageVersion());
+                      }
+                    }
+                  }
+                }
               }
             }
             resp.add("config", val);
-          }
-        }
-      }
-    }
-
-    private void fillPackageInfo(String componentName, Map map) {
-      Object o = map.get(componentName);
-      if (req.getParams().getBool("meta", false)) {
-        // meta=true is asking for the package info of the plugin
-        // We go through all the listeners and see if there is one registered for this plugin
-        List<PackageListeners.Listener> listeners = req.getCore().getPackageListeners().getListeners();
-        for (PackageListeners.Listener listener :
-            listeners) {
-          PluginInfo info = listener.pluginInfo();
-          if(info == null) continue;
-          if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
-            if (o instanceof Map) {
-              Map m1 = (Map) o;
-              m1.put("_packageinfo_", listener.getPackageVersion());
-            } else if(o instanceof MapWriter){
-              map.put(componentName, (MapWriter) ew -> {
-                ((MapWriter) o).writeMap(ew);
-                ew.put("_packageinfo_", listener.getPackageVersion());
-              });
-            }
           }
         }
       }
@@ -442,10 +431,14 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             if (op.hasError()) break;
             for (String s : name) {
               if (params.getParams(s) == null) {
-                op.addError(formatString("can't delete . No such params ''{0}'' exist", s));
+                op.addError(formatString("Could not delete. No such params ''{0}'' exist", s));
               }
               params = params.setParams(s, null);
             }
+            break;
+          }
+          default: {
+            op.unknownOperation();
           }
         }
       }
@@ -532,7 +525,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
       } else {
         SolrResourceLoader.persistConfLocally(loader, ConfigOverlay.RESOURCE_NAME, overlay.toByteArray());
         req.getCore().getCoreContainer().reload(req.getCore().getName());
-        log.info("Executed config commands successfully and persited to File System {}", ops);
+        log.info("Executed config commands successfully and persisted to File System {}", ops);
       }
 
     }
@@ -799,7 +792,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
 
         if (!success) {
           String coreUrl = concurrentTasks.get(f).coreUrl;
-          log.warn("Core " + coreUrl + "could not get the expected version " + expectedVersion);
+          log.warn("Core " + coreUrl + " could not get the expected version " + expectedVersion);
           if (failedList == null) failedList = new ArrayList<>();
           failedList.add(coreUrl);
         }

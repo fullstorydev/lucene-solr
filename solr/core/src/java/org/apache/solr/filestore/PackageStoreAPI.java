@@ -47,6 +47,7 @@ import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.BlobRepository;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.pkg.PackageAPI;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.security.PermissionNameProvider;
@@ -135,6 +136,9 @@ public class PackageStoreAPI {
 
     @Command
     public void upload(SolrQueryRequest req, SolrQueryResponse rsp) {
+      if(!coreContainer.getPackageLoader().getPackageAPI().isEnabled()) {
+        throw new RuntimeException(PackageAPI.ERR_MSG);
+      }
       try {
         coreContainer.getZkController().getZkClient().create(TMP_ZK_NODE, "true".getBytes(UTF_8),
             CreateMode.EPHEMERAL, true);
@@ -150,7 +154,6 @@ public class PackageStoreAPI {
         try {
           ByteBuffer buf = SimplePostTool.inputStreamToByteArray(stream.getStream());
           String sha512 = DigestUtils.sha512Hex(new ByteBufferInputStream(buf));
-          log.info("Uploading content with size :{}, sha512: {} ",buf.limit(), sha512);
           List<String> signatures = readSignatures(req, buf);
           Map<String, Object> vals = new HashMap<>();
           vals.put(MetaData.SHA512, sha512);

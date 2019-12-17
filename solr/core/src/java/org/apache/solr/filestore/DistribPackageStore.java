@@ -292,7 +292,7 @@ public class DistribPackageStore implements PackageStore {
 
           ew.put("size", size());
           ew.put("timestamp", getTimeStamp());
-          if(metaData != null)
+          if (metaData != null)
             metaData.writeMap(ew);
 
         }
@@ -321,7 +321,7 @@ public class DistribPackageStore implements PackageStore {
     byte[] bytes = baos.toByteArray();
     info.persistToFile(entry.buf, ByteBuffer.wrap(bytes, 0, bytes.length));
     tmpFiles.put(entry.getPath(), info);
-    List<String> nodes =  coreContainer.getPackageStoreAPI().shuffledNodes();
+    List<String> nodes = coreContainer.getPackageStoreAPI().shuffledNodes();
     int i = 0;
     int FETCHFROM_SRC = 50;
     String myNodeName = coreContainer.getZkController().getNodeName();

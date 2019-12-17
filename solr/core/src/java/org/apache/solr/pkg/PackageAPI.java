@@ -56,13 +56,15 @@ import static org.apache.solr.common.cloud.ZkStateReader.SOLR_PKGS_PATH;
 import static org.apache.solr.security.PermissionNameProvider.Name.PACKAGE_EDIT_PERM;
 import static org.apache.solr.security.PermissionNameProvider.Name.PACKAGE_READ_PERM;
 
-/**
- * This implements the public end points (/api/cluster/package) of package API.
+/**This implements the public end points (/api/cluster/package) of package API.
+ *
  */
 public class PackageAPI {
   public static final String PACKAGES = "packages";
   public final boolean enablePackages = Boolean.parseBoolean(System.getProperty("enable.packages", "false"));
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+  public static final String ERR_MSG = "Package loading is not enabled , Start your nodes with -Denable.packages=true";
 
   final CoreContainer coreContainer;
   private final ObjectMapper mapper = SolrJacksonAnnotationInspector.createObjectMapper();
@@ -180,12 +182,20 @@ public class PackageAPI {
     @JsonProperty
     public List<String> files;
 
+    @JsonProperty
+    public String manifest;
+
+    @JsonProperty
+    public String manifestSHA512;
+
     public PkgVersion() {
     }
 
     public PkgVersion(Package.AddVersion addVersion) {
       this.version = addVersion.version;
       this.files = addVersion.files;
+      this.manifest = addVersion.manifest;
+      this.manifestSHA512 = addVersion.manifestSHA512;
     }
 
     @Override
@@ -202,7 +212,7 @@ public class PackageAPI {
     @Override
     public String toString() {
       try {
-        return Utils.writeJson(this, new StringWriter(), false).toString();
+        return Utils.writeJson(this, new StringWriter(), false).toString() ;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -227,7 +237,7 @@ public class PackageAPI {
         payload.addError("No such package: " + p);
         return;
       }
-
+      //first refresh my own
       packageLoader.notifyListeners(p);
       for (String s : coreContainer.getPackageStoreAPI().shuffledNodes()) {
         Utils.executeGET(coreContainer.getUpdateShardHandler().getDefaultHttpClient(),
@@ -333,9 +343,13 @@ public class PackageAPI {
 
   }
 
+  public boolean isEnabled() {
+    return enablePackages;
+  }
+
   private boolean checkEnabled(CommandOperation payload) {
     if (!enablePackages) {
-      payload.addError("Package loading is not enabled , Start your nodes with -Denable.packages=true");
+      payload.addError(ERR_MSG);
       return false;
     }
     return true;
@@ -386,9 +400,14 @@ public class PackageAPI {
           pkgs = readPkgsFromZk(null, null);
         } catch (KeeperException | InterruptedException e) {
           handleZkErr(e);
+
         }
+
       }
+
     }
+
+
   }
 
   void notifyAllNodesToSync(int expected) {
