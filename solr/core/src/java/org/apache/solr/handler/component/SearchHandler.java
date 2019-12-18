@@ -40,6 +40,8 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.RequestHandlerBase;
+import org.apache.solr.pkg.PackageListeners;
+import org.apache.solr.pkg.PackageLoader;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.SolrQueryTimeoutImpl;
@@ -58,7 +60,6 @@ import static org.apache.solr.common.params.CommonParams.PATH;
 
 
 /**
- *
  * Refer SOLR-281
  *
  */
@@ -74,8 +75,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware ,
   private PluginInfo shfInfo;
   private SolrCore core;
 
-  protected List<String> getDefaultComponents()
-  {
+  protected List<String> getDefaultComponents() {
     ArrayList<String> names = new ArrayList<>(8);
     names.add( QueryComponent.COMPONENT_NAME );
     names.add( FacetComponent.COMPONENT_NAME );
@@ -94,7 +94,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware ,
   public void init(PluginInfo info) {
     init(info.initArgs);
     for (PluginInfo child : info.children) {
-      if("shardHandlerFactory".equals(child.type)){
+      if ("shardHandlerFactory".equals(child.type)) {
         this.shfInfo = child;
         break;
       }
@@ -140,6 +140,32 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware ,
 
         @Override
         public void postClose(SolrCore core) {
+        }
+      });
+    }
+
+    if (core.getCoreContainer().isZooKeeperAware()) {
+      core.getPackageListeners().addListener(new PackageListeners.Listener() {
+        @Override
+        public String packageName() {
+          return null;
+        }
+
+        @Override
+        public PluginInfo pluginInfo() {
+          return null;
+        }
+
+        @Override
+        public void changed(PackageLoader.Package pkg) {
+          //we could optimize this by listening to only relevant packages,
+          // but it is not worth optimizing as these are lightweight objects
+          components = null;
+        }
+
+        @Override
+        public PackageLoader.Package.Version getPackageVersion() {
+          return null;
         }
       });
     }

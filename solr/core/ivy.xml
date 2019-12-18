@@ -137,6 +137,7 @@
     <dependency org="org.bouncycastle" name="bcprov-jdk15on" rev="${/org.bouncycastle/bcprov-jdk15on}" conf="test.MiniKdc"/>
     <dependency org="antlr" name="antlr" rev="${/antlr/antlr}" conf="test.MiniKdc"/>
     <dependency org="net.sf.ehcache" name="ehcache-core" rev="${/net.sf.ehcache/ehcache-core}" conf="test.MiniKdc"/>
+    <dependency org="com.jayway.jsonpath" name="json-path" rev="${/com.jayway.jsonpath/json-path}" conf="compile"/>
 
     <dependency org="org.apache.curator" name="curator-framework" rev="${/org.apache.curator/curator-framework}" conf="compile"/>
     <dependency org="org.apache.curator" name="curator-client" rev="${/org.apache.curator/curator-client}" conf="compile"/>
@@ -154,6 +155,9 @@
     <dependency org="org.codehaus.janino" name="janino" rev="${/org.codehaus.janino/janino}" conf="compile"/>
     <dependency org="org.codehaus.janino" name="commons-compiler" rev="${/org.codehaus.janino/commons-compiler}" conf="compile"/>
     <dependency org="com.google.protobuf" name="protobuf-java" rev="${/com.google.protobuf/protobuf-java}" conf="compile"/>
+
+    <!-- Package manager -->
+    <dependency org="com.github.zafarkhaja" name="java-semver" rev="${/com.github.zafarkhaja/java-semver}" conf="compile"/>
 
     <dependency org="org.rrd4j" name="rrd4j" rev="${/org.rrd4j/rrd4j}" conf="compile"/>
 

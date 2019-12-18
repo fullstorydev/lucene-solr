@@ -16,6 +16,16 @@
  */
 package org.apache.solr.client.solrj.embedded;
 
+import javax.servlet.DispatcherType;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.BindException;
@@ -33,17 +43,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.servlet.DispatcherType;
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -53,6 +52,8 @@ import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.servlet.SolrDispatchFilter;
 import org.apache.solr.util.TimeOut;
+import org.eclipse.jetty.rewrite.handler.RewriteHandler;
+import org.eclipse.jetty.rewrite.handler.RewritePatternRule;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -60,6 +61,7 @@ import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.server.handler.HandlerWrapper;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.server.session.DefaultSessionIdManager;
 import org.eclipse.jetty.servlet.FilterHolder;
@@ -299,6 +301,8 @@ public class JettySolrRunner {
       server.setConnectors(new Connector[] {connector});
     }
 
+    HandlerWrapper chain;
+    {
     // Initialize the servlets
     final ServletContextHandler root = new ServletContextHandler(server, config.context, ServletContextHandler.SESSIONS);
 
@@ -357,11 +361,24 @@ public class JettySolrRunner {
         System.clearProperty("hostPort");
       }
     });
-
     // for some reason, there must be a servlet for this to get applied
     root.addServlet(Servlet404.class, "/*");
+    chain = root;
+    }
+
+    chain = injectJettyHandlers(chain);
+
+    if(config.enableV2) {
+      RewriteHandler rwh = new RewriteHandler();
+      rwh.setHandler(chain);
+      rwh.setRewriteRequestURI(true);
+      rwh.setRewritePathInfo(false);
+      rwh.setOriginalPathAttribute("requestedPath");
+      rwh.addRule(new RewritePatternRule("/api/*", "/solr/____v2"));
+      chain = rwh;
+    }
     GzipHandler gzipHandler = new GzipHandler();
-    gzipHandler.setHandler(root);
+    gzipHandler.setHandler(chain);
 
     gzipHandler.setMinGzipSize(0);
     gzipHandler.setCheckGzExists(false);
@@ -371,6 +388,13 @@ public class JettySolrRunner {
 
     server.setHandler(gzipHandler);
   }
+
+  /** descendants may inject own handler chaining it to the given root
+   * and then returning that own one*/
+  protected HandlerWrapper injectJettyHandlers(HandlerWrapper chain) {
+    return chain;
+  }
+
 
   /**
    * @return the {@link SolrDispatchFilter} for this node

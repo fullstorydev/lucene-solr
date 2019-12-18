@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.CharacterCodingException;
@@ -95,7 +96,10 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
   };
   private static final java.lang.String SOLR_CORE_NAME = "solr.core.name";
   private static Set<String> loggedOnce = new ConcurrentSkipListSet<>();
+  private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
+
+  private String name = "";
   protected URLClassLoader classLoader;
   private final Path instanceDir;
   private String dataDir;
@@ -103,7 +107,6 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
   private final List<SolrCoreAware> waitingForCore = Collections.synchronizedList(new ArrayList<SolrCoreAware>());
   private final List<SolrInfoBean> infoMBeans = Collections.synchronizedList(new ArrayList<SolrInfoBean>());
   private final List<ResourceLoaderAware> waitingForResources = Collections.synchronizedList(new ArrayList<ResourceLoaderAware>());
-  private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
   private final Properties coreProperties;
 
@@ -133,10 +136,19 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
    * found in the "lib/" directory in the specified instance directory.
    * If the instance directory is not specified (=null), SolrResourceLoader#locateInstanceDir will provide one.
    */
-  public SolrResourceLoader(Path instanceDir, ClassLoader parent)
-  {
+  public SolrResourceLoader(Path instanceDir, ClassLoader parent) {
     this(instanceDir, parent, null);
   }
+
+  public SolrResourceLoader(String name, List<Path> classpath, Path instanceDir, ClassLoader parent) throws MalformedURLException {
+    this(instanceDir, parent);
+    this.name = name;
+    for (Path path : classpath) {
+      addToClassLoader(path.toUri().normalize().toURL());
+    }
+
+  }
+
 
   public SolrResourceLoader(Path instanceDir) {
     this(instanceDir, null, null);
@@ -156,7 +168,7 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
     if (instanceDir == null) {
       this.instanceDir = SolrResourceLoader.locateSolrHome().toAbsolutePath().normalize();
       log.debug("new SolrResourceLoader for deduced Solr Home: '{}'", this.instanceDir);
-    } else{
+    } else {
       this.instanceDir = instanceDir.toAbsolutePath().normalize();
       log.debug("new SolrResourceLoader for directory: '{}'", this.instanceDir);
     }
@@ -495,25 +507,26 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
    * for the same class faster. The caching is done only if the class is loaded by the webapp classloader and it
    * is loaded using a shortname.
    *
-   * @param cname The name or the short name of the class.
+   * @param cname       The name or the short name of the class.
    * @param subpackages the packages to be tried if the cname starts with solr.
    * @return the loaded class. An exception is thrown if it fails
    */
   public <T> Class<? extends T> findClass(String cname, Class<T> expectedType, String... subpackages) {
     if (subpackages == null || subpackages.length == 0 || subpackages == packages) {
       subpackages = packages;
-      String  c = classNameCache.get(cname);
-      if(c != null) {
+      String c = classNameCache.get(cname);
+      if (c != null) {
         try {
           return Class.forName(c, true, classLoader).asSubclass(expectedType);
-        } catch (ClassNotFoundException e) {
-          //this is unlikely
-          log.error("Unable to load cached class-name :  "+ c +" for shortname : "+cname + e);
+        }  catch (ClassNotFoundException | ClassCastException e) {
+          // this can happen if the legacyAnalysisPattern below caches the wrong thing
+          log.warn( name + " Unable to load cached class, attempting lookup. name={} shortname={} reason={}", c, cname, e);
+          classNameCache.remove(cname);
         }
 
       }
     }
-    
+
     Class<? extends T> clazz = null;
     try {
       // first try legacy analysis patterns, now replaced by Lucene's Analysis package:
