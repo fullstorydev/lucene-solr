@@ -33,6 +33,8 @@
 
   <resolvers>
     <ibiblio name="sonatype-releases" root="https://oss.sonatype.org/content/repositories/releases" m2compatible="true" />
+    <!-- restlet was acquired, and the repo has been in flux. using maven.restlet.talentd.com might be required if it
+    changes again. -->
     <ibiblio name="maven.restlet.com" root="https://maven.restlet.com" m2compatible="true" />
     <ibiblio name="releases.cloudera.com" root="https://repository.cloudera.com/content/repositories/releases" m2compatible="true" />
 
