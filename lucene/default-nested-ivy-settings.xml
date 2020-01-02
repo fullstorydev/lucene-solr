@@ -33,8 +33,10 @@
 
   <resolvers>
     <ibiblio name="sonatype-releases" root="https://oss.sonatype.org/content/repositories/releases" m2compatible="true" />
-    <ibiblio name="maven.restlet.org" root="http://maven.restlet.org" m2compatible="true" />
-    <ibiblio name="releases.cloudera.com" root="http://repository.cloudera.com/content/repositories/releases" m2compatible="true" />
+    <!-- restlet was acquired, and the repo has been in flux. using maven.restlet.talentd.com might be required if it
+    changes again. -->
+    <ibiblio name="maven.restlet.com" root="https://maven.restlet.com" m2compatible="true" />
+    <ibiblio name="releases.cloudera.com" root="https://repository.cloudera.com/content/repositories/releases" m2compatible="true" />
 
     <!-- you might need to tweak this from china so it works -->
     <ibiblio name="working-chinese-mirror" root="http://uk.maven.org/maven2" m2compatible="true" />
@@ -50,10 +52,9 @@
       <resolver ref="local"/>
       <!-- <resolver ref="local-maven-2" /> -->
       <resolver ref="main"/>
-      <resolver ref="maven.restlet.org" />
+      <resolver ref="maven.restlet.com" />
       <resolver ref="sonatype-releases" />
       <resolver ref="releases.cloudera.com"/>
-      <resolver ref="working-chinese-mirror" />
     </chain>
   </resolvers>
 
