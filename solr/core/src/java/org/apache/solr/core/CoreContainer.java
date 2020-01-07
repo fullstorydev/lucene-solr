@@ -576,8 +576,13 @@ public class CoreContainer {
     hostName = cfg.getNodeName();
 
     zkSys.initZooKeeper(this, solrHome, cfg.getCloudConfig());
-    if(isZooKeeperAware())  pkiAuthenticationPlugin = new PKIAuthenticationPlugin(this, zkSys.getZkController().getNodeName(),
-        (PublicKeyHandler) containerHandlers.get(PublicKeyHandler.PATH));
+    if (isZooKeeperAware()) {
+      pkiAuthenticationPlugin = new PKIAuthenticationPlugin(this, zkSys.getZkController().getNodeName(),
+          (PublicKeyHandler) containerHandlers.get(PublicKeyHandler.PATH));
+      packageLoader = new PackageLoader(this);
+      containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().editAPI), Collections.EMPTY_MAP);
+      containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().readAPI), Collections.EMPTY_MAP);
+    }
 
     MDCLoggingContext.setNode(this);
 
@@ -670,9 +675,6 @@ public class CoreContainer {
     if (isZooKeeperAware()) {
       containerHandlers.getApiBag().register(new AnnotatedApi(new ZkRead(this)), Collections.EMPTY_MAP);
       metricManager.loadClusterReporters(metricReporters, this);
-      packageLoader = new PackageLoader(this);
-      containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().editAPI), Collections.EMPTY_MAP);
-      containerHandlers.getApiBag().register(new AnnotatedApi(packageLoader.getPackageAPI().readAPI), Collections.EMPTY_MAP);
     }
 
 
