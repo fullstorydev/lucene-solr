@@ -172,8 +172,8 @@ public interface JsonTextWriter extends TextWriter {
           JsonTextWriter.this.writeMapSeparator();
         }
         JsonTextWriter.this.indent();
-        JsonTextWriter.this.writeKey(k.toString(), true);
-        writeVal(k.toString(), v);
+        JsonTextWriter.this.writeKey(k == null ? "" : k.toString(), true);
+        writeVal(k==null?"": k.toString(), v);
         return this;
       }
     });

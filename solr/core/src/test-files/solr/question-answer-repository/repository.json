@@ -13,7 +13,7 @@
           }
         ],
         "manifest": {
-          "version-constraint": "8 - 9",
+          "version-constraint": "7 - 9",
           "plugins": [
             {
               "name": "request-handler",
@@ -46,7 +46,7 @@
         "artifacts": [
           {
             "url": "question-answer-request-handler-1.1.jar.tmp",
-            "sig": "LypqlmbJ76AWa5jx0XhjKxO4lrcQAvpSuYddfzcE6TnX0VDPFhrlQHSSX6cZLtvNbQ+74xUMKgsoX1IUnEnKYw=="
+            "sig": "wRrjR61UNOknE/48eEc/DPEFYLNwi7PSE2+6zkRkygMhxYcOAjPhTKKAPgfSe2gtq7PJuXWQtTdhPpJcCCCpYA=="
           }
         ]
       }
