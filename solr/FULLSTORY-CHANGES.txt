@@ -34,3 +34,4 @@
 
 --reliease 8.4.1--
 * SOLR-14158: Package trusted keys to come from Package Store, not ZK (noble, Ishan Chattopadhyaya)
+* SOLR-14165: SolrResponse serialVersionUID has changed in a backward incompatible way (Andy Webb via noble)
