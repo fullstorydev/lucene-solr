@@ -804,7 +804,6 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     for (String p : whitelist) {
       passParam(params, fparams, p);
     }
-    passParam(params, fparams, "fs.ignoreconflicts");
     return fparams;
   }
 
