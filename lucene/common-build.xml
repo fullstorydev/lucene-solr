@@ -669,7 +669,7 @@
     <attribute name="pom.xml"/>
     <attribute name="jar.file" default="${dist.jar.dir.prefix}-${version}/${dist.jar.dir.suffix}/${final.name}.jar"/>
     <sequential>
-      <artifact:install-provider artifactId="wagon-ssh" version="1.0-beta-7"/>
+      <artifact:install-provider artifactId="wagon-ssh" version="1.0-beta-7">
         <remoteRepository id="${m2.repository.id}" url="${m2.repository.url}">
           <credentials/>
         </remoteRepository>
