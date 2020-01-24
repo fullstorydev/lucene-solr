@@ -674,7 +674,7 @@
       <artifact:pom id="maven.project" file="@{pom.xml}"/>
       <artifact:deploy file="@{jar.file}">
         <artifact-attachments/>
-        <remoteRepository id="${m2.repository.id}" url="${m2.repository.url}">
+        <remoteRepository id="${m2.repository.id}" url="https://repo1.maven.org/maven2">
           <credentials/>
         </remoteRepository>
         <pom refid="maven.project"/>
