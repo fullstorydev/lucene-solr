@@ -86,6 +86,8 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
   private CoreContainer coreContainer;
   private PackageListeningClassLoader schemaLoader ;
 
+  SolrCore core;
+
   private final List<SolrCoreAware> waitingForCore = Collections.synchronizedList(new ArrayList<SolrCoreAware>());
   private final List<SolrInfoBean> infoMBeans = Collections.synchronizedList(new ArrayList<SolrInfoBean>());
   private final List<ResourceLoaderAware> waitingForResources = Collections.synchronizedList(new ArrayList<ResourceLoaderAware>());
@@ -135,6 +137,10 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     }
     addToClassLoader(libUrls);
+  }
+
+  public SolrCore getCore(){
+    return core;
   }
 
 
