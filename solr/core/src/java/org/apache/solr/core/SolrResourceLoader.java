@@ -103,6 +103,8 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
   protected URLClassLoader classLoader;
   private final Path instanceDir;
   private String dataDir;
+
+  SolrCore core;
   
   private final List<SolrCoreAware> waitingForCore = Collections.synchronizedList(new ArrayList<SolrCoreAware>());
   private final List<SolrInfoBean> infoMBeans = Collections.synchronizedList(new ArrayList<SolrInfoBean>());
@@ -148,6 +150,10 @@ public class SolrResourceLoader implements ResourceLoader,Closeable
       addToClassLoader(path.toUri().normalize().toURL());
     }
 
+  }
+
+  public SolrCore getCore(){
+    return core;
   }
 
 
