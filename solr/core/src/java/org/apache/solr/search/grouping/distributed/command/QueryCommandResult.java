@@ -24,9 +24,9 @@ import org.apache.lucene.search.TopDocs;
 public class QueryCommandResult {
 
   private final TopDocs topDocs;
-  private final int matches;
+  private final long matches;
 
-  public QueryCommandResult(TopDocs topDocs, int matches) {
+  public QueryCommandResult(TopDocs topDocs, long matches) {
     this.topDocs = topDocs;
     this.matches = matches;
   }
@@ -35,7 +35,7 @@ public class QueryCommandResult {
     return topDocs;
   }
 
-  public int getMatches() {
+  public long getMatches() {
     return matches;
   }
 }
