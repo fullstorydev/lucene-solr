@@ -952,7 +952,7 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
   public static Object buildGroupedResult(IndexSchema schema, List<Grp> sortedGroups, int start, int rows, int group_offset, int group_limit, boolean includeNGroups) {
     Map<String,Object> result = new LinkedHashMap<>();
 
-    int matches = 0;
+    long matches = 0;
     for (Grp grp : sortedGroups) {
       matches += grp.docs.size();
     }

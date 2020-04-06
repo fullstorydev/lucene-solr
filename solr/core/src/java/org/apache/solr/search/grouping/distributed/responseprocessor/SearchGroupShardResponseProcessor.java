@@ -67,7 +67,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
 
     SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(rb.req.getSearcher());
     int maxElapsedTime = 0;
-    long hitCountDuringFirstPhase = 0;
+    int hitCountDuringFirstPhase = 0;
 
     NamedList<Object> shardInfo = null;
     if (rb.req.getParams().getBool(ShardParams.SHARDS_INFO, false)) {
@@ -89,7 +89,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
           t.printStackTrace(new PrintWriter(trace));
           nl.add("trace", trace.toString());
         } else {
-          nl.add("numFound", ((Number) srsp.getSolrResponse().getResponse().get("totalHitCount")).longValue());
+          nl.add("numFound", (Integer) srsp.getSolrResponse().getResponse().get("totalHitCount"));
         }
         if (srsp.getSolrResponse() != null) {
           nl.add("time", srsp.getSolrResponse().getElapsedTime());
@@ -111,11 +111,11 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
         String field = entry.getKey();
         final SearchGroupsFieldCommandResult firstPhaseCommandResult = result.get(field);
 
-        final Long groupCount = firstPhaseCommandResult.getGroupCount();
+        final Integer groupCount = firstPhaseCommandResult.getGroupCount();
         if (groupCount != null) {
-          Long existingGroupCount = rb.mergedGroupCounts.get(field);
+          Integer existingGroupCount = rb.mergedGroupCounts.get(field);
           // Assuming groups don't cross shard boundary...
-          rb.mergedGroupCounts.put(field, existingGroupCount != null ? Long.valueOf(existingGroupCount + groupCount) : groupCount);
+          rb.mergedGroupCounts.put(field, existingGroupCount != null ? Integer.valueOf(existingGroupCount + groupCount) : groupCount);
         }
 
         final Collection<SearchGroup<BytesRef>> searchGroups = firstPhaseCommandResult.getSearchGroups();
@@ -134,7 +134,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
           shards.add(srsp.getShard());
         }
       }
-      hitCountDuringFirstPhase += ((Number) srsp.getSolrResponse().getResponse().get("totalHitCount")).longValue();
+      hitCountDuringFirstPhase += (Integer) srsp.getSolrResponse().getResponse().get("totalHitCount");
     }
     rb.totalHitCount = hitCountDuringFirstPhase;
     rb.firstPhaseElapsedTime = maxElapsedTime;

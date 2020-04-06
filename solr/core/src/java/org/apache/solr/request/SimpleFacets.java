@@ -343,7 +343,7 @@ public class SimpleFacets {
         .add(mainQueryFilter, Occur.FILTER)
         .build();
     searcher.search(filteredFacetQuery, collector);
-    return (int) collector.getGroupCount();
+    return collector.getGroupCount();
   }
 
   enum FacetMethod {

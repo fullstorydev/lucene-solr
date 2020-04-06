@@ -24,10 +24,10 @@ import org.apache.lucene.search.TopDocs;
 public class QueryCommandResult {
 
   private final TopDocs topDocs;
-  private final long matches;
+  private final int matches;
   private final float maxScore;
 
-  public QueryCommandResult(TopDocs topDocs, long matches, float maxScore) {
+  public QueryCommandResult(TopDocs topDocs, int matches, float maxScore) {
     this.topDocs = topDocs;
     this.matches = matches;
     this.maxScore = maxScore;
@@ -37,7 +37,7 @@ public class QueryCommandResult {
     return topDocs;
   }
 
-  public long getMatches() {
+  public int getMatches() {
     return matches;
   }
 

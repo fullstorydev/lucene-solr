@@ -132,9 +132,9 @@ public class SearchGroupsFieldCommand implements Command<SearchGroupsFieldComman
     } else {
       topGroups = Collections.emptyList();
     }
-    final Long groupCount;
+    final Integer groupCount;
     if (allGroupsCollector != null) {
-      groupCount = (long) allGroupsCollector.getGroupCount();
+      groupCount = allGroupsCollector.getGroupCount();
     } else {
       groupCount = null;
     }

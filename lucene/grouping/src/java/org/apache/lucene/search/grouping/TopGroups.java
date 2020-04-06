@@ -29,13 +29,13 @@ import org.apache.lucene.search.TotalHits.Relation;
  * @lucene.experimental */
 public class TopGroups<T> {
   /** Number of documents matching the search */
-  public final long totalHitCount;
+  public final int totalHitCount;
 
   /** Number of documents grouped into the topN groups */
-  public final long totalGroupedHitCount;
+  public final int totalGroupedHitCount;
 
   /** The total number of unique groups. If <code>null</code> this value is not computed. */
-  public final Long totalGroupCount;
+  public final Integer totalGroupCount;
 
   /** Group results in groupSort order */
   public final GroupDocs<T>[] groups;
@@ -50,7 +50,7 @@ public class TopGroups<T> {
    *  <code>Float.NaN</code> if scores were not computed. */
   public final float maxScore;
 
-  public TopGroups(SortField[] groupSort, SortField[] withinGroupSort, long totalHitCount, long totalGroupedHitCount, GroupDocs<T>[] groups, float maxScore) {
+  public TopGroups(SortField[] groupSort, SortField[] withinGroupSort, int totalHitCount, int totalGroupedHitCount, GroupDocs<T>[] groups, float maxScore) {
     this.groupSort = groupSort;
     this.withinGroupSort = withinGroupSort;
     this.totalHitCount = totalHitCount;
@@ -60,7 +60,7 @@ public class TopGroups<T> {
     this.maxScore = maxScore;
   }
 
-  public TopGroups(TopGroups<T> oldTopGroups, Long totalGroupCount) {
+  public TopGroups(TopGroups<T> oldTopGroups, Integer totalGroupCount) {
     this.groupSort = oldTopGroups.groupSort;
     this.withinGroupSort = oldTopGroups.withinGroupSort;
     this.totalHitCount = oldTopGroups.totalHitCount;
@@ -118,10 +118,10 @@ public class TopGroups<T> {
       return null;
     }
 
-    long totalHitCount = 0;
-    long totalGroupedHitCount = 0;
+    int totalHitCount = 0;
+    int totalGroupedHitCount = 0;
     // Optionally merge the totalGroupCount.
-    Long totalGroupCount = null;
+    Integer totalGroupCount = null;
 
     final int numGroups = shardGroups[0].groups.length;
     for(TopGroups<T> shard : shardGroups) {
@@ -132,7 +132,7 @@ public class TopGroups<T> {
       totalGroupedHitCount += shard.totalGroupedHitCount;
       if (shard.totalGroupCount != null) {
         if (totalGroupCount == null) {
-          totalGroupCount = 0L;
+          totalGroupCount = 0;
         }
 
         totalGroupCount += shard.totalGroupCount;
@@ -154,7 +154,7 @@ public class TopGroups<T> {
       final T groupValue = shardGroups[0].groups[groupIDX].groupValue;
       //System.out.println("  merge groupValue=" + groupValue + " sortValues=" + Arrays.toString(shardGroups[0].groups[groupIDX].groupSortValues));
       float maxScore = Float.NaN;
-      long totalHits = 0;
+      int totalHits = 0;
       double scoreSum = 0.0;
       for(int shardIDX=0;shardIDX<shardGroups.length;shardIDX++) {
         //System.out.println("    shard=" + shardIDX);
