@@ -89,7 +89,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
           t.printStackTrace(new PrintWriter(trace));
           nl.add("trace", trace.toString());
         } else {
-          nl.add("numFound", (Integer) srsp.getSolrResponse().getResponse().get("totalHitCount"));
+          nl.add("numFound", ((Number) srsp.getSolrResponse().getResponse().get("totalHitCount")).intValue());
         }
         if (srsp.getSolrResponse() != null) {
           nl.add("time", srsp.getSolrResponse().getElapsedTime());
@@ -135,7 +135,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
           shards.add(srsp.getShard());
         }
       }
-      hitCountDuringFirstPhase += (Integer) srsp.getSolrResponse().getResponse().get("totalHitCount");
+      hitCountDuringFirstPhase += ((Number) srsp.getSolrResponse().getResponse().get("totalHitCount")).intValue();
     }
     rb.totalHitCount = hitCountDuringFirstPhase;
     rb.firstPhaseElapsedTime = maxElapsedTime;
