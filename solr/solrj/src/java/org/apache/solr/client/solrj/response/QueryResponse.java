@@ -266,11 +266,11 @@ public class QueryResponse extends SolrResponseBase
         }
 
         if (oGroups != null) {
-          Integer iMatches = (Integer) oMatches;
+          Integer iMatches = ((Number) oMatches).intValue();
           ArrayList<Object> groupsArr = (ArrayList<Object>) oGroups;
           GroupCommand groupedCommand;
           if (oNGroups != null) {
-            Integer iNGroups = (Integer) oNGroups;
+            Integer iNGroups = ((Number) oNGroups).intValue();
             groupedCommand = new GroupCommand(fieldName, iMatches, iNGroups);
           } else {
             groupedCommand = new GroupCommand(fieldName, iMatches);
@@ -286,10 +286,10 @@ public class QueryResponse extends SolrResponseBase
 
           _groupResponse.add(groupedCommand);
         } else if (queryCommand != null) {
-          Integer iMatches = (Integer) oMatches;
+          Integer iMatches = ((Number) oMatches).intValue();
           GroupCommand groupCommand;
           if (oNGroups != null) {
-            Integer iNGroups = (Integer) oNGroups;
+            Integer iNGroups = ((Number) oNGroups).intValue();
             groupCommand = new GroupCommand(fieldName, iMatches, iNGroups);
           } else {
             groupCommand = new GroupCommand(fieldName, iMatches);

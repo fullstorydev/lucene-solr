@@ -101,7 +101,7 @@ public class SearchGroupsResultTransformer implements ShardResultTransformer<Lis
         }
       }
 
-      final Integer groupCount = (Integer) topGroupsAndGroupCount.get(GROUP_COUNT);
+      final Integer groupCount = topGroupsAndGroupCount.get(GROUP_COUNT)==null? null: ((Number) topGroupsAndGroupCount.get(GROUP_COUNT)).intValue();
       result.put(command.getKey(), new SearchGroupsFieldCommandResult(groupCount, searchGroups));
     }
     return result;
