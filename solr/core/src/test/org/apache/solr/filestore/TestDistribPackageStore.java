@@ -100,6 +100,8 @@ public class TestDistribPackageStore extends SolrCloudTestCase {
       );
 
       assertTrue(rsp._getStr("message", "").contains("File with same metadata exists "));
+
+
       assertResponseValues(10,
           cluster.getSolrClient(),
           new V2Request.Builder("/node/files/package/mypkg/v1.0")
@@ -279,7 +281,7 @@ public class TestDistribPackageStore extends SolrCloudTestCase {
         .build()
         .process(client);
     assertEquals(name, rsp.getResponse().get(CommonParams.FILE));
-    returrn rsp.getResponse();
+    return rsp.getResponse();
   }
 
   public static byte[] readFile(String fname) throws IOException {
