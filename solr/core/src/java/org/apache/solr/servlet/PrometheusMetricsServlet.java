@@ -17,6 +17,7 @@
 package org.apache.solr.servlet;
 
 import com.sun.management.UnixOperatingSystemMXBean;
+import org.apache.solr.common.util.NamedList;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -29,12 +30,24 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * FullStory: a simple servlet to produce a few prometheus metrics.
  * This servlet exists for backwards compatibility and will be removed in favor of the native prometheus-exporter.
  */
 public final class PrometheusMetricsServlet extends BaseSolrServlet {
+
+
+
+  private static Supplier<Map> getCacheStats() {
+    try {
+      return  (Supplier<Map>)SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get("fs-shared-caches");
+    } catch (Exception e) {
+      return null;
+    }
+  }
 
   private enum PromType {
     counter,
@@ -83,6 +96,25 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     writeProm(writer, "open_file_descriptors", PromType.gauge, "the number of open file descriptors on the filesystem", osBean.getOpenFileDescriptorCount());
 
+    writeCacheMetrics(writer);
     writer.flush();
+  }
+
+  private static void writeCacheMetrics(PrintWriter writer) {
+    Supplier<Map> supplier = getCacheStats();
+    if(supplier==null) return;
+    Map<String, NamedList> cacheStats = supplier.get();
+    if (cacheStats != null) {
+      cacheStats.forEach((s, namedList) -> {
+        Number number = (Number) namedList.get("bytesUsed");
+        if (number != null && number.longValue() > -1) {
+          writeProm(writer, s + ".bytesUsed", PromType.gauge, "Memory used by cache:" + s, number.longValue());
+        }
+        number = (Number) namedList.get("size");
+        if (number != null) {
+          writeProm(writer, s + ".size", PromType.gauge, "Size of cache:" + s, number.longValue());
+        }
+      });
+    }
   }
 }

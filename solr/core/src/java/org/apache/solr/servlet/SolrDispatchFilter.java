@@ -103,6 +103,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   private SolrMetricManager metricManager;
   private String registryName;
   private volatile boolean closeOnDestroy = true;
+  static SolrDispatchFilter instance;
+
 
   /**
    * Enum to define action that needs to be processed.
@@ -134,6 +136,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   @Override
   public void init(FilterConfig config) throws ServletException
   {
+    instance = this;
     SSLConfigurationsFactory.current().init();
     log.trace("SolrDispatchFilter.init(): {}", this.getClass().getClassLoader());
     CoreContainer coresInit = null;
