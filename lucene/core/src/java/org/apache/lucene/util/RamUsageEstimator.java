@@ -31,8 +31,6 @@ import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-import org.apache.lucene.index.Term;
-import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.Query;
 
 /**
