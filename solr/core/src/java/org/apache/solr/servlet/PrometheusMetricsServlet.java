@@ -31,6 +31,7 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
@@ -105,15 +106,17 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     if(supplier==null) return;
     Map<String, NamedList> cacheStats = supplier.get();
     if (cacheStats != null) {
-      cacheStats.forEach((s, namedList) -> {
-        Number number = (Number) namedList.get("bytesUsed");
-        if (number != null && number.longValue() > -1) {
-          writeProm(writer, s + ".bytesUsed", PromType.gauge, "Memory used by cache:" + s, number.longValue());
-        }
-        number = (Number) namedList.get("size");
-        if (number != null) {
-          writeProm(writer, s + ".size", PromType.gauge, "Size of cache:" + s, number.longValue());
-        }
+      cacheStats.forEach((cacheName, namedList) -> {
+        namedList.forEach((BiConsumer<String, Object>) (statName, v) -> {
+          if (v instanceof Number) {
+            Number number = (Number) v;
+            writeProm(writer,
+                "cache."+cacheName + "."+ statName,
+                PromType.gauge,
+                "cache info:" + statName,
+                number.longValue());
+          }
+        });
       });
     }
   }
