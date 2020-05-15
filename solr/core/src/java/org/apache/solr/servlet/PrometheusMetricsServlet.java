@@ -41,15 +41,6 @@ import java.util.function.Supplier;
 public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
 
-
-  private static Supplier<Map> getCacheStats() {
-    try {
-      return  (Supplier<Map>)SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get("fs-shared-caches");
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
   private enum PromType {
     counter,
     gauge
@@ -102,8 +93,10 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
 
   private static void writeCacheMetrics(PrintWriter writer) {
-    Supplier<Map> supplier = getCacheStats();
-    if(supplier==null) return;
+    Supplier<Map> supplier = (Supplier<Map>) SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get("fs-shared-caches");
+    if (supplier == null) {
+      return;
+    }
     Map<String, NamedList> cacheStats = supplier.get();
     if (cacheStats != null) {
       cacheStats.forEach((cacheName, namedList) -> {

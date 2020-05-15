@@ -418,4 +418,3 @@ public final class RamUsageEstimator {
     return size;
   }
 }
-
