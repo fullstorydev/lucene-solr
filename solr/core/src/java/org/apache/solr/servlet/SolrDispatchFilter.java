@@ -113,7 +113,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   private SolrMetricManager metricManager;
   private String registryName;
   private volatile boolean closeOnDestroy = true;
-  static SolrDispatchFilter instance;
+  static volatile SolrDispatchFilter instance;
 
 
   /**
@@ -146,7 +146,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   @Override
   public void init(FilterConfig config) throws ServletException
   {
-    instance = this;
     SSLConfigurationsFactory.current().init();
     log.trace("SolrDispatchFilter.init(): {}", this.getClass().getClassLoader());
     CoreContainer coresInit = null;
@@ -201,6 +200,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       log.trace("SolrDispatchFilter.init() done");
       this.cores = coresInit; // crucially final assignment 
       init.countDown();
+      instance = this;
     }
   }
 

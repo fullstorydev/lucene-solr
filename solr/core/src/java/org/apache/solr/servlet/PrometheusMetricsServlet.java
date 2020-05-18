@@ -93,6 +93,9 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
 
   private static void writeCacheMetrics(PrintWriter writer) {
+    if(SolrDispatchFilter.instance == null) {
+      return;
+    }
     Supplier<Map> supplier = (Supplier<Map>) SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get("fs-shared-caches");
     if (supplier == null) {
       return;
