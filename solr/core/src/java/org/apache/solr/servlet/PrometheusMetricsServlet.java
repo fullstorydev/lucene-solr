@@ -96,7 +96,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     if(SolrDispatchFilter.instance == null) {
       return;
     }
-    Supplier<Map> supplier = (Supplier<Map>) SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get("fs-shared-caches");
+    Supplier<Map> supplier = (Supplier<Map>) SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get(SHARED_CACHE_METRIC_NAME);
     if (supplier == null) {
       return;
     }
@@ -116,4 +116,5 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       });
     }
   }
+  public static final String SHARED_CACHE_METRIC_NAME =  "fs-shared-caches";
 }
