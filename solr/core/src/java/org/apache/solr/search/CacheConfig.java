@@ -28,6 +28,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.MapSerializable;
 import org.apache.solr.core.SolrConfig;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.util.DOMUtil;
 import org.slf4j.Logger;
@@ -49,7 +50,7 @@ public class CacheConfig implements MapSerializable{
   
   private String nodeName;
 
-  private Class<? extends SolrCache> clazz;
+//  private Class<? extends SolrCache> clazz;
   private Map<String,String> args;
   private CacheRegenerator regenerator;
 
@@ -62,7 +63,7 @@ public class CacheConfig implements MapSerializable{
   public CacheConfig() {}
 
   public CacheConfig(Class<? extends SolrCache> clazz, Map<String,String> args, CacheRegenerator regenerator) {
-    this.clazz = clazz;
+    this.cacheImpl = clazz.getName();
     this.args = args;
     this.regenerator = regenerator;
   }
@@ -126,7 +127,7 @@ public class CacheConfig implements MapSerializable{
     config.cacheImpl = config.args.get("class");
     if (config.cacheImpl == null) config.cacheImpl = "solr.CaffeineCache";
     config.regenImpl = config.args.get("regenerator");
-    config.clazz = loader.findClass(config.cacheImpl, SolrCache.class);
+//    config.clazz = loader.findClass(config.cacheImpl, SolrCache.class);
     if (config.regenImpl != null) {
       config.regenerator = loader.newInstance(config.regenImpl, CacheRegenerator.class);
     }
@@ -134,9 +135,9 @@ public class CacheConfig implements MapSerializable{
     return config;
   }
 
-  public SolrCache newInstance() {
+  public SolrCache newInstance(SolrCore core) {
     try {
-      SolrCache cache = clazz.getConstructor().newInstance();
+      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, null, core, core.getResourceLoader());
       persistence[0] = cache.init(args, persistence[0], regenerator);
       return cache;
     } catch (Exception e) {
