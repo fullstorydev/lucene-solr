@@ -141,9 +141,8 @@ public class CacheConfig implements MapSerializable {
       return new SolrCacheHolder(this, core);
     }
 
-    Class<? extends SolrCache> clazz = core.getResourceLoader().findClass(cacheImpl, SolrCache.class);
     try {
-      SolrCache cache = clazz.getConstructor().newInstance();
+      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, null, core, core.getResourceLoader());
       initCache(cache);
       return cache;
     } catch (Exception e) {
