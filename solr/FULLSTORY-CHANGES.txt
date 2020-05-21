@@ -36,3 +36,4 @@
 * SOLR-14158: Package trusted keys to come from Package Store, not ZK (noble, Ishan Chattopadhyaya)
 * SOLR-14165: SolrResponse serialVersionUID has changed in a backward incompatible way (Andy Webb via noble)
 * LUCENE-9170: Fix https maven issues with wagon-ssh etc. (Ishan Chattopadhyaya)
+* LUCENE-9302, SOLR-14381: Grouping to use long instead of int to avoid overflows (Ishan Chattopadhyaya)
