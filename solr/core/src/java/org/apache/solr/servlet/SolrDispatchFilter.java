@@ -113,8 +113,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   private SolrMetricManager metricManager;
   private String registryName;
   private volatile boolean closeOnDestroy = true;
-  static volatile SolrDispatchFilter instance;
-
 
   /**
    * Enum to define action that needs to be processed.
@@ -127,7 +125,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   public enum Action {
     PASSTHROUGH, FORWARD, RETURN, RETRY, ADMIN, REMOTEQUERY, PROCESS
   }
-  
+
   public SolrDispatchFilter() {
   }
 
@@ -198,9 +196,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     }finally{
       log.trace("SolrDispatchFilter.init() done");
-      this.cores = coresInit; // crucially final assignment 
+      this.cores = coresInit; // crucially final assignment
       init.countDown();
-      instance = this;
     }
   }
 

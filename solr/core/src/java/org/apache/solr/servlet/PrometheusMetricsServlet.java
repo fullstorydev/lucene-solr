@@ -18,6 +18,7 @@ package org.apache.solr.servlet;
 
 import com.sun.management.UnixOperatingSystemMXBean;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.CoreContainer;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -62,10 +63,10 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     response.setCharacterEncoding("UTF-8");
     response.setContentType("application/json");
     PrintWriter pw = new PrintWriter(out);
-    writeStats(pw);
+    writeStats(pw, (CoreContainer) request.getAttribute(CoreContainer.class.getName()));
   }
 
-  static void writeStats(PrintWriter writer) {
+  static void writeStats(PrintWriter writer, CoreContainer coreContainer) {
     // GC stats
     for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
       writeProm(writer, "collection_count_" + gcBean.getName(), PromType.counter, "the number of GC invocations for " + gcBean.getName(), gcBean.getCollectionCount());
@@ -88,15 +89,15 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     writeProm(writer, "open_file_descriptors", PromType.gauge, "the number of open file descriptors on the filesystem", osBean.getOpenFileDescriptorCount());
 
-    writeCacheMetrics(writer);
+    writeCacheMetrics(writer, coreContainer);
     writer.flush();
   }
 
-  private static void writeCacheMetrics(PrintWriter writer) {
-    if(SolrDispatchFilter.instance == null) {
+  private static void writeCacheMetrics(PrintWriter writer, CoreContainer coreContainer) {
+    if (coreContainer == null || coreContainer.getZkController() == null ) {
       return;
     }
-    Supplier<Map> supplier = (Supplier<Map>) SolrDispatchFilter.instance.cores.getZkController().getSolrCloudManager().getObjectCache().get(SHARED_CACHE_METRIC_NAME);
+    Supplier<Map> supplier = (Supplier<Map>) coreContainer.getZkController().getSolrCloudManager().getObjectCache().get(SHARED_CACHE_METRIC_NAME);
     if (supplier == null) {
       return;
     }
