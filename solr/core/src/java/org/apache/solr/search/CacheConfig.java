@@ -50,7 +50,6 @@ public class CacheConfig implements MapSerializable{
   
   private String nodeName;
 
-//  private Class<? extends SolrCache> clazz;
   private Map<String,String> args;
   private CacheRegenerator regenerator;
 
@@ -127,7 +126,6 @@ public class CacheConfig implements MapSerializable{
     config.cacheImpl = config.args.get("class");
     if (config.cacheImpl == null) config.cacheImpl = "solr.CaffeineCache";
     config.regenImpl = config.args.get("regenerator");
-//    config.clazz = loader.findClass(config.cacheImpl, SolrCache.class);
     if (config.regenImpl != null) {
       config.regenerator = loader.newInstance(config.regenImpl, CacheRegenerator.class);
     }
