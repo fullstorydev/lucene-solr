@@ -125,7 +125,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   public enum Action {
     PASSTHROUGH, FORWARD, RETURN, RETRY, ADMIN, REMOTEQUERY, PROCESS
   }
-
+  
   public SolrDispatchFilter() {
   }
 
@@ -196,7 +196,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     }finally{
       log.trace("SolrDispatchFilter.init() done");
-      this.cores = coresInit; // crucially final assignment
+      this.cores = coresInit; // crucially final assignment 
       init.countDown();
     }
   }
