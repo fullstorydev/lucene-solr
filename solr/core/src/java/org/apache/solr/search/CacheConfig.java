@@ -143,7 +143,7 @@ public class CacheConfig implements MapSerializable{
     try {
       SolrResourceLoader  resourceLoader = findResourceLoader(core,
           new PluginInfo("cache", Utils.makeMap("class", cacheImpl)));
-      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, "", core,
+      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, null, core,
           resourceLoader);
       persistence[0] = cache.init(args, persistence[0], regenerator);
       return cache;
