@@ -56,11 +56,8 @@ public class CacheConfig implements MapSerializable{
   
   private String nodeName;
 
-  private Class<? extends SolrCache> clazz;
-  private String  clazzName;
   private Map<String,String> args;
   private CacheRegenerator regenerator;
-  private SolrResourceLoader resourceLoader;
 
   private String cacheImpl;
 
@@ -71,8 +68,7 @@ public class CacheConfig implements MapSerializable{
   public CacheConfig() {}
 
   public CacheConfig(Class<? extends SolrCache> clazz, Map<String,String> args, CacheRegenerator regenerator) {
-    this.clazz = clazz;
-    this.clazzName = clazz.getName();
+    this.cacheImpl = clazz.getName();
     this.args = args;
     this.regenerator = regenerator;
   }
@@ -136,9 +132,6 @@ public class CacheConfig implements MapSerializable{
     config.cacheImpl = config.args.get("class");
     if (config.cacheImpl == null) config.cacheImpl = "solr.CaffeineCache";
     config.regenImpl = config.args.get("regenerator");
-    config.clazzName = config.cacheImpl;
-    //we delay finding class  so that core is available and initialized
-//    config.clazz = loader.findClass(config.cacheImpl, SolrCache.class);
     if (config.regenImpl != null) {
       config.regenerator = loader.newInstance(config.regenImpl, CacheRegenerator.class);
     }
@@ -146,13 +139,12 @@ public class CacheConfig implements MapSerializable{
     return config;
   }
 
-  public SolrCache newInstance() {
+  public SolrCache newInstance(SolrCore core) {
     try {
-      if(clazz == null) {
-        PluginInfo info = new PluginInfo("cache", Utils.makeMap("class", clazzName));
-        clazz = findResourceLoader(resourceLoader.getCore(), info).findClass(info.className, SolrCache.class);
-      }
-      SolrCache cache = clazz.getConstructor().newInstance();
+      SolrResourceLoader  resourceLoader = findResourceLoader(core,
+          new PluginInfo("cache", Utils.makeMap("class", cacheImpl)));
+      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, "", core,
+          resourceLoader);
       persistence[0] = cache.init(args, persistence[0], regenerator);
       return cache;
     } catch (Exception e) {
@@ -174,6 +166,9 @@ public class CacheConfig implements MapSerializable{
       }
     }
     PackageLoader.Package pkg = core.getCoreContainer().getPackageLoader().getPackage(info.pkgName);
+    if (pkg == null) {
+      throw new RuntimeException("No such package: " + info.pkgName);
+    }
     if (ver == null || LATEST.equals(ver)) {
       return pkg.getLatest().getLoader();
     } else {

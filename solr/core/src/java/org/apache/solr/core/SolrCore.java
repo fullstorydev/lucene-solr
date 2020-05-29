@@ -936,7 +936,6 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       MDCLoggingContext.setCore(this);
 
       resourceLoader = config.getResourceLoader();
-      resourceLoader.core = this;
       this.solrConfig = config;
       this.configSetProperties = configSetProperties;
       // Initialize the metrics manager
