@@ -24,12 +24,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.solr.common.MapSerializable;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.common.MapSerializable;
+import org.apache.solr.common.util.Utils;
+import org.apache.solr.core.PluginInfo;
+import org.apache.solr.core.RequestParams;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
+import org.apache.solr.pkg.PackageListeners;
+import org.apache.solr.pkg.PackageLoader;
 import org.apache.solr.util.DOMUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +42,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import static org.apache.solr.common.params.CommonParams.NAME;
+import static org.apache.solr.packagemanager.PackageUtils.LATEST;
 
 /**
  * Contains the knowledge of how cache config is
@@ -135,7 +141,10 @@ public class CacheConfig implements MapSerializable{
 
   public SolrCache newInstance(SolrCore core) {
     try {
-      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, null, core, core.getResourceLoader());
+      SolrResourceLoader  resourceLoader = findResourceLoader(core,
+          new PluginInfo("cache", Utils.makeMap("class", cacheImpl)));
+      SolrCache cache = SolrCore.createInstance(cacheImpl, SolrCache.class, null, core,
+          resourceLoader);
       persistence[0] = cache.init(args, persistence[0], regenerator);
       return cache;
     } catch (Exception e) {
@@ -143,6 +152,27 @@ public class CacheConfig implements MapSerializable{
       // we can carry on without a cache... but should we?
       // in some cases (like an OOM) we probably should try to continue.
       return null;
+    }
+  }
+
+  private SolrResourceLoader findResourceLoader(SolrCore core, PluginInfo info) {
+    if (info.pkgName == null) return core.getResourceLoader();
+    String ver = null;
+    RequestParams.ParamSet p = core.getSolrConfig().getRequestParams().getParams(PackageListeners.PACKAGE_VERSIONS);
+    if (p != null) {
+      Object o = p.get().get(info.pkgName);
+      if (o != null) {
+        ver = o.toString();
+      }
+    }
+    PackageLoader.Package pkg = core.getCoreContainer().getPackageLoader().getPackage(info.pkgName);
+    if (pkg == null) {
+      throw new RuntimeException("No such package: " + info.pkgName);
+    }
+    if (ver == null || LATEST.equals(ver)) {
+      return pkg.getLatest().getLoader();
+    } else {
+      return pkg.getLatest(ver).getLoader();
     }
   }
 
