@@ -15,15 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.solr.client.solrj.cloud.autoscaling;
+package org.apache.solr.client.solrj.util;
 
-import org.junit.Ignore;
+/**
+ * Listener for async requests
+ */
+public interface AsyncListener<T> {
+  /**
+   * Callback method invoked before processing the request
+   */
+  default void onStart() {
 
-@Ignore
-public class TestPolicy2Old extends TestPolicy2 {
-  public TestPolicy2Old(){
-    super();
-    useNodeset = false;
   }
+  void onSuccess(T t);
+  void onFailure(Throwable throwable);
 
 }

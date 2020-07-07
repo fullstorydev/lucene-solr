@@ -15,15 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.solr.client.solrj.cloud.autoscaling;
+package org.apache.solr.client.solrj.util;
 
-import org.junit.Ignore;
-
-@Ignore
-public class TestPolicy2Old extends TestPolicy2 {
-  public TestPolicy2Old(){
-    super();
-    useNodeset = false;
-  }
-
+public interface Cancellable {
+  void cancel();
 }

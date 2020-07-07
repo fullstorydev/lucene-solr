@@ -72,6 +72,7 @@ import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.common.util.ValidatingJsonMap;
 import org.apache.solr.response.JSONWriter;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +87,7 @@ import static org.apache.solr.client.solrj.cloud.autoscaling.Variable.Type.REPLI
 import static org.apache.solr.common.cloud.ZkStateReader.CLUSTER_STATE;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOVEREPLICA;
-
+@Ignore
 public class TestPolicy extends SolrTestCaseJ4 {
   boolean useNodeset ;
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());

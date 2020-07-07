@@ -38,7 +38,6 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Replica.State;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
@@ -99,13 +98,15 @@ public class CreateSnapshotCmd implements OverseerCollectionMessageHandler.Cmd {
     NamedList shardRequestResults = new NamedList();
     Map<String, Slice> shardByCoreName = new HashMap<>();
     ShardStateProvider ssp = ocmh.cloudManager.getClusterStateProvider().getShardStateProvider(collectionName);
-    ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());
+    ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler();
 
     final ShardRequestTracker shardRequestTracker = ocmh.asyncRequestTracker(asyncId);
     for (Slice slice : ocmh.zkStateReader.getClusterState().getCollection(collectionName).getSlices()) {
       for (Replica replica : slice.getReplicas()) {
         if (ssp.getState(replica) != State.ACTIVE) {
-          log.info("Replica {} is not active. Hence not sending the createsnapshot request", replica.getCoreName());
+          if (log.isInfoEnabled()) {
+            log.info("Replica {} is not active. Hence not sending the createsnapshot request", replica.getCoreName());
+          }
           continue; // Since replica is not active - no point sending a request.
         }
 
@@ -143,7 +144,8 @@ public class CreateSnapshotCmd implements OverseerCollectionMessageHandler.Cmd {
         // to have latest state.
         String coreName = (String)resp.get(CoreAdminParams.CORE);
         Slice slice = shardByCoreName.remove(coreName);
-        boolean leader = (ssp.getLeader(slice)!= null && ssp.getLeader(slice).getCoreName().equals(coreName));
+        Replica shardLeader = ssp.getLeader(slice);
+        boolean leader = (shardLeader != null && shardLeader.getCoreName().equals(coreName));
         resp.add(SolrSnapshotManager.SHARD_ID, slice.getName());
         resp.add(SolrSnapshotManager.LEADER, leader);
 
