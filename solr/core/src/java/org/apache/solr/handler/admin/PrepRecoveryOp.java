@@ -75,7 +75,7 @@ class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
     }
     AtomicReference<String> errorMessage = new AtomicReference<>();
     try {
-      coreContainer.getZkController().getZkStateReader().waitForState(collectionName, conflictWaitMs, TimeUnit.MILLISECONDS, (n, c) -> {
+      coreContainer.getZkController().getZkStateReader().waitForState(collectionName, conflictWaitMs, TimeUnit.MILLISECONDS, (n, c, ssp) -> {
         if (c == null)
           return false;
 
@@ -96,7 +96,7 @@ class PrepRecoveryOp implements CoreAdminHandler.CoreAdminOp {
         if (slice != null) {
           final Replica replica = slice.getReplicasMap().get(coreNodeName);
           if (replica != null) {
-            state = replica.getState();
+            state = ssp.getState(replica);
             live = n.contains(nodeName);
 
             final Replica.State localState = cloudDescriptor.getLastPublished();

@@ -54,9 +54,9 @@ public class PackageManagerCLITest extends SolrCloudTestCase {
     System.setProperty("enable.packages", "true");
 
     configureCluster(1)
-    .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
-    .addConfig("conf2", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
-    .configure();
+        .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
+        .addConfig("conf2", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
+        .configure();
 
     repositoryServer = new LocalWebServer(TEST_PATH().resolve("question-answer-repository").toString());
     repositoryServer.start();
@@ -71,7 +71,7 @@ public class PackageManagerCLITest extends SolrCloudTestCase {
   @Test
   public void testPackageManager() throws Exception {
     PackageTool tool = new PackageTool();
-    
+
     String solrUrl = cluster.getJettySolrRunner(0).getBaseUrl().toString();
 
     run(tool, new String[] {"-solrUrl", solrUrl, "list-installed"});
@@ -86,6 +86,8 @@ public class PackageManagerCLITest extends SolrCloudTestCase {
 
     CollectionAdminRequest.createCollection("abc", "conf1", 1, 1).process(cluster.getSolrClient());
     CollectionAdminRequest.createCollection("def", "conf2", 1, 1).process(cluster.getSolrClient());
+//    CollectionAdminRequest.createCollection("abc", "conf1", 1, 1).setExternalState(true).process(cluster.getSolrClient());
+//    CollectionAdminRequest.createCollection("def", "conf2", 1, 1).setExternalState(true).process(cluster.getSolrClient());
 
     String rhPath = "/mypath2";
 
@@ -123,10 +125,10 @@ public class PackageManagerCLITest extends SolrCloudTestCase {
       }
       assertPackageVersion("abc", "question-answer", "1.1.0", rhPath, "1.1.0");
     }
-    
+
     log.info("Running undeploy...");
     run(tool, new String[] {"-solrUrl", solrUrl, "undeploy", "question-answer", "-collections", "abc"});
-    
+
     run(tool, new String[] {"-solrUrl", solrUrl, "list-deployed", "question-answer"});
 
   }

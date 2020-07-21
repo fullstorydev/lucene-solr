@@ -124,8 +124,8 @@ public class CloudUtil {
    */
   public static String unifiedResourcePath(SolrResourceLoader loader) {
     return (loader instanceof ZkSolrResourceLoader) ?
-            ((ZkSolrResourceLoader) loader).getConfigSetZkPath() + "/" :
-            loader.getConfigDir() + File.separator;
+        ((ZkSolrResourceLoader) loader).getConfigSetZkPath() + "/" :
+        loader.getConfigDir() + File.separator;
   }
 
   /**Read the list of public keys from ZK
@@ -170,10 +170,10 @@ public class CloudUtil {
     AtomicReference<DocCollection> state = new AtomicReference<>();
     AtomicReference<Set<String>> liveNodesLastSeen = new AtomicReference<>();
     try {
-      return waitForState(cloudManager, collection, DEFAULT_TIMEOUT, TimeUnit.SECONDS, (n, c) -> {
+      return waitForState(cloudManager, collection, DEFAULT_TIMEOUT, TimeUnit.SECONDS, (n, c, ssp) -> {
         state.set(c);
         liveNodesLastSeen.set(n);
-        return predicate.matches(n, c);
+        return predicate.matches(n, c, ssp);
       });
     } catch (Exception e) {
       throw new AssertionError(message + "\n" + "Live Nodes: " + liveNodesLastSeen.get() + "\nLast available state: " + state.get(), e);
@@ -209,7 +209,7 @@ public class CloudUtil {
         timeout.sleep(100);
         continue;
       }
-      if (predicate.matches(state.getLiveNodes(), coll)) {
+      if (predicate.matches(state.getLiveNodes(), coll, cloudManager.getClusterStateProvider().getShardStateProvider(collection))) {
         log.trace("-- predicate matched with state {}", state);
         return timeout.timeElapsed(TimeUnit.MILLISECONDS);
       }
@@ -243,7 +243,7 @@ public class CloudUtil {
    */
   public static CollectionStatePredicate clusterShape(int expectedShards, int expectedReplicas, boolean withInactive,
                                                       boolean requireLeaders) {
-    return (liveNodes, collectionState) -> {
+    return (liveNodes, collectionState, ssp) -> {
       if (collectionState == null) {
         log.debug("-- null collection");
         return false;
@@ -258,7 +258,7 @@ public class CloudUtil {
       Set<String> leaderless = new HashSet<>();
       for (Slice slice : slices) {
         int activeReplicas = 0;
-        if (requireLeaders && slice.getState() != Slice.State.INACTIVE && slice.getLeader() == null) {
+        if (requireLeaders && slice.getState() != Slice.State.INACTIVE && ssp.getLeader(slice) == null) {
           leaderless.add(slice.getName());
           continue;
         }
@@ -267,7 +267,7 @@ public class CloudUtil {
           continue;
         }
         for (Replica replica : slice) {
-          if (replica.isActive(liveNodes))
+          if (ssp.isActive(replica))
             activeReplicas++;
         }
         if (activeReplicas != expectedReplicas) {

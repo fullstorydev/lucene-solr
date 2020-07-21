@@ -103,11 +103,11 @@ public class CustomCollectionTest extends SolrCloudTestCase {
     //Testing CREATESHARD
     CollectionAdminRequest.createShard(collection, "x")
         .process(cluster.getSolrClient());
-    waitForState("Expected shard 'x' to be active", collection, (n, c) -> {
+    waitForState("Expected shard 'x' to be active", collection, (n, c, ssp) -> {
       if (c.getSlice("x") == null)
         return false;
       for (Replica r : c.getSlice("x")) {
-        if (r.getState() != Replica.State.ACTIVE)
+        if (ssp.getState(r) != Replica.State.ACTIVE)
           return false;
       }
       return true;
@@ -194,7 +194,7 @@ public class CustomCollectionTest extends SolrCloudTestCase {
     CollectionAdminRequest.createShard(collectionName, "x")
         .process(cluster.getSolrClient());
 
-    waitForState("Not enough active replicas in shard 'x'", collectionName, (n, c) -> {
+    waitForState("Not enough active replicas in shard 'x'", collectionName, (n, c, ssp) -> {
       return c.getSlice("x").getReplicas().size() == 1;
     });
 

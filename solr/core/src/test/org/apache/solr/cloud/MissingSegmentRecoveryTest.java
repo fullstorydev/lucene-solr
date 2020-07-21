@@ -73,7 +73,7 @@ public class MissingSegmentRecoveryTest extends SolrCloudTestCase {
     cluster.getSolrClient().commit();
     
     DocCollection state = getCollectionState(collection);
-    leader = state.getLeader("shard1");
+    leader = getShardStateProvider(collection).getLeader(state.getSlice("shard1"));;
     replica = getRandomReplica(state.getSlice("shard1"), (r) -> leader != r);
   }
   

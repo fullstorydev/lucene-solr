@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.solr.client.solrj.cloud.ShardTerms;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -162,7 +163,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
     boolean isAlreadyLeader = false;
     if (zkStateReader.getClusterState() != null &&
         zkStateReader.getClusterState().getCollection(collection).getSlice(shardId).getReplicas().size() < 2) {
-      Replica leader = zkStateReader.getLeader(collection, shardId);
+      Replica leader = zkStateReader.getShardStateProvider(collection).getLeader(collection, shardId);
       if (leader != null
           && leader.getBaseUrl().equals(leaderProps.get(ZkStateReader.BASE_URL_PROP))
           && leader.getCoreName().equals(leaderProps.get(ZkStateReader.CORE_NAME_PROP))) {

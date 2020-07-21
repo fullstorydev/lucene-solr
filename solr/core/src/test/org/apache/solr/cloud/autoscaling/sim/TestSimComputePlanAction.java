@@ -129,8 +129,8 @@ public class TestSimComputePlanAction extends SimSolrCloudTestCase {
 
   @Test
   @AwaitsFix(bugUrl = "https://issues.apache.org/jira/browse/SOLR-12028") // if you beast this, eventually you will see
-                                                                          // creation of 'testNodeLost' collection fail
-                                                                          // because shard1 elects no leader
+  // creation of 'testNodeLost' collection fail
+  // because shard1 elects no leader
   public void testNodeLost() throws Exception {
     // let's start a node so that we have at least two
     String node = cluster.simAddNode();
@@ -318,7 +318,7 @@ public class TestSimComputePlanAction extends SimSolrCloudTestCase {
     create.process(solrClient);
 
     CloudUtil.waitForState(cluster, "Timed out waiting for replicas of new collection to be active",
-        "testNodeAdded", (liveNodes, collectionState) -> collectionState.getReplicas().stream().allMatch(replica -> replica.isActive(liveNodes)));
+        "testNodeAdded", (liveNodes, collectionState, ssp) -> collectionState.getReplicas().stream().allMatch(ssp::isActive));
 
     // reset to the original policy which has only 1 replica per shard per node
     setClusterPolicyCommand = "{" +

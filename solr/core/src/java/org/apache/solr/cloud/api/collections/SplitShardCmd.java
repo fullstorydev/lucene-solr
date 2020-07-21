@@ -147,7 +147,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
     // find the leader for the shard
     Replica parentShardLeader;
     try {
-      parentShardLeader = zkStateReader.getLeaderRetry(collectionName, slice.get(), 10000);
+      parentShardLeader = zkStateReader.getShardStateProvider(collectionName).getLeader(collectionName, slice.get(), 10000);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Interrupted.");
@@ -798,7 +798,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
   }
 
   public static String fillRanges(SolrCloudManager cloudManager, ZkNodeProps message, DocCollection collection, Slice parentSlice,
-                                List<DocRouter.Range> subRanges, List<String> subSlices, List<String> subShardNames,
+                                  List<DocRouter.Range> subRanges, List<String> subSlices, List<String> subShardNames,
                                   boolean firstReplicaNrt) {
     String splitKey = message.getStr("split.key");
     String rangesStr = message.getStr(CoreAdminParams.RANGES);
@@ -876,7 +876,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
       if(numSubShards < MIN_NUM_SUB_SHARDS || numSubShards > MAX_NUM_SUB_SHARDS)
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
             "A shard can only be split into "+MIN_NUM_SUB_SHARDS+" to " + MAX_NUM_SUB_SHARDS
-            + " subshards in one split request. Provided "+NUM_SUB_SHARDS+"=" + numSubShards);
+                + " subshards in one split request. Provided "+NUM_SUB_SHARDS+"=" + numSubShards);
       subRanges.addAll(router.partitionRange(numSubShards, range, fuzz));
     }
 

@@ -69,6 +69,10 @@ public class LeaderElectionContextKeyTest extends SolrCloudTestCase {
         false, true, 30);
   }
 
+  Replica getLeader(ZkStateReader stateReader, String collection, String shard) {
+    return stateReader.getShardStateProvider(collection).getLeader(stateReader.getCollection(collection).getSlice(shard));
+  }
+
   @Test
   public void test() throws KeeperException, InterruptedException, IOException, SolrServerException {
     ZkStateReader stateReader = cluster.getSolrClient().getZkStateReader();
@@ -77,8 +81,8 @@ public class LeaderElectionContextKeyTest extends SolrCloudTestCase {
     // The test assume that TEST_COLLECTION_1 and TEST_COLLECTION_2 will have identical layout
     // ( same replica's name on every shard )
     for (int i = 1; i <= 2; i++) {
-      String coll1ShardiLeader = clusterState.getCollection(TEST_COLLECTION_1).getLeader("shard"+i).getName();
-      String coll2ShardiLeader = clusterState.getCollection(TEST_COLLECTION_2).getLeader("shard"+i).getName();
+      String coll1ShardiLeader = getLeader(stateReader, TEST_COLLECTION_1, "shard"+i).getName();
+      String coll2ShardiLeader = getLeader(stateReader, TEST_COLLECTION_2, "shard"+i).getName();
       String assertMss = String.format(Locale.ROOT, "Expect %s and %s each have a replica with same name on shard %s",
           coll1ShardiLeader, coll2ShardiLeader, "shard"+i);
       assertEquals(
@@ -89,7 +93,7 @@ public class LeaderElectionContextKeyTest extends SolrCloudTestCase {
     }
 
     String shard = "shard" + String.valueOf(random().nextInt(2) + 1);
-    Replica replica = clusterState.getCollection(TEST_COLLECTION_1).getLeader(shard);
+    Replica replica = getLeader(stateReader, TEST_COLLECTION_1, shard);
     assertNotNull(replica);
 
     try (SolrClient shardLeaderClient = new HttpSolrClient.Builder(replica.get("base_url").toString()).build()) {

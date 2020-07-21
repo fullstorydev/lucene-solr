@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 import org.apache.lucene.util.Version;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -143,19 +144,20 @@ public class BackupCmd implements OverseerCollectionMessageHandler.Cmd {
     Collection<CoreSnapshotMetaData> snapshots = snapshotMeta.getReplicaSnapshotsForShard(slice.getName());
 
     Optional<CoreSnapshotMetaData> leaderCore = snapshots.stream().filter(x -> x.isLeader()).findFirst();
+    ShardStateProvider ssp = ocmh.cloudManager.getClusterStateProvider().getShardStateProvider(slice.collection);
     if (leaderCore.isPresent()) {
       if (log.isInfoEnabled()) {
         log.info("Replica {} was the leader when snapshot {} was created.", leaderCore.get().getCoreName(), snapshotMeta.getName());
       }
       Replica r = slice.getReplica(leaderCore.get().getCoreName());
-      if ((r != null) && !r.getState().equals(State.DOWN)) {
+      if ((r != null) && ssp.getState(r) != State.DOWN) {
         return r;
       }
     }
 
     Optional<Replica> r = slice.getReplicas().stream()
-                               .filter(x -> x.getState() != State.DOWN && snapshotMeta.isSnapshotExists(slice.getName(), x))
-                               .findFirst();
+        .filter(it -> ssp.getState(it) != State.DOWN && snapshotMeta.isSnapshotExists(slice.getName(), it))
+        .findFirst();
 
     if (!r.isPresent()) {
       throw new SolrException(ErrorCode.SERVER_ERROR,
@@ -196,6 +198,7 @@ public class BackupCmd implements OverseerCollectionMessageHandler.Cmd {
     }
 
     final ShardRequestTracker shardRequestTracker = ocmh.asyncRequestTracker(asyncId);
+    ShardStateProvider ssp = ocmh.zkStateReader.getShardStateProvider(collectionName);
     for (Slice slice : ocmh.zkStateReader.getClusterState().getCollection(collectionName).getActiveSlices()) {
       Replica replica = null;
 
@@ -208,7 +211,7 @@ public class BackupCmd implements OverseerCollectionMessageHandler.Cmd {
         replica = selectReplicaWithSnapshot(snapshotMeta.get(), slice);
       } else {
         // Note - Actually this can return a null value when there is no leader for this shard.
-        replica = slice.getLeader();
+        replica = ssp.getLeader(slice);
         if (replica == null) {
           throw new SolrException(ErrorCode.SERVER_ERROR, "No 'leader' replica available for shard " + slice.getName() + " of collection " + collectionName);
         }

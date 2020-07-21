@@ -613,7 +613,7 @@ public class TestCollectionAPI extends ReplicaPropertiesBase {
   private void clusterStatusRolesTest() throws Exception  {
     try (CloudSolrClient client = createCloudClient(null)) {
       client.connect();
-      Replica replica = client.getZkStateReader().getLeaderRetry(DEFAULT_COLLECTION, SHARD1);
+      Replica replica = client.getZkStateReader().getShardStateProvider(DEFAULT_COLLECTION). getLeader(DEFAULT_COLLECTION, SHARD1, -1);
 
       ModifiableSolrParams params = new ModifiableSolrParams();
       params.set("action", CollectionParams.CollectionAction.ADDROLE.toString());

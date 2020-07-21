@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -73,12 +74,6 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
   @BeforeClass
   public static void createCluster() throws Exception {
     docsSeed = random().nextLong();
-    System.setProperty("solr.allowPaths", "*");
-  }
-
-  @AfterClass
-  public static void afterClass() throws Exception {
-    System.clearProperty("solr.allowPaths");
   }
 
   /**
@@ -215,7 +210,7 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
 
       restore.setConfigName("confFaulty");
       assertEquals(RequestStatusState.FAILED, restore.processAndWait(solrClient, 30));
-      assertThat("Failed collection is still in the clusterstate: " + cluster.getSolrClient().getClusterStateProvider().getClusterState().getCollectionOrNull(restoreCollectionName), 
+      assertThat("Failed collection is still in the clusterstate: " + cluster.getSolrClient().getClusterStateProvider().getClusterState().getCollectionOrNull(restoreCollectionName),
           CollectionAdminRequest.listCollections(solrClient), not(hasItem(restoreCollectionName)));
     }
   }
@@ -353,10 +348,8 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
     int computeRestoreMaxShardsPerNode = (int) Math.ceil((restoreReplFactor * numShards/(double) cluster.getJettySolrRunners().size()));
 
     if (restoreReplFactor > backupReplFactor) { //else the backup maxShardsPerNode should be enough
-      if (log.isInfoEnabled()) {
-        log.info("numShards={} restoreReplFactor={} maxShardsPerNode={} totalNodes={}",
-            numShards, restoreReplFactor, computeRestoreMaxShardsPerNode, cluster.getJettySolrRunners().size());
-      }
+      log.info("numShards={} restoreReplFactor={} maxShardsPerNode={} totalNodes={}",
+          numShards, restoreReplFactor, computeRestoreMaxShardsPerNode, cluster.getJettySolrRunners().size());
 
       if (random().nextBoolean()) { //set it to -1
         isMaxShardsUnlimited = true;
@@ -413,7 +406,7 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
     });
     numReplicasByNodeName.forEach((k, v) -> {
       assertTrue("Node " + k + " has " + v + " replicas. Expected num replicas : " + restoreMaxShardsPerNode
-              + ". state: \n" + restoreCollection, v <= restoreMaxShardsPerNode);
+          + ". state: \n" + restoreCollection, v <= restoreMaxShardsPerNode);
     });
 
     assertEquals(restoreCollection.toString(), restoreReplcationFactor, restoreCollection.getReplicationFactor().intValue());
@@ -439,9 +432,7 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
       Map<String, Integer> restoredCollectionPerShardCountAfterIndexing = getShardToDocCountMap(client, restoreCollection);
       int restoredCollectionFinalDocCount = restoredCollectionPerShardCountAfterIndexing.values().stream().mapToInt(Number::intValue).sum();
 
-      log.info("Original doc count in restored collection:{} , number of newly added documents to the restored collection: {}"
-          + ", after indexing: {}"
-          , restoredCollectionDocCount, numberNewDocsIndexed, restoredCollectionFinalDocCount);
+      log.info("Original doc count in restored collection:" + restoredCollectionDocCount + ", number of newly added documents to the restored collection: " + numberNewDocsIndexed + ", after indexing: " + restoredCollectionFinalDocCount);
       assertEquals((restoredCollectionDocCount + numberNewDocsIndexed), restoredCollectionFinalDocCount);
     }
 
@@ -451,10 +442,11 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
   }
 
   private Map<String, Integer> getShardToDocCountMap(CloudSolrClient client, DocCollection docCollection) throws SolrServerException, IOException {
+    ShardStateProvider ssp = client.getClusterStateProvider().getShardStateProvider(docCollection.getName());
     Map<String,Integer> shardToDocCount = new TreeMap<>();
     for (Slice slice : docCollection.getActiveSlices()) {
       String shardName = slice.getName();
-      try (HttpSolrClient leaderClient = new HttpSolrClient.Builder(slice.getLeader().getCoreUrl()).withHttpClient(client.getHttpClient()).build()) {
+      try (HttpSolrClient leaderClient = new HttpSolrClient.Builder(ssp.getLeader(slice).getCoreUrl()).withHttpClient(client.getHttpClient()).build()) {
         long docsInShard = leaderClient.query(new SolrQuery("*:*").setParam("distrib", "false"))
             .getResults().getNumFound();
         shardToDocCount.put(shardName, (int) docsInShard);

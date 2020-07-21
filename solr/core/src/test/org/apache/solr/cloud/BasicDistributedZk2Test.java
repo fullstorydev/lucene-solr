@@ -115,8 +115,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
       // TODO: bring this to its own method?
       // try indexing to a leader that has no replicas up
       ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-      ZkNodeProps leaderProps = zkStateReader.getLeaderRetry(
-          DEFAULT_COLLECTION, SHARD2);
+      ZkNodeProps leaderProps = zkStateReader.getShardStateProvider(DEFAULT_COLLECTION).getLeader(DEFAULT_COLLECTION, SHARD2, -1);
       
       String nodeName = leaderProps.getStr(ZkStateReader.NODE_NAME_PROP);
       chaosMonkey.stopShardExcept(SHARD2, nodeName);
@@ -158,7 +157,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
     waitForCollection(cloudClient.getZkStateReader(), ONE_NODE_COLLECTION, 1);
     waitForRecoveriesToFinish(ONE_NODE_COLLECTION, cloudClient.getZkStateReader(), false);
     
-    cloudClient.getZkStateReader().getLeaderRetry(ONE_NODE_COLLECTION, SHARD1, 30000);
+    cloudClient.getZkStateReader().getShardStateProvider(ONE_NODE_COLLECTION).getLeader(ONE_NODE_COLLECTION, SHARD1, 30000);
     
     int docs = 2;
     for (SolrClient client : clients) {
@@ -278,7 +277,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
   
     long numFound1 = cloudClient.query(new SolrQuery("*:*")).getResults().getNumFound();
     
-    cloudClient.getZkStateReader().getLeaderRetry(DEFAULT_COLLECTION, SHARD1, 60000);
+    cloudClient.getZkStateReader().getShardStateProvider(DEFAULT_COLLECTION).getLeader(DEFAULT_COLLECTION, SHARD1, 60000);
     
     try {
       index_specific(shardToJetty.get(SHARD1).get(1).client.solrClient, id, 1000, i1, 108, t1,

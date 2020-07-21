@@ -31,8 +31,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import com.codahale.metrics.Counter;
 import org.apache.lucene.util.Version;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
@@ -54,6 +56,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.ConnectionManager;
 import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
@@ -97,6 +100,7 @@ public class Overseer implements SolrCloseable {
 
   enum LeaderStatus {DONT_KNOW, NO, YES}
 
+  private Counter stateUpdateMessages;
   private class ClusterStateUpdater implements Runnable, Closeable {
 
     private final ZkStateReader reader;
@@ -254,6 +258,7 @@ public class Overseer implements SolrCloseable {
                   stateUpdateQueue.remove(processedNodes);
                   processedNodes.clear();
                 });
+                if (stateUpdateMessages != null) stateUpdateMessages.inc();
               }
               if (isClosed) break;
               // if an event comes in the next 100ms batch it together
@@ -393,7 +398,7 @@ public class Overseer implements SolrCloseable {
           case DELETEREPLICAPROP:
             return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).deleteReplicaProperty(clusterState, message));
           case BALANCESHARDUNIQUE:
-            ExclusiveSliceProperty dProp = new ExclusiveSliceProperty(clusterState, message);
+            ExclusiveSliceProperty dProp = new ExclusiveSliceProperty(reader, clusterState, message);
             if (dProp.balanceProperty()) {
               String collName = message.getStr(ZkStateReader.COLLECTION_PROP);
               return Collections.singletonList(new ZkWriteCommand(collName, dProp.getDocCollection()));
@@ -621,10 +626,12 @@ public class Overseer implements SolrCloseable {
     if (coll == null) {
       return;
     }
+    ShardStateProvider ssp = zkController.getZkStateReader().getShardStateProvider(coll.getName());
     // check that all shard leaders are active
     boolean allActive = true;
     for (Slice s : coll.getActiveSlices()) {
-      if (s.getLeader() == null || !s.getLeader().isActive(clusterState.getLiveNodes())) {
+      Replica leader = ssp.getLeader(s);
+      if (leader == null || !ssp.isActive(leader)) {
         allActive = false;
         break;
       }
@@ -633,13 +640,14 @@ public class Overseer implements SolrCloseable {
       doCompatCheck(consumer);
     } else {
       // wait for all leaders to become active and then check
-      zkController.zkStateReader.registerCollectionStateWatcher(CollectionAdminParams.SYSTEM_COLL, (liveNodes, state) -> {
+      zkController.zkStateReader.registerCollectionStateWatcher(CollectionAdminParams.SYSTEM_COLL, (stateProvider, liveNodes, state) -> {
         boolean active = true;
         if (state == null || liveNodes.isEmpty()) {
           return true;
         }
         for (Slice s : state.getActiveSlices()) {
-          if (s.getLeader() == null || !s.getLeader().isActive(liveNodes)) {
+          Replica leader = stateProvider.getLeader(s);
+          if (leader == null || !stateProvider.isActive(leader)) {
             active = false;
             break;
           }

@@ -132,7 +132,7 @@ public class CloudAuthStreamTest extends SolrCloudTestCase {
     
     for (String collection : Arrays.asList(COLLECTION_X, COLLECTION_Y)) {
       cluster.getSolrClient().waitForState(collection, DEFAULT_TIMEOUT, TimeUnit.SECONDS,
-                                           (n, c) -> DocCollection.isFullyActive(n, c, 2, 2));
+                                           (n, c,ssp) -> DocCollection.isFullyActive(ssp, c, 2, 2));
     }
 
     solrUrl = cluster.getRandomJetty(random()).getProxyBaseUrl().toString();

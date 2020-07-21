@@ -42,10 +42,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
+import org.apache.solr.client.solrj.cloud.DirectShardState;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
+import org.apache.solr.client.solrj.cloud.ShardTerms;
+import org.apache.solr.client.solrj.cloud.ShardTermsStateProvider;
 import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.Callable;
@@ -219,6 +225,19 @@ public class ZkStateReader implements SolrCloseable {
   private Set<LiveNodesListener> liveNodesListeners = ConcurrentHashMap.newKeySet();
 
   private Set<ClusterPropertiesListener> clusterPropertiesListeners = ConcurrentHashMap.newKeySet();
+  private final ShardTermsStateProvider shardTermsStateProvider ;
+
+  private final ShardStateProvider directShardState = new DirectShardState(s -> liveNodes.contains(s), s -> clusterState.getCollectionOrNull(s)) {
+    @Override
+    public Replica getLeader(Slice slice, int timeout) throws InterruptedException {
+      return getLeaderRetry(slice.collection, slice.getName(), timeout);
+    }
+
+    @Override
+    public Replica getLeader(String collection, String slice, int timeout) throws InterruptedException {
+      return  getLeaderRetry(collection, slice, timeout);
+    }
+  };
 
   /**
    * Used to submit notifications to Collection Properties watchers in order
@@ -261,6 +280,10 @@ public class ZkStateReader implements SolrCloseable {
     }
     map.put(AutoScalingParams.ZK_VERSION, stat.getVersion());
     return new AutoScalingConfig(map);
+  }
+
+  public DocCollection getCollection(String coll) {
+    return clusterState.getCollectionOrNull(coll);
   }
 
   private static class CollectionWatch<T> {
@@ -331,15 +354,17 @@ public class ZkStateReader implements SolrCloseable {
   private Set<CountDownLatch> waitLatches = ConcurrentHashMap.newKeySet();
 
   public ZkStateReader(SolrZkClient zkClient) {
-    this(zkClient, null);
+    this(zkClient, null, null);
   }
 
-  public ZkStateReader(SolrZkClient zkClient, Runnable securityNodeListener) {
+  public ZkStateReader(SolrZkClient zkClient, Runnable securityNodeListener, BiFunction<String,String , ShardTerms> termsDataProvider) {
     this.zkClient = zkClient;
     this.configManager = new ZkConfigManager(zkClient);
     this.closeClient = false;
     this.securityNodeListener = securityNodeListener;
     assert ObjectReleaseTracker.track(this);
+    if(termsDataProvider == null) termsDataProvider = (s, s2) -> null;
+    this.shardTermsStateProvider = new ShardTermsStateProvider(this, termsDataProvider);
   }
 
 
@@ -365,6 +390,7 @@ public class ZkStateReader implements SolrCloseable {
     this.configManager = new ZkConfigManager(zkClient);
     this.closeClient = true;
     this.securityNodeListener = null;
+    this.shardTermsStateProvider = new ShardTermsStateProvider(this, (s, s2) -> null);
 
     assert ObjectReleaseTracker.track(this);
   }
@@ -928,22 +954,28 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public String getLeaderUrl(String collection, String shard, int timeout) throws InterruptedException {
-    ZkCoreNodeProps props = new ZkCoreNodeProps(getLeaderRetry(collection, shard, timeout));
+    Replica leader = getShardStateProvider(collection).getLeader(collection, shard, timeout);
+    ZkCoreNodeProps props = new ZkCoreNodeProps(leader);
     return props.getCoreUrl();
   }
 
   public Replica getLeader(Set<String> liveNodes, DocCollection docCollection, String shard) {
-    Replica replica = docCollection != null ? docCollection.getLeader(shard) : null;
+    Replica leader = getShardStateProvider(docCollection.getName()).getLeader(docCollection.getSlice(shard));
+    Replica replica = docCollection != null ? leader : null;
     if (replica != null && liveNodes.contains(replica.getNodeName())) {
       return replica;
     }
     return null;
   }
 
+  /**Use {@link ShardStateProvider#getLeader(String, String)} instead
+   */
+  @Deprecated
   public Replica getLeader(String collection, String shard) {
     if (clusterState != null) {
       DocCollection docCollection = clusterState.getCollectionOrNull(collection);
-      Replica replica = docCollection != null ? docCollection.getLeader(shard) : null;
+      Replica leader = getShardStateProvider(collection).getLeader(docCollection.getSlice(shard));
+      Replica replica = docCollection != null ? leader : null;
       if (replica != null && getClusterState().liveNodesContain(replica.getNodeName())) {
         return replica;
       }
@@ -958,22 +990,26 @@ public class ZkStateReader implements SolrCloseable {
 
   /**
    * Get shard leader properties, with retry if none exist.
+   * use {@link ShardStateProvider#getLeader(String, String, int)} instead
    */
+  @Deprecated
   public Replica getLeaderRetry(String collection, String shard) throws InterruptedException {
     return getLeaderRetry(collection, shard, GET_LEADER_RETRY_DEFAULT_TIMEOUT);
   }
 
-  /**
+
+  /** use {@link ShardStateProvider#getLeader(Slice, int)} instead
    * Get shard leader properties, with retry if none exist.
    */
+  @Deprecated
   public Replica getLeaderRetry(String collection, String shard, int timeout) throws InterruptedException {
-
+    if(timeout == -1 ) timeout = GET_LEADER_RETRY_DEFAULT_TIMEOUT;
     AtomicReference<Replica> leader = new AtomicReference<>();
     try {
-      waitForState(collection, timeout, TimeUnit.MILLISECONDS, (n, c) -> {
+      waitForState(collection, timeout, TimeUnit.MILLISECONDS, (n, c, ssp) -> {
         if (c == null)
           return false;
-        Replica l = getLeader(n, c, shard);
+        Replica l = ssp.getLeader(collection, shard);
         if (l != null) {
           leader.set(l);
           return true;
@@ -1049,8 +1085,9 @@ public class ZkStateReader implements SolrCloseable {
       String coreNodeName = entry.getValue().getName();
 
       if (clusterState.liveNodesContain(nodeProps.getNodeName()) && !coreNodeName.equals(thisCoreNodeName)) {
-        if (mustMatchStateFilter == null || mustMatchStateFilter == Replica.State.getState(nodeProps.getState())) {
-          if (mustNotMatchStateFilter == null || mustNotMatchStateFilter != Replica.State.getState(nodeProps.getState())) {
+        Replica.State repState = getShardStateProvider(collection).getState(entry.getValue());
+        if (mustMatchStateFilter == null || mustMatchStateFilter == repState) {
+          if (mustNotMatchStateFilter == null || mustNotMatchStateFilter != repState) {
             nodes.add(nodeProps);
           }
         }
@@ -1687,7 +1724,7 @@ public class ZkStateReader implements SolrCloseable {
     registerLiveNodesListener(wrapper);
 
     DocCollection state = clusterState.getCollectionOrNull(collection);
-    if (stateWatcher.onStateChanged(liveNodes, state) == true) {
+    if (stateWatcher.onStateChanged(getShardStateProvider(collection), liveNodes, state) == true) {
       removeCollectionStateWatcher(collection, stateWatcher);
     }
   }
@@ -1716,7 +1753,7 @@ public class ZkStateReader implements SolrCloseable {
     }
 
     DocCollection state = clusterState.getCollectionOrNull(collection);
-    if (stateWatcher.onStateChanged(state) == true) {
+    if (stateWatcher.onStateChanged(state, getShardStateProvider(collection)) == true) {
       removeDocCollectionWatcher(collection, stateWatcher);
     }
   }
@@ -1741,12 +1778,26 @@ public class ZkStateReader implements SolrCloseable {
    * @param predicate  the predicate to call on state changes
    * @throws InterruptedException on interrupt
    * @throws TimeoutException     on timeout
-   * @see #waitForState(String, long, TimeUnit, Predicate)
+   * @see #waitForState(String, long, TimeUnit, BiPredicate)
    * @see #registerCollectionStateWatcher
    */
   public void waitForState(final String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate)
       throws InterruptedException, TimeoutException {
 
+    ShardStateProvider ssp = getShardStateProvider(collection);
+    if (ssp instanceof DirectShardState) {
+      waitForLegacyState(collection, wait, unit, predicate);
+    } else {
+      for (; ; ) {
+        if (predicate.matches(liveNodes, getCollection(collection), ssp)) return;
+        Thread.sleep(50);
+      }
+    }
+  }
+
+
+
+  private void waitForLegacyState(String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate) throws InterruptedException, TimeoutException {
     if (closed) {
       throw new AlreadyClosedException();
     }
@@ -1754,9 +1805,9 @@ public class ZkStateReader implements SolrCloseable {
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);
     AtomicReference<DocCollection> docCollection = new AtomicReference<>();
-    CollectionStateWatcher watcher = (n, c) -> {
+    CollectionStateWatcher watcher = (ssp, n, c) -> {
       docCollection.set(c);
-      boolean matches = predicate.matches(n, c);
+      boolean matches = predicate.matches(n, c, ssp);
       if (matches)
         latch.countDown();
 
@@ -1790,7 +1841,7 @@ public class ZkStateReader implements SolrCloseable {
    * @throws InterruptedException on interrupt
    * @throws TimeoutException     on timeout
    */
-  public void waitForState(final String collection, long wait, TimeUnit unit, Predicate<DocCollection> predicate)
+  public void waitForState(final String collection, long wait, TimeUnit unit, BiPredicate<DocCollection, ShardStateProvider> predicate)
       throws InterruptedException, TimeoutException {
 
     if (closed) {
@@ -1800,9 +1851,9 @@ public class ZkStateReader implements SolrCloseable {
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);
     AtomicReference<DocCollection> docCollection = new AtomicReference<>();
-    DocCollectionWatcher watcher = (c) -> {
+    DocCollectionWatcher watcher = (c, ssp) -> {
       docCollection.set(c);
-      boolean matches = predicate.test(c);
+      boolean matches = predicate.test(c, getShardStateProvider(collection));
       if (matches)
         latch.countDown();
 
@@ -2059,7 +2110,7 @@ public class ZkStateReader implements SolrCloseable {
       });
       for (DocCollectionWatcher watcher : watchers) {
         try {
-          if (watcher.onStateChanged(collectionState)) {
+          if (watcher.onStateChanged(collectionState, getShardStateProvider(collection))) {
             removeDocCollectionWatcher(collection, watcher);
           }
         } catch (Exception exception) {
@@ -2326,8 +2377,8 @@ public class ZkStateReader implements SolrCloseable {
     }
 
     @Override
-    public boolean onStateChanged(DocCollection collectionState) {
-      final boolean result = delegate.onStateChanged(ZkStateReader.this.liveNodes,
+    public boolean onStateChanged(DocCollection collectionState, ShardStateProvider ssp) {
+      final boolean result = delegate.onStateChanged(ssp, ZkStateReader.this.liveNodes,
           collectionState);
       if (result) {
         // it might be a while before live nodes changes, so proactively remove ourselves
@@ -2339,12 +2390,25 @@ public class ZkStateReader implements SolrCloseable {
     @Override
     public boolean onChange(SortedSet<String> oldLiveNodes, SortedSet<String> newLiveNodes) {
       final DocCollection collection = ZkStateReader.this.clusterState.getCollectionOrNull(collectionName);
-      final boolean result = delegate.onStateChanged(newLiveNodes, collection);
+      final boolean result = delegate.onStateChanged(getShardStateProvider(collectionName), newLiveNodes, collection);
       if (result) {
         // it might be a while before collection changes, so proactively remove ourselves
         removeDocCollectionWatcher(collectionName, this);
       }
       return result;
     }
+  }
+  public Set<String> getCollections(){
+    return clusterState.getCollectionStates().keySet();
+  }
+
+
+  public ShardStateProvider getShardStateProvider(String collection) {
+    return directShardState;
+  /*  DocCollection coll = getClusterState().getCollectionOrNull(collection);
+    if(coll == null) return directReplicaState;
+    return coll.getExternalState()?
+        shardTermsStateProvider:
+        directReplicaState;*/
   }
 }

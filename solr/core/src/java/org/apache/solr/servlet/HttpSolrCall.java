@@ -57,6 +57,7 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.solr.api.ApiBag;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.common.SolrException;
@@ -184,7 +185,7 @@ public class HttpSolrCall {
   protected RequestType requestType;
 
   public HttpSolrCall(SolrDispatchFilter solrDispatchFilter, CoreContainer cores,
-               HttpServletRequest request, HttpServletResponse response, boolean retry) {
+                      HttpServletRequest request, HttpServletResponse response, boolean retry) {
     this.solrDispatchFilter = solrDispatchFilter;
     this.cores = cores;
     this.req = request;
@@ -568,6 +569,7 @@ public class HttpSolrCall {
         case REMOTEQUERY:
           SolrRequestInfo.setRequestInfo(new SolrRequestInfo(req, new SolrQueryResponse(), action));
           mustClearSolrRequestInfo = true;
+
           remoteQuery(coreUrl + path, resp);
           return RETURN;
         case PROCESS:
@@ -578,11 +580,11 @@ public class HttpSolrCall {
           if (config.getHttpCachingConfig().isNever304() ||
               !HttpCacheHeaderUtil.doCacheHeaderValidation(solrReq, req, reqMethod, resp)) {
             SolrQueryResponse solrRsp = new SolrQueryResponse();
-              /* even for HEAD requests, we need to execute the handler to
-               * ensure we don't get an error (and to make sure the correct
-               * QueryResponseWriter is selected and we get the correct
-               * Content-Type)
-               */
+            /* even for HEAD requests, we need to execute the handler to
+             * ensure we don't get an error (and to make sure the correct
+             * QueryResponseWriter is selected and we get the correct
+             * Content-Type)
+             */
             SolrRequestInfo.setRequestInfo(new SolrRequestInfo(solrReq, solrRsp, action));
             mustClearSolrRequestInfo = true;
             execute(solrRsp);
@@ -943,24 +945,24 @@ public class HttpSolrCall {
       return null;
     }
 
-    Set<String> liveNodes = clusterState.getLiveNodes();
+    ShardStateProvider ssp = cores.getZkController().getZkStateReader().getShardStateProvider(collectionName);
 
     if (isPreferLeader) {
       List<Replica> leaderReplicas = collection.getLeaderReplicas(cores.getZkController().getNodeName());
-      SolrCore core = randomlyGetSolrCore(liveNodes, leaderReplicas);
+      SolrCore core = randomlyGetSolrCore(ssp, leaderReplicas);
       if (core != null) return core;
     }
 
     List<Replica> replicas = collection.getReplicas(cores.getZkController().getNodeName());
-    return randomlyGetSolrCore(liveNodes, replicas);
+    return randomlyGetSolrCore(ssp, replicas);
   }
 
-  private SolrCore randomlyGetSolrCore(Set<String> liveNodes, List<Replica> replicas) {
+  private SolrCore randomlyGetSolrCore(ShardStateProvider ssp, List<Replica> replicas) {
     if (replicas != null) {
       RandomIterator<Replica> it = new RandomIterator<>(random, replicas);
       while (it.hasNext()) {
         Replica replica = it.next();
-        if (liveNodes.contains(replica.getNodeName()) && replica.getState() == Replica.State.ACTIVE) {
+        if (ssp.isActive(replica)) {
           SolrCore core = checkProps(replica);
           if (core != null) return core;
         }
@@ -1056,14 +1058,14 @@ public class HttpSolrCall {
     String coreUrl;
     Set<String> liveNodes = clusterState.getLiveNodes();
     Collections.shuffle(slices, random);
+    ShardStateProvider ssp = this.cores.getZkController().getZkStateReader().getShardStateProvider(collectionName);
 
     for (Slice slice : slices) {
       List<Replica> randomizedReplicas = new ArrayList<>(slice.getReplicas());
       Collections.shuffle(randomizedReplicas, random);
 
       for (Replica replica : randomizedReplicas) {
-        if (!activeReplicas || (liveNodes.contains(replica.getNodeName())
-            && replica.getState() == Replica.State.ACTIVE)) {
+        if (!activeReplicas || ssp.isActive(replica)) {
 
           if (byCoreName && !origCorename.equals(replica.getStr(CORE_NAME_PROP))) {
             // if it's by core name, make sure they match

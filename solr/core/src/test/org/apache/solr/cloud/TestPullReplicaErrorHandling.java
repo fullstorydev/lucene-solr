@@ -32,6 +32,7 @@ import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -147,6 +148,7 @@ public void testCantConnectToPullReplica() throws Exception {
       .setMaxShardsPerNode(1)
       .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(collectionName, numShards, numShards * 2);
+  ShardStateProvider ssp = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
     addDocs(10);
     DocCollection docCollection = assertNumberOfReplicas(numShards, 0, numShards, false, true);
     Slice s = docCollection.getSlices().iterator().next();
@@ -155,7 +157,7 @@ public void testCantConnectToPullReplica() throws Exception {
       proxy.close();
       for (int i = 1; i <= 10; i ++) {
         addDocs(10 + i);
-        try (HttpSolrClient leaderClient = getHttpSolrClient(s.getLeader().getCoreUrl())) {
+        try (HttpSolrClient leaderClient = getHttpSolrClient(ssp.getLeader(s).getCoreUrl())) {
           assertNumDocs(10 + i, leaderClient);
         }
       }
@@ -190,10 +192,11 @@ public void testCantConnectToPullReplica() throws Exception {
       .setMaxShardsPerNode(1)
       .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(collectionName, numShards, numShards * 2);
+    ShardStateProvider ssp = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
     addDocs(10);
     DocCollection docCollection = assertNumberOfReplicas(numShards, 0, numShards, false, true);
     Slice s = docCollection.getSlices().iterator().next();
-    SocketProxy proxy = getProxyForReplica(s.getLeader());
+    SocketProxy proxy = getProxyForReplica(ssp.getLeader(s));
     try {
       // wait for replication
       try (HttpSolrClient pullReplicaClient = getHttpSolrClient(s.getReplicas(EnumSet.of(Replica.Type.PULL)).get(0).getCoreUrl())) {
@@ -275,13 +278,14 @@ public void testCantConnectToPullReplica() throws Exception {
       cluster.getSolrClient().getZkStateReader().forceUpdateCollection(collectionName);
     }
     DocCollection docCollection = getCollectionState(collectionName);
+    ShardStateProvider ssp = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
     assertNotNull(docCollection);
     assertEquals("Unexpected number of writer replicas: " + docCollection, numWriter, 
-        docCollection.getReplicas(EnumSet.of(Replica.Type.NRT)).stream().filter(r->!activeOnly || r.getState() == Replica.State.ACTIVE).count());
+        docCollection.getReplicas(EnumSet.of(Replica.Type.NRT)).stream().filter(r->!activeOnly || ssp.getState(r)  == Replica.State.ACTIVE).count());
     assertEquals("Unexpected number of pull replicas: " + docCollection, numPassive, 
-        docCollection.getReplicas(EnumSet.of(Replica.Type.PULL)).stream().filter(r->!activeOnly || r.getState() == Replica.State.ACTIVE).count());
+        docCollection.getReplicas(EnumSet.of(Replica.Type.PULL)).stream().filter(r->!activeOnly || ssp.getState(r) == Replica.State.ACTIVE).count());
     assertEquals("Unexpected number of active replicas: " + docCollection, numActive, 
-        docCollection.getReplicas(EnumSet.of(Replica.Type.TLOG)).stream().filter(r->!activeOnly || r.getState() == Replica.State.ACTIVE).count());
+        docCollection.getReplicas(EnumSet.of(Replica.Type.TLOG)).stream().filter(r->!activeOnly || ssp.getState(r) == Replica.State.ACTIVE).count());
     return docCollection;
   }
   
@@ -327,13 +331,13 @@ public void testCantConnectToPullReplica() throws Exception {
   }
   
   private CollectionStatePredicate activeReplicaCount(int numWriter, int numActive, int numPassive) {
-    return (liveNodes, collectionState) -> {
+    return (liveNodes, collectionState, ssp) -> {
       int writersFound = 0, activesFound = 0, passivesFound = 0;
       if (collectionState == null)
         return false;
       for (Slice slice : collectionState) {
         for (Replica replica : slice) {
-          if (replica.isActive(liveNodes))
+          if (ssp.isActive(replica))
             switch (replica.getType()) {
               case TLOG:
                 activesFound++;

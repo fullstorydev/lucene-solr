@@ -25,10 +25,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.autoscaling.Policy;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -53,10 +53,12 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   public static final String STATE_FORMAT = "stateFormat";
   public static final String RULE = "rule";
   public static final String SNITCH = "snitch";
+  public static final String EXT_STATE = "externalState";
 
   private final int znodeVersion;
 
   private final String name;
+  private final Boolean externalState;
   private final Map<String, Slice> slices;
   private final Map<String, Slice> activeSlices;
   private final Slice[] activeSlicesArr;
@@ -98,12 +100,13 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     this.numTlogReplicas = (Integer) verifyProp(props, TLOG_REPLICAS, 0);
     this.numPullReplicas = (Integer) verifyProp(props, PULL_REPLICAS, 0);
     this.maxShardsPerNode = (Integer) verifyProp(props, MAX_SHARDS_PER_NODE);
+    this.externalState = (Boolean) verifyProp(props, EXT_STATE);
     Boolean autoAddReplicas = (Boolean) verifyProp(props, AUTO_ADD_REPLICAS);
     this.policy = (String) props.get(Policy.POLICY);
     this.autoAddReplicas = autoAddReplicas == null ? Boolean.FALSE : autoAddReplicas;
     Boolean readOnly = (Boolean) verifyProp(props, READ_ONLY);
     this.readOnly = readOnly == null ? Boolean.FALSE : readOnly;
-    
+
     verifyProp(props, RULE);
     verifyProp(props, SNITCH);
     Iterator<Map.Entry<String, Slice>> iter = slices.entrySet().iterator();
@@ -140,7 +143,7 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
       leaderReplicas.add(replica);
     }
   }
-  
+
   public static Object verifyProp(Map<String, Object> props, String propName) {
     return verifyProp(props, propName, null);
   }
@@ -156,6 +159,7 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
       case TLOG_REPLICAS:
         return Integer.parseInt(o.toString());
       case AUTO_ADD_REPLICAS:
+      case EXT_STATE:
       case READ_ONLY:
         return Boolean.parseBoolean(o.toString());
       case "snitch":
@@ -257,11 +261,11 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   public Integer getReplicationFactor() {
     return replicationFactor;
   }
-  
+
   public boolean getAutoAddReplicas() {
     return autoAddReplicas;
   }
-  
+
   public int getMaxShardsPerNode() {
     if (maxShardsPerNode == null) {
       throw new SolrException(ErrorCode.BAD_REQUEST, MAX_SHARDS_PER_NODE + " is not in the cluster state.");
@@ -304,6 +308,9 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     return null;
   }
 
+  /**Use {@link ShardStateProvider#getLeader(Slice)} instead
+   */
+  @Deprecated
   public Replica getLeader(String sliceName) {
     Slice slice = getSlice(sliceName);
     if (slice == null) return null;
@@ -315,16 +322,15 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
    *
    * @see CollectionStatePredicate
    */
-  public static boolean isFullyActive(Set<String> liveNodes, DocCollection collectionState,
+  public static boolean isFullyActive(ShardStateProvider ssp, DocCollection collectionState,
                                       int expectedShards, int expectedReplicas) {
-    Objects.requireNonNull(liveNodes);
     if (collectionState == null)
       return false;
     int activeShards = 0;
     for (Slice slice : collectionState) {
       int activeReplicas = 0;
       for (Replica replica : slice) {
-        if (replica.isActive(liveNodes) == false)
+        if (!ssp.isActive(replica))
           return false;
         activeReplicas++;
       }
@@ -433,4 +439,10 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     return result == null ? def : result;
 
   }
+
+  public boolean getExternalState() {
+    return externalState != null &&
+        externalState == Boolean.TRUE;
+  }
+
 }

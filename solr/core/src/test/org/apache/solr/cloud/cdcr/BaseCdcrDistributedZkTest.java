@@ -34,6 +34,7 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -606,7 +607,7 @@ public class BaseCdcrDistributedZkTest extends AbstractDistribZkTestBase {
 
     // now wait till we see the leader for each shard
     for (int i = 1; i <= shardCount; i++) {
-      zkStateReader.getLeaderRetry(temporaryCollection, "shard" + i, 15000);
+      zkStateReader.getShardStateProvider(temporaryCollection). getLeader(temporaryCollection, "shard" + i, 15000);
     }
 
     // store the node names
@@ -668,6 +669,7 @@ public class BaseCdcrDistributedZkTest extends AbstractDistribZkTestBase {
       ZkStateReader zkStateReader = cloudClient.getZkStateReader();
       ClusterState clusterState = zkStateReader.getClusterState();
       DocCollection coll = clusterState.getCollection(collection);
+      ShardStateProvider ssp = zkStateReader.getShardStateProvider(collection);
 
       for (JettySolrRunner jetty : jettys) {
         int port = jetty.getLocalPort();
@@ -684,7 +686,7 @@ public class BaseCdcrDistributedZkTest extends AbstractDistribZkTestBase {
               if (!shardToJetty.containsKey(shard.getName())) {
                 shardToJetty.put(shard.getName(), new ArrayList<CloudJettyRunner>());
               }
-              boolean isLeader = shard.getLeader() == replica;
+              boolean isLeader = ssp.getLeader(shard) == replica;
               CloudJettyRunner cjr = new CloudJettyRunner(jetty, replica, collection, shard.getName(), entry.getKey());
               shardToJetty.get(shard.getName()).add(cjr);
               if (isLeader) {

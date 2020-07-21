@@ -291,8 +291,8 @@ public class MoveReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     SolrCloseableLatch countDownLatch = new SolrCloseableLatch(1, ocmh);
     ActiveReplicaWatcher watcher = null;
     ZkNodeProps props = ocmh.addReplica(clusterState, addReplicasProps, addResult, null).get(0);
-    log.debug("props {}", props);
-    if (replica.equals(slice.getLeader()) || waitForFinalState) {
+    log.debug("props " + props);
+    if (replica.equals(ocmh.zkStateReader.getShardStateProvider(coll.getName()).getLeader(slice)) || waitForFinalState) {
       watcher = new ActiveReplicaWatcher(coll.getName(), null, Collections.singletonList(newCoreName), countDownLatch);
       log.debug("-- registered watcher {}", watcher);
       ocmh.zkStateReader.registerCollectionStateWatcher(coll.getName(), watcher);

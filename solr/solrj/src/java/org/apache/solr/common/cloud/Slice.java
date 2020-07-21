@@ -153,10 +153,10 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
     range = tmpRange;
 
     /** debugging.  this isn't an error condition for custom sharding.
-    if (range == null) {
-      System.out.println("###### NO RANGE for " + name + " props=" + props);
-    }
-    **/
+     if (range == null) {
+     System.out.println("###### NO RANGE for " + name + " props=" + props);
+     }
+     **/
 
     if (propMap.containsKey(PARENT) && propMap.get(PARENT) != null)
       this.parent = (String) propMap.get(PARENT);
@@ -260,6 +260,9 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
     return new LinkedHashMap<>(replicas);
   }
 
+  /**use {@link org.apache.solr.client.solrj.cloud.ShardStateProvider#getLeader(Slice)} instead
+   */
+  @Deprecated
   public Replica getLeader() {
     return leader;
   }

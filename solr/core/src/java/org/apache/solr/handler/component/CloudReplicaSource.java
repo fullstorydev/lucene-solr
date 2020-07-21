@@ -186,7 +186,7 @@ class CloudReplicaSource implements ReplicaSource {
     public boolean test(Replica replica) {
       if (shardLeader == null) {
         try {
-          shardLeader = zkStateReader.getLeaderRetry(collectionName, sliceName);
+          shardLeader = zkStateReader.getShardStateProvider(collectionName).getLeader(collectionName, sliceName, -1);
         } catch (InterruptedException e) {
           throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE,
               "Exception finding leader for shard " + sliceName + " in collection "

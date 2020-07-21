@@ -61,8 +61,8 @@ public class DeleteInactiveReplicaTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(collectionName, "conf", numShards, replicationFactor)
         .setMaxShardsPerNode(maxShardsPerNode)
         .process(cluster.getSolrClient());
-    waitForState("Expected a cluster of 2 shards and 2 replicas", collectionName, (n, c) -> {
-      return DocCollection.isFullyActive(n, c, numShards, replicationFactor);
+    waitForState("Expected a cluster of 2 shards and 2 replicas", collectionName, (n, c, ssp) -> {
+      return DocCollection.isFullyActive(ssp, c, numShards, replicationFactor);
     });
 
     DocCollection collectionState = getCollectionState(collectionName);
@@ -76,9 +76,9 @@ public class DeleteInactiveReplicaTest extends SolrCloudTestCase {
     }
     cluster.stopJettySolrRunner(jetty);
 
-    waitForState("Expected replica " + replica.getName() + " on down node to be removed from cluster state", collectionName, (n, c) -> {
+    waitForState("Expected replica " + replica.getName() + " on down node to be removed from cluster state", collectionName, (n, c, ssp) -> {
       Replica r = c.getReplica(replica.getCoreName());
-      return r == null || r.getState() != Replica.State.ACTIVE;
+      return r == null || ssp.getState(r) != Replica.State.ACTIVE;
     });
 
     if (log.isInfoEnabled()) {
@@ -86,7 +86,7 @@ public class DeleteInactiveReplicaTest extends SolrCloudTestCase {
     }
     CollectionAdminRequest.deleteReplica(collectionName, shard.getName(), replica.getName())
         .process(cluster.getSolrClient());
-    waitForState("Expected deleted replica " + replica.getName() + " to be removed from cluster state", collectionName, (n, c) -> {
+    waitForState("Expected deleted replica " + replica.getName() + " to be removed from cluster state", collectionName, (n, c, ssp) -> {
       return c.getReplica(replica.getCoreName()) == null;
     });
 

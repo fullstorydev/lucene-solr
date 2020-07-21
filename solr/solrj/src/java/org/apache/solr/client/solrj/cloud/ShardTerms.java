@@ -31,9 +31,13 @@ import org.apache.solr.common.SolrException;
  * Hold values of terms, this class is immutable. Create a new instance for every mutation
  */
 public class ShardTerms implements MapWriter {
-  private static final String RECOVERING_TERM_SUFFIX = "_recovering";
+  public static final String RECOVERING_TERM_SUFFIX = "_recovering";
+  public static final String LEADER_TERM_SUFFIX = "_LEADER";
+
   private final Map<String, Long> values;
+  private final String leader;
   private final long maxTerm;
+  public final long createTime;
   // ZK node version
   private final int version;
 
@@ -51,10 +55,26 @@ public class ShardTerms implements MapWriter {
   }
 
   public ShardTerms(Map<String, Long> values, int version) {
+    this.createTime = System.nanoTime();
     this.values = values;
     this.version = version;
     if (values.isEmpty()) this.maxTerm = 0;
     else this.maxTerm = Collections.max(values.values());
+    String leader = "#";//while the system is upgrading , we may not have a leader entry
+    for (Map.Entry<String, Long> e : values.entrySet()) {
+      if(e.getKey().endsWith(LEADER_TERM_SUFFIX)){
+        leader = e.getKey().substring(0,e.getKey().length() -  LEADER_TERM_SUFFIX.length());
+        break;
+      }
+    }
+    this.leader = leader;
+  }
+  public String getLeader(){
+    return leader;
+  }
+
+  public int getVersion(){
+    return version;
   }
 
   /**
@@ -64,6 +84,17 @@ public class ShardTerms implements MapWriter {
    */
   public boolean canBecomeLeader(String coreNodeName) {
     return haveHighestTermValue(coreNodeName) && !values.containsKey(recoveringTerm(coreNodeName));
+  }
+
+  public ShardTerms setLeader(String leader) {
+    if (this.leader.equals(leader)) return this;
+    HashMap<String, Long> newValues = new HashMap<>(values.size());
+    for (Map.Entry<String, Long> entry : values.entrySet()) {
+      if (entry.getKey().endsWith(LEADER_TERM_SUFFIX)) continue;
+      newValues.put(entry.getKey(), entry.getValue());
+    }
+    newValues.put(leader + LEADER_TERM_SUFFIX, -1L);
+    return new ShardTerms(newValues, version);
   }
 
   /**
@@ -99,6 +130,7 @@ public class ShardTerms implements MapWriter {
     long leaderTerm = newValues.get(leader);
     for (Map.Entry<String, Long> entry : newValues.entrySet()) {
       String key = entry.getKey();
+      if (key.endsWith(LEADER_TERM_SUFFIX)) continue;
       if (replicasNeedingRecovery.contains(key)) foundReplicasInLowerTerms = true;
       if (Objects.equals(entry.getValue(), leaderTerm)) {
         if(skipIncreaseTermOf(key, replicasNeedingRecovery)) {
@@ -201,9 +233,16 @@ public class ShardTerms implements MapWriter {
    * @return null if {@code coreNodeName} is already marked as doing recovering
    */
   public ShardTerms startRecovering(String coreNodeName) {
+    return startRecovering(coreNodeName, false);
+  }
+
+  // nocommit javadocs
+  public ShardTerms startRecovering(String coreNodeName, boolean forceMarkRecovering) {
     long maxTerm = getMaxTerm();
-    if (values.get(coreNodeName) == maxTerm)
-      return null;
+    if (!forceMarkRecovering) {
+      if (values.get(coreNodeName) == maxTerm)
+        return null;
+    }
 
     HashMap<String, Long> newValues = new HashMap<>(values);
     if (!newValues.containsKey(recoveringTerm(coreNodeName))) {
@@ -213,6 +252,9 @@ public class ShardTerms implements MapWriter {
     }
     newValues.put(coreNodeName, maxTerm);
     return new ShardTerms(newValues, version);
+  }
+  public boolean isRecovering(String name) {
+    return values.containsKey( recoveringTerm(name));
   }
 
   /**
@@ -242,15 +284,7 @@ public class ShardTerms implements MapWriter {
         '}';
   }
 
-  public int getVersion() {
-    return version;
-  }
-
-  public Map<String , Long> getTerms() {
-    return new HashMap<>(this.values);
-  }
-
-  public boolean isRecovering(String name) {
-    return values.containsKey(recoveringTerm(name));
+  public Map<String,Long> getData() {
+    return Collections.unmodifiableMap(values);
   }
 }

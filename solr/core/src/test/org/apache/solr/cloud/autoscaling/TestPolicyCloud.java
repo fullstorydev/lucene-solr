@@ -191,14 +191,14 @@ public class TestPolicyCloud extends SolrCloudTestCase {
      final int expectedSliceCount,
      final int expectedReplicaCount) {
 
-    return (liveNodes, collection) -> {
+    return (liveNodes, collection, ssp) -> {
       if (null == collection || expectedSliceCount != collection.getSlices().size()) {
         return false;
       }
       int actualReplicaCount = 0;
       for (Slice slice : collection) {
         for (Replica replica : slice) {
-          if ( ! (replica.isActive(liveNodes)
+          if ( ! (ssp.isActive(replica)
                   && expectedNodeName.equals(replica.getNodeName())) ) {
             return false;
           }
@@ -274,7 +274,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
                    
     waitForState("Should have found exactly 1 slice w/2 live Replicas, one on each expected jetty: " +
                  firstNodeName + "/" + firstNodePort + " & " +  secondNodeName + "/" + secondNodePort,
-                 collectionName, (liveNodes, collection) -> {
+                 collectionName, (liveNodes, collection, ssp) -> {
                    // short circut if collection is deleted
                    // or we some how have the wrong number of slices
                    if (null == collection || 1 != collection.getSlices().size()) {
@@ -289,7 +289,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
                      }
                      // make sure our replicas are fully live...
                      final List<Replica> liveReplicas = slice.getReplicas
-                       ((r) -> r.isActive(liveNodes));
+                       (ssp::isActive);
                      if (2 != liveReplicas.size()) {
                        return false;
                      }
@@ -311,7 +311,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
     waitForState("Should have found exactly 3 shards (1 inactive) each w/two live Replicas, " +
                  "one on each expected jetty: " +
                  firstNodeName + "/" + firstNodePort + " & " +  secondNodeName + "/" + secondNodePort,
-                 collectionName, (liveNodes, collection) -> {
+                 collectionName, (liveNodes, collection, ssp) -> {
                    // short circut if collection is deleted
                    // or we some how have the wrong number of (active) slices
                    if (null == collection
@@ -327,7 +327,7 @@ public class TestPolicyCloud extends SolrCloudTestCase {
                      }
                      // make sure our replicas are fully live...
                      final List<Replica> liveReplicas = slice.getReplicas
-                       ((r) -> r.isActive(liveNodes));
+                       (ssp::isActive);
                      if (2 != liveReplicas.size()) {
                        return false;
                      }

@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.solr.client.solrj.cloud.DirectShardState;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
@@ -108,6 +110,16 @@ public interface ClusterStateProvider extends SolrCloseable {
    * Get the collection-specific policy
    */
   String getPolicyNameByCollection(String coll);
+
+  default ShardStateProvider getShardStateProvider(String coll) {
+    return new DirectShardState(s -> getLiveNodes().contains(s), s -> {
+      try {
+        return getCollection(s);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }) ;
+  }
 
   void connect();
 }

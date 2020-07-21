@@ -558,7 +558,7 @@ public class MiniSolrCloudCluster {
       }
       
       for (String collection : reader.getClusterState().getCollectionStates().keySet()) {
-        reader.waitForState(collection, 15, TimeUnit.SECONDS, (collectionState) -> collectionState == null ? true : false);
+        reader.waitForState(collection, 15, TimeUnit.SECONDS, (collectionState,ssp) -> collectionState == null ? true : false);
       }
      
     } 
@@ -755,11 +755,11 @@ public class MiniSolrCloudCluster {
     AtomicReference<DocCollection> state = new AtomicReference<>();
     AtomicReference<Set<String>> liveNodesLastSeen = new AtomicReference<>();
     try {
-      getSolrClient().waitForState(collection, wait, unit, (n, c) -> {
+      getSolrClient().waitForState(collection, wait, unit, (n, c, ssp) -> {
         state.set(c);
         liveNodesLastSeen.set(n);
 
-        return predicate.matches(n, c);
+        return predicate.matches(n, c, ssp);
       });
     } catch (TimeoutException | InterruptedException e) {
       throw new RuntimeException("Failed while waiting for active collection" + "\n" + e.getMessage() + "\nLive Nodes: " + Arrays.toString(liveNodesLastSeen.get().toArray())
@@ -773,7 +773,7 @@ public class MiniSolrCloudCluster {
   }
   
   public static CollectionStatePredicate expectedShardsAndActiveReplicas(int expectedShards, int expectedReplicas) {
-    return (liveNodes, collectionState) -> {
+    return (liveNodes, collectionState, ssp) -> {
       if (collectionState == null)
         return false;
       if (collectionState.getSlices().size() != expectedShards) {
@@ -783,7 +783,7 @@ public class MiniSolrCloudCluster {
       int activeReplicas = 0;
       for (Slice slice : collectionState) {
         for (Replica replica : slice) {
-          if (replica.isActive(liveNodes)) {
+          if (ssp.isActive(replica)) {
             activeReplicas++;
           }
         }

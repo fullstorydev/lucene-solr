@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -218,12 +219,12 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
   private void checkElectionQueues() throws KeeperException, InterruptedException {
 
     DocCollection docCollection = cluster.getSolrClient().getZkStateReader().getClusterState().getCollection(COLLECTION_NAME);
-    Set<String> liveNodes = cluster.getSolrClient().getZkStateReader().getClusterState().getLiveNodes();
+    ShardStateProvider ssp = cluster.getSolrClient().getZkStateReader().getShardStateProvider(COLLECTION_NAME);
 
     for (Slice slice : docCollection.getSlices()) {
       Set<Replica> liveReplicas = new HashSet<>();
       slice.getReplicas().forEach(replica -> {
-        if (replica.isActive(liveNodes)) {
+        if (ssp.isActive(replica)) {
           liveReplicas.add(replica);
         }
       });
@@ -453,7 +454,7 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
     cluster.getSolrClient().request(request);
     String propLC = prop.toLowerCase(Locale.ROOT);
     waitForState("Expecting property '" + prop + "'to appear on replica " + rep.getName(), COLLECTION_NAME,
-        (n, c) -> "true".equals(c.getReplica(rep.getName()).getProperty(propLC)));
+        (n, c, ssp) -> "true".equals(c.getReplica(rep.getName()).getProperty(propLC)));
 
   }
 
@@ -468,7 +469,7 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
     assertEquals(0, resp.getStatus());
     String propLC = prop.toLowerCase(Locale.ROOT);
     waitForState("Expecting property '" + prop + "'to appear on replica " + rep.getName(), COLLECTION_NAME,
-        (n, c) -> "true".equals(c.getReplica(rep.getName()).getProperty(propLC)));
+        (n, c, ssp) -> "true".equals(c.getReplica(rep.getName()).getProperty(propLC)));
 
   }
 
@@ -478,7 +479,7 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
         .process(cluster.getSolrClient());
     assertEquals("Admin request failed; ", 0, resp.getStatus());
     waitForState("Expecting property '" + prop + "' to be removed from replica " + rep.getName(), COLLECTION_NAME,
-        (n, c) -> c.getReplica(rep.getName()).getProperty(prop) == null);
+        (n, c, ssp) -> c.getReplica(rep.getName()).getProperty(prop) == null);
   }
 
   // Intentionally un-balance the property to insure that BALANCESHARDUNIQUE does its job. There was an odd case
@@ -526,7 +527,7 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
     while (timeout.hasTimedOut() == false) {
       forceUpdateCollectionStatus();
       docCollection = cluster.getSolrClient().getZkStateReader().getClusterState().getCollection(COLLECTION_NAME);
-      liveNodes = cluster.getSolrClient().getZkStateReader().getClusterState().getLiveNodes();
+      ShardStateProvider ssp = cluster.getSolrClient().getZkStateReader().getShardStateProvider(COLLECTION_NAME);
       boolean expectedInactive = true;
 
       for (Slice slice : docCollection.getSlices()) {
@@ -535,7 +536,7 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
             continue; // We are on a live node
           }
           // A replica on an allegedly down node is reported as active.
-          if (rep.isActive(liveNodes)) {
+          if (ssp.isActive(rep)) {
             expectedInactive = false;
           }
         }
@@ -556,11 +557,11 @@ public class TestRebalanceLeaders extends SolrCloudTestCase {
     while (timeout.hasTimedOut() == false) {
       forceUpdateCollectionStatus();
       DocCollection docCollection = cluster.getSolrClient().getZkStateReader().getClusterState().getCollection(COLLECTION_NAME);
-      Set<String> liveNodes = cluster.getSolrClient().getZkStateReader().getClusterState().getLiveNodes();
+      ShardStateProvider ssp = cluster.getSolrClient().getZkStateReader().getShardStateProvider(COLLECTION_NAME);
       boolean allActive = true;
       for (Slice slice : docCollection.getSlices()) {
         for (Replica rep : slice.getReplicas()) {
-          if (rep.isActive(liveNodes) == false) {
+          if (ssp.isActive(rep) == false) {
             allActive = false;
           }
         }

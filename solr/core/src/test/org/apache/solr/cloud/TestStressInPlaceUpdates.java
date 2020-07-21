@@ -18,19 +18,21 @@
 package org.apache.solr.cloud;
 
 import java.lang.invoke.MethodHandles;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.math3.primes.Primes;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -588,9 +590,10 @@ public class TestStressInPlaceUpdates extends AbstractFullDistribZkTestBase {
     ZkStateReader zkStateReader = cloudClient.getZkStateReader();
     cloudClient.getZkStateReader().forceUpdateCollection(DEFAULT_COLLECTION);
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
+    ShardStateProvider ssp = cloudClient.getClusterStateProvider().getShardStateProvider(DEFAULT_COLLECTION);
     Replica leader = null;
     Slice shard1 = clusterState.getCollection(DEFAULT_COLLECTION).getSlice(SHARD1);
-    leader = shard1.getLeader();
+    leader = ssp.getLeader(shard1);
 
     for (int i = 0; i < clients.size(); i++) {
       String leaderBaseUrl = zkStateReader.getBaseUrlForNodeName(leader.getNodeName());

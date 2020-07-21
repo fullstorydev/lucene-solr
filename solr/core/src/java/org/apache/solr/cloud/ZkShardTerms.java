@@ -160,7 +160,7 @@ public class ZkShardTerms implements AutoCloseable{
 
   // package private for testing, only used by tests
   Map<String, Long> getTerms() {
-    return new HashMap<>(terms.get().getTerms());
+    return terms.get().getData();
   }
 
   /**
@@ -303,7 +303,7 @@ public class ZkShardTerms implements AutoCloseable{
    * @return true if terms is saved successfully to ZK, false if otherwise
    * @throws KeeperException.NoNodeException correspond ZK term node is not created
    */
-  private boolean saveTerms(ShardTerms newTerms) throws KeeperException.NoNodeException {
+  public boolean saveTerms(ShardTerms newTerms) throws KeeperException.NoNodeException {
     byte[] znodeData = Utils.toJSON(newTerms);
     try {
       Stat stat = zkClient.setData(znodePath, znodeData, newTerms.getVersion(), true);

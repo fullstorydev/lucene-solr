@@ -28,6 +28,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest.Create;
@@ -99,12 +100,13 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     cluster.waitForActiveCollection(collectionName, 2, 4);
 
     DocCollection state = getCollectionState(collectionName);
+    ShardStateProvider shardStateProvider = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
     Slice shard = getRandomShard(state);
     
     // don't choose the leader to shutdown, it just complicates things unneccessarily
     Replica replica = getRandomReplica(shard, (r) ->
-                                       ( r.getState() == Replica.State.ACTIVE &&
-                                         ! r.equals(shard.getLeader())));
+                                       ( shardStateProvider.getState(r) == Replica.State.ACTIVE &&
+                                         ! r.equals(shardStateProvider.getLeader(shard))));
 
     CoreStatus coreStatus = getCoreStatus(replica);
     Path dataDir = Paths.get(coreStatus.getDataDirectory());
@@ -125,7 +127,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     
     CollectionAdminRequest.deleteReplica(collectionName, shard.getName(), replica.getName())
         .process(cluster.getSolrClient());
-    waitForState("Expected replica " + replica.getName() + " to have been removed", collectionName, (n, c) -> {
+    waitForState("Expected replica " + replica.getName() + " to have been removed", collectionName, (n, c, ssp) -> {
       Slice testShard = c.getSlice(shard.getName());
       return testShard.getReplica(replica.getName()) == null;
     });
@@ -151,7 +153,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     final String collectionName = "deletereplica_test";
     CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2).process(cluster.getSolrClient());
 
-    Replica leader = cluster.getSolrClient().getZkStateReader().getLeaderRetry(collectionName, "shard1");
+    Replica leader = cluster.getSolrClient().getZkStateReader().getShardStateProvider(collectionName). getLeader(collectionName, "shard1", -1);
 
     //Confirm that the instance and data directory exist
     CoreStatus coreStatus = getCoreStatus(leader);
@@ -161,7 +163,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     CollectionAdminRequest.deleteReplica(collectionName, "shard1",leader.getName())
         .process(cluster.getSolrClient());
 
-    Replica newLeader = cluster.getSolrClient().getZkStateReader().getLeaderRetry(collectionName, "shard1");
+    Replica newLeader = cluster.getSolrClient().getZkStateReader().getShardStateProvider(collectionName).getLeader(collectionName, "shard1", -1);
 
     assertFalse(leader.equals(newLeader));
 
@@ -239,8 +241,11 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
 
     // don't choose the leader to shutdown, it just complicates things unneccessarily
     Replica replica = getRandomReplica(shard, (r) ->
-                                       ( r.getState() == Replica.State.ACTIVE &&
-                                         ! r.equals(shard.getLeader())));
+    {
+      ShardStateProvider ssp = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
+      return ( ssp.getState(r) == Replica.State.ACTIVE &&
+        ! r.equals(ssp.getLeader(shard)));
+    });
     
     JettySolrRunner replicaJetty = cluster.getReplicaJetty(replica);
     ZkStateReaderAccessor accessor = new ZkStateReaderAccessor(replicaJetty.getCoreContainer().getZkController().getZkStateReader());
@@ -259,7 +264,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     cluster.getOpenOverseer().getStateUpdateQueue().offer(Utils.toJSON(m));
 
     waitForState("Timeout waiting for replica get deleted", collectionName,
-        (liveNodes, collectionState) -> collectionState.getSlice("shard1").getReplicas().size() == 2);
+        (liveNodes, collectionState, ssp) -> collectionState.getSlice("shard1").getReplicas().size() == 2);
 
     TimeOut timeOut = new TimeOut(60, TimeUnit.SECONDS, TimeSource.NANO_TIME);
     timeOut.waitFor("Waiting for replica get unloaded", () ->
@@ -307,8 +312,9 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     
     waitForState("Expected 1x2 collections", collectionName, clusterShape(1, 2));
 
+    ShardStateProvider ssp = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
     Slice shard1 = getCollectionState(collectionName).getSlice("shard1");
-    Replica leader = shard1.getLeader();
+    Replica leader = ssp.getLeader(shard1);
     JettySolrRunner leaderJetty = getJettyForReplica(leader);
     Replica replica1 = shard1.getReplicas(replica -> !replica.getName().equals(leader.getName())).get(0);
     assertFalse(replica1.getName().equals(leader.getName()));
@@ -375,8 +381,8 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     try {
       replica1Jetty.stop();
       waitForNodeLeave(replica1JettyNodeName);
-      waitForState("Expected replica:"+replica1+" get down", collectionName, (liveNodes, collectionState)
-          -> collectionState.getSlice("shard1").getReplica(replica1.getName()).getState() == DOWN);
+      waitForState("Expected replica:"+replica1+" get down", collectionName, (liveNodes, collectionState, sp)
+          -> sp.getState(collectionState.getSlice("shard1").getReplica(replica1.getName())) == DOWN);
       replica1Jetty.start();
       waitingForReplicaGetDeleted.acquire();
     } finally {
@@ -397,16 +403,16 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     waitForState("Expected 1x2 collections", collectionName, clusterShape(1, 2));
 
     shard1 = getCollectionState(collectionName).getSlice("shard1");
-    Replica latestLeader = shard1.getLeader();
+    Replica latestLeader = ssp.getLeader(shard1);
     leaderJetty = getJettyForReplica(latestLeader);
     String leaderJettyNodeName = leaderJetty.getNodeName();
     leaderJetty.stop();
     waitForNodeLeave(leaderJettyNodeName);
 
-    waitForState("Expected new active leader", collectionName, (liveNodes, collectionState) -> {
+    waitForState("Expected new active leader", collectionName, (liveNodes, collectionState, sp) -> {
       Slice shard = collectionState.getSlice("shard1");
-      Replica newLeader = shard.getLeader();
-      return newLeader != null && newLeader.getState() == Replica.State.ACTIVE && !newLeader.getName().equals(latestLeader.getName());
+      Replica newLeader = sp.getLeader(shard);
+      return newLeader != null && sp.getState(newLeader) == Replica.State.ACTIVE && !newLeader.getName().equals(latestLeader.getName());
     });
 
     leaderJetty.start();
@@ -457,7 +463,8 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     }
 
     Slice shard1 = getCollectionState(collectionName).getSlice("shard1");
-    Replica nonLeader = shard1.getReplicas(rep -> !rep.getName().equals(shard1.getLeader().getName())).get(0);
+    ShardStateProvider shardStateProvider = cluster.getSolrClient().getClusterStateProvider().getShardStateProvider(collectionName);
+    Replica nonLeader = shard1.getReplicas(rep -> !rep.getName().equals(shardStateProvider.getLeader(shard1).getName())).get(0);
     CollectionAdminRequest.deleteReplica(collectionName, "shard1", nonLeader.getName()).process(cluster.getSolrClient());
     closed.set(true);
     for (int i = 0; i < threads.length; i++) {
@@ -465,7 +472,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     }
 
     try {
-      cluster.getSolrClient().waitForState(collectionName, 20, TimeUnit.SECONDS, (liveNodes, collectionState) -> collectionState.getReplicas().size() == 1);
+      cluster.getSolrClient().waitForState(collectionName, 20, TimeUnit.SECONDS, (liveNodes, collectionState, ssp) -> collectionState.getReplicas().size() == 1);
     } catch (TimeoutException e) {
       if (log.isInfoEnabled()) {
         log.info("Timeout wait for state {}", getCollectionState(collectionName));

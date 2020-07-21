@@ -76,14 +76,14 @@ public class DeleteShardTest extends SolrCloudTestCase {
 
     // Can delete an INATIVE shard
     CollectionAdminRequest.deleteShard(collection, "shard1").process(cluster.getSolrClient());
-    waitForState("Expected 'shard1' to be removed", collection, (n, c) -> {
+    waitForState("Expected 'shard1' to be removed", collection, (n, c, ssp) -> {
       return c.getSlice("shard1") == null;
     });
 
     // Can delete a shard under construction
     setSliceState(collection, "shard2", Slice.State.CONSTRUCTION);
     CollectionAdminRequest.deleteShard(collection, "shard2").process(cluster.getSolrClient());
-    waitForState("Expected 'shard2' to be removed", collection, (n, c) -> {
+    waitForState("Expected 'shard2' to be removed", collection, (n, c, ssp) -> {
       return c.getSlice("shard2") == null;
     });
 
@@ -102,7 +102,7 @@ public class DeleteShardTest extends SolrCloudTestCase {
     ZkNodeProps m = new ZkNodeProps(propMap);
     inQueue.offer(Utils.toJSON(m));
 
-    waitForState("Expected shard " + slice + " to be in state " + state.toString(), collection, (n, c) -> {
+    waitForState("Expected shard " + slice + " to be in state " + state.toString(), collection, (n, c, ssp) -> {
       return c.getSlice(slice).getState() == state;
     });
 
@@ -120,7 +120,7 @@ public class DeleteShardTest extends SolrCloudTestCase {
     cluster.waitForActiveCollection(collection, 3, 3);
 
     // Get replica details
-    Replica leader = getCollectionState(collection).getLeader("a");
+    Replica leader = getShardStateProvider(collection).getLeader(getCollectionState(collection).getSlice("a"));
 
     CoreStatus coreStatus = getCoreStatus(leader);
     assertTrue("Instance directory doesn't exist", FileUtils.fileExists(coreStatus.getInstanceDirectory()));
@@ -131,7 +131,7 @@ public class DeleteShardTest extends SolrCloudTestCase {
     // Delete shard 'a'
     CollectionAdminRequest.deleteShard(collection, "a").process(cluster.getSolrClient());
     
-    waitForState("Expected 'a' to be removed", collection, (n, c) -> {
+    waitForState("Expected 'a' to be removed", collection, (n, c, ssp) -> {
       return c.getSlice("a") == null;
     });
 
@@ -139,7 +139,7 @@ public class DeleteShardTest extends SolrCloudTestCase {
     assertFalse("Instance directory still exists", FileUtils.fileExists(coreStatus.getInstanceDirectory()));
     assertFalse("Data directory still exists", FileUtils.fileExists(coreStatus.getDataDirectory()));
 
-    leader = getCollectionState(collection).getLeader("b");
+    leader = getShardStateProvider(collection).getLeader(getCollectionState(collection).getSlice("b"));
     coreStatus = getCoreStatus(leader);
 
     // Delete shard 'b'
@@ -148,7 +148,7 @@ public class DeleteShardTest extends SolrCloudTestCase {
         .setDeleteInstanceDir(false)
         .process(cluster.getSolrClient());
 
-    waitForState("Expected 'b' to be removed", collection, (n, c) -> {
+    waitForState("Expected 'b' to be removed", collection, (n, c, ssp) -> {
       return c.getSlice("b") == null;
     });
     

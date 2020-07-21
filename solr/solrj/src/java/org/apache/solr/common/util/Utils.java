@@ -51,6 +51,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.lang.invoke.MethodHandles;
@@ -217,10 +218,10 @@ public class Utils {
   }
 
   public static Writer writeJson(Object o, Writer writer, boolean indent) throws IOException {
-    try (SolrJSONWriter jsonWriter = new SolrJSONWriter(writer)) {
-      jsonWriter.setIndent(indent)
-      .writeObj(o);
-    }
+    new SolrJSONWriter(writer)
+        .setIndent(indent)
+        .writeObj(o)
+        .close();
     return writer;
   }
 
@@ -824,6 +825,34 @@ public class Utils {
       Utils.consumeFully(entity);
     }
     return result;
+  }
+  /**This uses Solr's native JSON writer {@link SolrJSONWriter} to serilize to json
+   *
+   * @param o the object to write
+   * @param writer A writer object. If null, a {@link StringWriter} is created and returned
+   * @param indent to indent or not
+   * @param compact writes key value without quotes. This is OK for noggit parser that we use. Useful to serialaize
+   *                use {@link Utils#fromJSONString(String)} to deserialize
+   * @return the writer supplied
+   */
+  public static Writer writeJson(Object o, Writer writer, boolean indent, boolean compact) throws IOException {
+    if(writer == null) writer= new StringWriter();
+    SolrJSONWriter jsonw = compact? compactJsonWriter(writer): new SolrJSONWriter(writer);
+    jsonw.setIndent(indent)
+        .writeObj(o)
+        .close();
+    return writer;
+  }
+
+  /**Write a json without double quotes
+   */
+  public static SolrJSONWriter compactJsonWriter(Writer w) {
+    return new SolrJSONWriter(w) {
+      @Override
+      public void writeStr(String name, String val, boolean needsEscaping) throws IOException {
+        super._writeStr(val);
+      }
+    };
   }
 
 

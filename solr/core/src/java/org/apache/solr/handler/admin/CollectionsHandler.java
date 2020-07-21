@@ -22,6 +22,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.api.Api;
 import org.apache.solr.client.solrj.SolrResponse;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient.Builder;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -123,6 +124,7 @@ import static org.apache.solr.cloud.api.collections.OverseerCollectionMessageHan
 import static org.apache.solr.cloud.api.collections.RoutedAlias.CREATE_COLLECTION_PREFIX;
 import static org.apache.solr.common.SolrException.ErrorCode.BAD_REQUEST;
 import static org.apache.solr.common.cloud.DocCollection.DOC_ROUTER;
+import static org.apache.solr.common.cloud.DocCollection.EXT_STATE;
 import static org.apache.solr.common.cloud.DocCollection.RULE;
 import static org.apache.solr.common.cloud.DocCollection.SNITCH;
 import static org.apache.solr.common.cloud.DocCollection.STATE_FORMAT;
@@ -490,6 +492,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
           POLICY,
           WAIT_FOR_FINAL_STATE,
           WITH_COLLECTION,
+          EXT_STATE,
           ALIAS);
 
       props.putIfAbsent(STATE_FORMAT, "2");
@@ -547,8 +550,8 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       if (props.containsKey(CoreAdminParams.NAME) && !props.containsKey(COLLECTION_PROP)) {
         props.put(COLLECTION_PROP, props.get(CoreAdminParams.NAME));
       }
-      new ColStatus(h.coreContainer.getSolrClientCache(),
-          h.coreContainer.getZkController().getZkStateReader().getClusterState(), new ZkNodeProps(props))
+      new ColStatus(h.coreContainer.getUpdateShardHandler().getDefaultHttpClient(),
+          h.coreContainer.getZkController().getZkStateReader(), new ZkNodeProps(props))
           .getColStatus(rsp.getValues());
       return null;
     }),
@@ -604,18 +607,16 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
       ClusterState clusterState = h.coreContainer.getZkController().getClusterState();
 
-      DocCollection docCollection = clusterState.getCollection(collection);
-      ZkNodeProps leaderProps = docCollection.getLeader(shard);
-      ZkCoreNodeProps nodeProps = new ZkCoreNodeProps(leaderProps);
+      Replica leader = h.coreContainer.getZkController().getZkStateReader().getShardStateProvider(collection).getLeader(clusterState.getCollection(collection).getSlice(shard));
 
-      try (HttpSolrClient client = new Builder(nodeProps.getBaseUrl())
+      try (HttpSolrClient client = new Builder(leader.getBaseUrl())
           .withConnectionTimeout(15000)
           .withSocketTimeout(60000)
           .build()) {
         RequestSyncShard reqSyncShard = new RequestSyncShard();
         reqSyncShard.setCollection(collection);
         reqSyncShard.setShard(shard);
-        reqSyncShard.setCoreName(nodeProps.getCoreName());
+        reqSyncShard.setCoreName(leader.getCoreName());
         client.request(reqSyncShard);
       }
       return null;
@@ -1349,11 +1350,12 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       throw new SolrException(ErrorCode.BAD_REQUEST,
           "No shard with name " + sliceId + " exists for collection " + collectionName);
     }
+    ShardStateProvider ssp = handler.coreContainer.getZkController().getZkStateReader().getShardStateProvider(collectionName);
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, slice.getName(), zkController.getZkClient())) {
       // if an active replica is the leader, then all is fine already
-      Replica leader = slice.getLeader();
-      if (leader != null && leader.getState() == State.ACTIVE) {
+      Replica leader = ssp.getLeader(slice);
+      if (leader != null && ssp.getState(leader) == State.ACTIVE) {
         throw new SolrException(ErrorCode.SERVER_ERROR,
             "The shard already has an active leader. Force leader is not applicable. State: " + slice);
       }
@@ -1378,7 +1380,8 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
         clusterState = handler.coreContainer.getZkController().getClusterState();
         collection = clusterState.getCollection(collectionName);
         slice = collection.getSlice(sliceId);
-        if (slice.getLeader() != null && slice.getLeader().getState() == State.ACTIVE) {
+        Replica ldr = ssp.getLeader(slice);
+        if (ldr != null && ssp.getState(ldr) == State.ACTIVE) {
           success = true;
           break;
         }
@@ -1425,7 +1428,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
     }
 
     try {
-      cc.getZkController().getZkStateReader().waitForState(collectionName, seconds, TimeUnit.SECONDS, (n, c) -> {
+      cc.getZkController().getZkStateReader().waitForState(collectionName, seconds, TimeUnit.SECONDS, (n, c, ssp) -> {
 
         if (c == null) {
           // the collection was not created, don't wait
@@ -1440,16 +1443,16 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
             if (!checkLeaderOnly) replicas = shard.getReplicas();
             else {
               replicas = new ArrayList<Replica>();
-              replicas.add(shard.getLeader());
+              replicas.add(ssp.getLeader(shard));
             }
             for (Replica replica : replicas) {
-              String state = replica.getStr(ZkStateReader.STATE_PROP);
+              Replica.State state = ssp.getState(replica);
               if (log.isDebugEnabled()) {
                 log.debug("Checking replica status, collection={} replica={} state={}", collectionName,
                     replica.getCoreUrl(), state);
               }
               if (!n.contains(replica.getNodeName())
-                  || !state.equals(Replica.State.ACTIVE.toString())) {
+                  || !state.equals(Replica.State.ACTIVE)) {
                 replicaNotAliveCnt++;
                 return false;
               }

@@ -339,7 +339,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection("acollectionafterbaddelete", "conf", 1, 2)
         .process(cluster.getSolrClient());
     waitForState("Collection creation after a bad delete failed", "acollectionafterbaddelete",
-        (n, c) -> DocCollection.isFullyActive(n, c, 1, 2));
+        (n, c, ssp) -> DocCollection.isFullyActive(ssp, c, 1, 2));
   }
 
   @Test
@@ -472,15 +472,15 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
       String collectionName = "awhollynewcollection_" + i;
       final int j = i;
       waitForState("Expected to see collection " + collectionName, collectionName,
-          (n, c) -> {
+          (n, c, ssp) -> {
             CollectionAdminRequest.Create req = createRequests[j];
-            return DocCollection.isFullyActive(n, c, req.getNumShards(), req.getReplicationFactor());
+            return DocCollection.isFullyActive(ssp, c, req.getNumShards(), req.getReplicationFactor());
           });
       
       ZkStateReader zkStateReader = cluster.getSolrClient().getZkStateReader();
       // make sure we have leaders for each shard
       for (int z = 1; z < createRequests[j].getNumShards(); z++) {
-        zkStateReader.getLeaderRetry(collectionName, "shard" + z, 10000);
+        zkStateReader. getShardStateProvider(collectionName).getLeader(collectionName, "shard" + z, 10000);
       }      // make sure we again have leaders for each shard
     }
   }

@@ -150,6 +150,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       ZkStateReader.MAX_SHARDS_PER_NODE, "1",
       ZkStateReader.AUTO_ADD_REPLICAS, "false",
       DocCollection.RULE, null,
+      DocCollection.EXT_STATE, null,
       POLICY, null,
       SNITCH, null,
       WITH_COLLECTION, null,
@@ -420,7 +421,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
 
   boolean waitForCoreNodeGone(String collectionName, String shard, String replicaName, int timeoutms) throws InterruptedException {
     try {
-      zkStateReader.waitForState(collectionName, timeoutms, TimeUnit.MILLISECONDS, (c) -> {
+      zkStateReader.waitForState(collectionName, timeoutms, TimeUnit.MILLISECONDS, (c,ssp) -> {
           if (c == null)
             return true;
           Slice slice = c.getSlice(shard);
@@ -978,7 +979,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
                   Slice slice, ShardHandler shardHandler) {
       List<Replica> notLiveReplicas = new ArrayList<>();
       for (Replica replica : slice.getReplicas()) {
-        if ((stateMatcher == null || Replica.State.getState(replica.getStr(ZkStateReader.STATE_PROP)) == stateMatcher)) {
+        if ((stateMatcher == null || zkStateReader.getShardStateProvider(replica.getCollection()).getState(replica) == stateMatcher)) {
           if (clusterState.liveNodesContain(replica.getStr(ZkStateReader.NODE_NAME_PROP))) {
             // For thread safety, only simple clone the ModifiableSolrParams
             ModifiableSolrParams cloneParams = new ModifiableSolrParams();

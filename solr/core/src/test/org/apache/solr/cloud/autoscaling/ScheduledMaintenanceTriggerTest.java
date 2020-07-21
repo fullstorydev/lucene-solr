@@ -313,7 +313,7 @@ public class ScheduledMaintenanceTriggerTest extends SolrCloudTestCase {
 
     ClusterState state = cloudManager.getClusterStateProvider().getClusterState();
 
-    CloudUtil.clusterShape(2, 1).matches(state.getLiveNodes(), state.getCollection(collection1));
+    CloudUtil.clusterShape(2, 1).matches(state.getLiveNodes(), state.getCollection(collection1), cloudManager.getClusterStateProvider().getShardStateProvider(collection1));
   }
 
   public static CountDownLatch getTriggerFired() {
@@ -340,7 +340,7 @@ public class ScheduledMaintenanceTriggerTest extends SolrCloudTestCase {
         "'enabled' : true," +
         "'actions' : [" +
         "{'name' : 'test', 'class' : '" + TestTriggerAction2.class.getName() + "'}]" +
-    "}}";
+        "}}";
     @SuppressWarnings({"rawtypes"})
     SolrRequest req = AutoScalingRequest.create(SolrRequest.METHOD.POST, setTriggerCommand);
     NamedList<Object> response = solrClient.request(req);

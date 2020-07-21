@@ -167,7 +167,7 @@ public class ShardSplitTest extends BasicDistributedZkTest {
           waitForRecoveriesToFinish(collectionName, true);
           // let's wait to see parent shard become inactive
           CountDownLatch latch = new CountDownLatch(1);
-          client.getZkStateReader().registerCollectionStateWatcher(collectionName, (liveNodes, collectionState) -> {
+          client.getZkStateReader().registerCollectionStateWatcher(collectionName, (ssp, liveNodes, collectionState) -> {
             Slice parent = collectionState.getSlice(SHARD1);
             Slice slice10 = collectionState.getSlice(SHARD1_0);
             Slice slice11 = collectionState.getSlice(SHARD1_1);
@@ -221,13 +221,13 @@ public class ShardSplitTest extends BasicDistributedZkTest {
           
           if (state == RequestStatusState.COMPLETED)  {
             CountDownLatch newReplicaLatch = new CountDownLatch(1);
-            client.getZkStateReader().registerCollectionStateWatcher(collectionName, (liveNodes, collectionState) -> {
+            client.getZkStateReader().registerCollectionStateWatcher(collectionName, (ssp, liveNodes, collectionState) -> {
               if (liveNodes.size() != liveNodeCount)  {
                 return false;
               }
               Slice slice = collectionState.getSlice(SHARD1_0);
               if (slice.getReplicas().size() == 2)  {
-                if (slice.getReplicas().stream().noneMatch(r -> r.getState() == Replica.State.RECOVERING)) {
+                if (slice.getReplicas().stream().noneMatch(r -> ssp.getState(r)  == Replica.State.RECOVERING)) {
                   // we see replicas and none of them are recovering
                   newReplicaLatch.countDown();
                   return true;
@@ -443,7 +443,7 @@ public class ShardSplitTest extends BasicDistributedZkTest {
     AtomicBoolean killed = new AtomicBoolean(false);
     Runnable monkey = () -> {
       ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-      zkStateReader.registerCollectionStateWatcher(AbstractDistribZkTestBase.DEFAULT_COLLECTION, (liveNodes, collectionState) -> {
+      zkStateReader.registerCollectionStateWatcher(AbstractDistribZkTestBase.DEFAULT_COLLECTION, (ssp, liveNodes, collectionState) -> {
         if (stop.get()) {
           return true; // abort and remove the watch
         }
@@ -515,7 +515,7 @@ public class ShardSplitTest extends BasicDistributedZkTest {
         waitForRecoveriesToFinish(AbstractDistribZkTestBase.DEFAULT_COLLECTION, true);
         // let's wait for the overseer to switch shard states
         CountDownLatch latch = new CountDownLatch(1);
-        cloudClient.getZkStateReader().registerCollectionStateWatcher(AbstractDistribZkTestBase.DEFAULT_COLLECTION, (liveNodes, collectionState) -> {
+        cloudClient.getZkStateReader().registerCollectionStateWatcher(AbstractDistribZkTestBase.DEFAULT_COLLECTION, (ssp, liveNodes, collectionState) -> {
           Slice parent = collectionState.getSlice(SHARD1);
           Slice slice10 = collectionState.getSlice(SHARD1_0);
           Slice slice11 = collectionState.getSlice(SHARD1_1);

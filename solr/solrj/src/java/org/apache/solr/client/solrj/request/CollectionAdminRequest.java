@@ -450,6 +450,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     protected Integer stateFormat;
     protected String[] rule , snitch;
     protected String withCollection;
+    protected boolean externalState;
 
     /** Constructor intended for typical use cases */
     protected Create(String collection, String config, Integer numShards, Integer numNrtReplicas, Integer numTlogReplicas, Integer numPullReplicas) { // TODO: maybe add other constructors
@@ -489,6 +490,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     public Create setStateFormat(Integer stateFormat) { this.stateFormat = stateFormat; return this; }
     public Create setRule(String... s){ this.rule = s; return this; }
     public Create setSnitch(String... s){ this.snitch = s; return this; }
+    public Create setExternalState(boolean flag){ this.externalState = flag;return this; }
 
     public Create setAlias(String alias) {
       this.alias = alias;
@@ -588,6 +590,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
       if (tlogReplicas != null) {
         params.set(ZkStateReader.TLOG_REPLICAS, tlogReplicas);
       }
+      if(externalState) params.set(DocCollection.EXT_STATE,"true");
       if (rule != null) params.set(DocCollection.RULE, rule);
       if (snitch != null) params.set(DocCollection.SNITCH, snitch);
       params.setNonNull(POLICY, policy);
@@ -1862,9 +1865,9 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
    * @param createCollTemplate Holds options to create a collection.  The "name" is ignored.
    */
   public static CreateCategoryRoutedAlias createCategoryRoutedAlias(String aliasName,
-                                                            String routerField,
-                                                            int maxCardinality,
-                                                            Create createCollTemplate) {
+                                                                    String routerField,
+                                                                    int maxCardinality,
+                                                                    Create createCollTemplate) {
 
     return new CreateCategoryRoutedAlias(aliasName, routerField, maxCardinality, createCollTemplate);
   }

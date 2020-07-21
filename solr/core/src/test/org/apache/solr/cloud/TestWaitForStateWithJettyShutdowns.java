@@ -28,6 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.common.cloud.CollectionStatePredicate;
@@ -46,14 +47,14 @@ public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
   public void testWaitForStateAfterShutDown() throws Exception {
     final String col_name = "test_col";
     final MiniSolrCloudCluster cluster = new MiniSolrCloudCluster
-      (1, createTempDir(), buildJettyConfig("/solr"));
+        (1, createTempDir(), buildJettyConfig("/solr"));
     try {
       log.info("Create our collection");
       CollectionAdminRequest.createCollection(col_name, "_default", 1, 1).process(cluster.getSolrClient());
-      
+
       log.info("Sanity check that our collection has come online");
       cluster.getSolrClient().waitForState(col_name, 30, TimeUnit.SECONDS, clusterShape(1, 1));
-                                           
+
       log.info("Shutdown 1 node");
       final JettySolrRunner nodeToStop = cluster.getJettySolrRunner(0);
       nodeToStop.stop();
@@ -64,8 +65,8 @@ public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
       // call will detect the missing replica -- shouldn't need long wait times (we know it's down)...
       log.info("Now check if waitForState will recognize we already have the exepcted state");
       cluster.getSolrClient().waitForState(col_name, 500, TimeUnit.MILLISECONDS, clusterShape(1, 0));
-                                           
-      
+
+
     } finally {
       cluster.shutdown();
     }
@@ -74,16 +75,16 @@ public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
   public void testWaitForStateBeforeShutDown() throws Exception {
     final String col_name = "test_col";
     final ExecutorService executor = ExecutorUtil.newMDCAwareFixedThreadPool
-      (1, new SolrNamedThreadFactory("background_executor"));
+        (1, new SolrNamedThreadFactory("background_executor"));
     final MiniSolrCloudCluster cluster = new MiniSolrCloudCluster
-      (1, createTempDir(), buildJettyConfig("/solr"));
+        (1, createTempDir(), buildJettyConfig("/solr"));
     try {
       log.info("Create our collection");
       CollectionAdminRequest.createCollection(col_name, "_default", 1, 1).process(cluster.getSolrClient());
-      
+
       log.info("Sanity check that our collection has come online");
       cluster.getSolrClient().waitForState(col_name, 30, TimeUnit.SECONDS,
-                                           SolrCloudTestCase.clusterShape(1, 1));
+          SolrCloudTestCase.clusterShape(1, 1));
 
 
       // HACK implementation detail...
@@ -95,20 +96,20 @@ public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
       // calling the predicate at least once, which should also be neccessary for any future impl
       // (to verify that it didn't "miss" the state change when creating the watcher)
       final CountDownLatch latch = new CountDownLatch(2);
-      
+
       final Future<?> backgroundWaitForState = executor.submit
-        (() -> {
-          try {
-            cluster.getSolrClient().waitForState(col_name, 180, TimeUnit.SECONDS,
-                                                 new LatchCountingPredicateWrapper(latch,
-                                                                                   clusterShape(1, 0)));
-          } catch (Exception e) {
-            log.error("background thread got exception", e);
-            throw new RuntimeException(e);
-          }
-          return;
-        }, null);
-      
+          (() -> {
+            try {
+              cluster.getSolrClient().waitForState(col_name, 180, TimeUnit.SECONDS,
+                  new LatchCountingPredicateWrapper(latch,
+                      clusterShape(1, 0)));
+            } catch (Exception e) {
+              log.error("background thread got exception", e);
+              throw new RuntimeException(e);
+            }
+            return;
+          }, null);
+
       log.info("Awaiting latch...");
       if (! latch.await(120, TimeUnit.SECONDS)) {
         fail("timed out Waiting a ridiculous amount of time for the waitForState latch -- did impl change?");
@@ -129,13 +130,13 @@ public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
         log.error("background waitForState exception", e);
         throw e;
       }
-      
+
     } finally {
       ExecutorUtil.shutdownAndAwaitTermination(executor);
       cluster.shutdown();
     }
   }
-    
+
   public final class LatchCountingPredicateWrapper implements CollectionStatePredicate {
     private final CountDownLatch latch;
     private final CollectionStatePredicate inner;
@@ -143,8 +144,8 @@ public class TestWaitForStateWithJettyShutdowns extends SolrTestCaseJ4 {
       this.latch = latch;
       this.inner = inner;
     }
-    public boolean matches(Set<String> liveNodes, DocCollection collectionState) {
-      final boolean result = inner.matches(liveNodes, collectionState);
+    public boolean matches(Set<String> liveNodes, DocCollection collectionState, ShardStateProvider ssp) {
+      final boolean result = inner.matches(liveNodes, collectionState, ssp);
       if (log.isInfoEnabled()) {
         log.info("Predicate called: result={}, (pre)latch={}, liveNodes={}, state={}",
             result, latch.getCount(), liveNodes, collectionState);

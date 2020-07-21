@@ -23,14 +23,14 @@ import java.util.Set;
 
 import org.apache.solr.common.util.Utils;
 public class Replica extends ZkNodeProps {
-  
+
   /**
    * The replica's state. In general, if the node the replica is hosted on is
    * not under {@code /live_nodes} in ZK, the replica's state should be
    * discarded.
    */
   public enum State {
-    
+
     /**
      * The replica is ready to receive updates and queries.
      * <p>
@@ -42,7 +42,7 @@ public class Replica extends ZkNodeProps {
      * </p>
      */
     ACTIVE,
-    
+
     /**
      * The first state before {@link State#RECOVERING}. A node in this state
      * should be actively trying to move to {@link State#RECOVERING}.
@@ -53,13 +53,13 @@ public class Replica extends ZkNodeProps {
      * </p>
      */
     DOWN,
-    
+
     /**
      * The node is recovering from the leader. This might involve peer-sync,
      * full replication or finding out things are already in sync.
      */
     RECOVERING,
-    
+
     /**
      * Recovery attempts have not worked, something is not right.
      * <p>
@@ -69,12 +69,12 @@ public class Replica extends ZkNodeProps {
      * </p>
      */
     RECOVERY_FAILED;
-    
+
     @Override
     public String toString() {
       return super.toString().toLowerCase(Locale.ROOT);
     }
-    
+
     /** Converts the state string to a State instance. */
     public static State getState(String stateStr) {
       return stateStr == null ? null : State.valueOf(stateStr.toUpperCase(Locale.ROOT));
@@ -179,16 +179,20 @@ public class Replica extends ZkNodeProps {
   public String getNodeName() {
     return nodeName;
   }
-  
-  /** Returns the {@link State} of this replica. */
+
+  /** Returns the {@link State} of this replica. use {@link org.apache.solr.client.solrj.cloud.ShardStateProvider#getState(Replica)}  instead*/
+
   public State getState() {
     return state;
   }
 
+  /**Use {@link org.apache.solr.client.solrj.cloud.ShardStateProvider#isActive(Replica)} instead
+   */
+  @Deprecated
   public boolean isActive(Set<String> liveNodes) {
     return this.nodeName != null && liveNodes.contains(this.nodeName) && this.state == State.ACTIVE;
   }
-  
+
   public Type getType() {
     return this.type;
   }

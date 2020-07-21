@@ -121,7 +121,12 @@
           "type": "boolean",
           "description": "If true then request will complete only when all affected replicas become active.",
           "default": false
-        }
+        },
+      "externalState" : {
+        "type": "boolean",
+        "description": "If true, the state of the replicas will not be stored in state.json",
+        "default": false
+      }
       },
       "required": [
         "name"

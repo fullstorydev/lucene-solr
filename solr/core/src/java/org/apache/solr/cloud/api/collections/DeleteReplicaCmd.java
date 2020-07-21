@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.Cmd;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
 import org.apache.solr.common.SolrException;
@@ -171,7 +172,7 @@ public class DeleteReplicaCmd implements Cmd {
     validateReplicaAvailability(slice, shard, collectionName, count);
     Collection<Replica> allReplicas = slice.getReplicas();
     Set<String> replicasToBeRemoved = new HashSet<String>();
-    Replica leader = slice.getLeader();
+    Replica leader = ocmh.zkStateReader.getShardStateProvider(collectionName).getLeader(slice);
     for (Replica replica: allReplicas) {
       if (count == 0) {
         break;
@@ -226,10 +227,11 @@ public class DeleteReplicaCmd implements Cmd {
 
     // If users are being safe and only want to remove a shard if it is down, they can specify onlyIfDown=true
     // on the command.
-    if (Boolean.parseBoolean(message.getStr(OverseerCollectionMessageHandler.ONLY_IF_DOWN)) && replica.getState() != Replica.State.DOWN) {
+    ShardStateProvider ssp = ocmh.cloudManager.getClusterStateProvider().getShardStateProvider(collectionName);
+    if (Boolean.parseBoolean(message.getStr(OverseerCollectionMessageHandler.ONLY_IF_DOWN)) && ssp.getState(replica) != Replica.State.DOWN) {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
               "Attempted to remove replica : " + collectionName + "/"  + shard + "/" + replicaName +
-              " with onlyIfDown='true', but state is '" + replica.getStr(ZkStateReader.STATE_PROP) + "'");
+              " with onlyIfDown='true', but state is '" + ssp.getState(replica) + "'");
     }
 
     ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseer.getCoreContainer().getUpdateShardHandler().getDefaultHttpClient());

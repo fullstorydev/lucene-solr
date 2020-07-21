@@ -174,7 +174,7 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
   }
 
   @Test
-  @LuceneTestCase.AwaitsFix(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") 
+  @LuceneTestCase.AwaitsFix(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028")
   public void testNodeLost() throws Exception  {
     // let's start a node so that we have at least two
     JettySolrRunner runner = cluster.startJettySolrRunner();
@@ -289,7 +289,7 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
         "conf", 2, 3);
     create.setMaxShardsPerNode(2);
     create.process(solrClient);
-    
+
     cluster.waitForActiveCollection("testNodeWithMultipleReplicasLost", 2, 6);
 
     waitForState("Timed out waiting for replicas of new collection to be active",
@@ -376,7 +376,7 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
     create.process(solrClient);
 
     waitForState("Timed out waiting for replicas of new collection to be active",
-        "testNodeAdded", (liveNodes, collectionState) -> collectionState.getReplicas().stream().allMatch(replica -> replica.isActive(liveNodes)));
+        "testNodeAdded", (liveNodes, collectionState, ssp) -> collectionState.getReplicas().stream().allMatch(replica -> ssp.isActive(replica)));
 
     // reset to the original policy which has only 1 replica per shard per node
     setClusterPolicyCommand = "{" +
@@ -459,11 +459,11 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
   public void testSelectedCollectionsByPolicy() throws Exception {
     CloudSolrClient solrClient = cluster.getSolrClient();
     String setSearchPolicyCommand = "{" +
-            " 'set-policy': {" +
-            "   'search': [" +
-            "      {'replica':'<5', 'shard': '#EACH', 'node': '#ANY'}," +
-            "    ]" +
-            "}}";
+        " 'set-policy': {" +
+        "   'search': [" +
+        "      {'replica':'<5', 'shard': '#EACH', 'node': '#ANY'}," +
+        "    ]" +
+        "}}";
     @SuppressWarnings({"rawtypes"})
     SolrRequest req = AutoScalingRequest.create(SolrRequest.METHOD.POST, setSearchPolicyCommand);
     NamedList<Object> response = solrClient.request(req);
@@ -489,14 +489,14 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
 
     CloudSolrClient solrClient = cluster.getSolrClient();
     String setTriggerCommand = "{" +
-            "'set-trigger' : {" +
-            "'name' : 'node_lost_trigger'," +
-            "'event' : 'nodeLost'," +
-            "'waitFor' : '1s'," +
-            "'enabled' : true," +
-            "'actions' : [{'name':'compute_plan', 'class' : 'solr.ComputePlanAction', 'collections' : " + collectionsFilter + "}," +
-            "{'name':'test','class':'" + ComputePlanActionTest.AssertingTriggerAction.class.getName() + "'}]" +
-            "}}";
+        "'set-trigger' : {" +
+        "'name' : 'node_lost_trigger'," +
+        "'event' : 'nodeLost'," +
+        "'waitFor' : '1s'," +
+        "'enabled' : true," +
+        "'actions' : [{'name':'compute_plan', 'class' : 'solr.ComputePlanAction', 'collections' : " + collectionsFilter + "}," +
+        "{'name':'test','class':'" + ComputePlanActionTest.AssertingTriggerAction.class.getName() + "'}]" +
+        "}}";
     @SuppressWarnings({"rawtypes"})
     SolrRequest req = AutoScalingRequest.create(SolrRequest.METHOD.POST, setTriggerCommand);
     NamedList<Object> response = solrClient.request(req);
@@ -522,11 +522,11 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
       create.setPolicy(createCollectionParameters.get("testSelected3"));
     }
     create.process(solrClient);
-    
+
     cluster.waitForActiveCollection("testSelected1", 2, 4);
     cluster.waitForActiveCollection("testSelected2", 2, 4);
     cluster.waitForActiveCollection("testSelected3", 2, 4);
-    
+
     waitForState("Timed out waiting for replicas of new collection to be active",
         "testSelected1", clusterShape(2, 4));
 
@@ -670,8 +670,8 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
     create.process(solrClient);
 
     waitForState("Timed out waiting for replicas of new collection to be active",
-        collectionNamePrefix + "_0", (liveNodes, collectionState) ->
-            collectionState.getReplicas().stream().allMatch(replica -> replica.isActive(liveNodes)));
+        collectionNamePrefix + "_0", (liveNodes, collectionState, ssp) ->
+            collectionState.getReplicas().stream().allMatch(ssp::isActive));
 
     JettySolrRunner newNode = cluster.startJettySolrRunner();
     cluster.waitForAllNodes(30);
@@ -699,8 +699,8 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
       create.process(solrClient);
 
       waitForState("Timed out waiting for replicas of new collection to be active",
-          collectionNamePrefix + "_" + i, (liveNodes, collectionState) ->
-              collectionState.getReplicas().stream().allMatch(replica -> replica.isActive(liveNodes)));
+          collectionNamePrefix + "_" + i, (liveNodes, collectionState, ssp) ->
+              collectionState.getReplicas().stream().allMatch(ssp::isActive));
     }
 
     reset();
@@ -771,8 +771,8 @@ public class ComputePlanActionTest extends SolrCloudTestCase {
     create.process(solrClient);
 
     waitForState("Timed out waiting for replicas of new collection to be active",
-        collectionNamePrefix + "_0", (liveNodes, collectionState) ->
-            collectionState.getReplicas().stream().allMatch(replica -> replica.isActive(liveNodes)));
+        collectionNamePrefix + "_0", (liveNodes,  collectionState, ssp) ->
+            collectionState.getReplicas().stream().allMatch(ssp::isActive));
 
     cluster.stopJettySolrRunner(newNode);
     assertTrue(triggerFiredLatch.await(30, TimeUnit.SECONDS));

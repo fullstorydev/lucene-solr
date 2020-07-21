@@ -38,6 +38,7 @@ import java.util.function.BiPredicate;
 
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.Suggester.Hint;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
@@ -141,9 +142,10 @@ public class PolicyHelper {
       Map<String, Double> diskSpaceReqd = new HashMap<>();
       try {
         DocCollection coll = cloudManager.getClusterStateProvider().getCollection(collName);
+        ShardStateProvider ssp = cloudManager.getClusterStateProvider().getShardStateProvider(collName);
         if (coll != null) {
           for (String shardName : shardNames) {
-            Replica ldr = coll.getLeader(shardName);
+            Replica ldr = ssp.getLeader(coll.getSlice(shardName));
             if (ldr != null && cloudManager.getClusterStateProvider().getLiveNodes().contains(ldr.getNodeName())) {
               Map<String, Map<String, List<ReplicaInfo>>> details = cloudManager.getNodeStateProvider().getReplicaInfo(ldr.getNodeName(),
                   Collections.singleton(FREEDISK.perReplicaValue));
@@ -310,10 +312,11 @@ public class PolicyHelper {
 
   private static void addMissingReplicas(SolrCloudManager cloudManager, Suggestion.Ctx ctx) throws IOException {
     cloudManager.getClusterStateProvider().getClusterState().forEachCollection(coll -> coll.forEach(slice -> {
+      ShardStateProvider ssp = cloudManager.getClusterStateProvider().getShardStateProvider(coll.getName());
       if (!ctx.needMore()) return;
           ReplicaCount replicaCount = new ReplicaCount();
           slice.forEach(replica -> {
-            if (replica.getState() == Replica.State.ACTIVE || replica.getState() == Replica.State.RECOVERING) {
+            if (ssp.getState(replica) == Replica.State.ACTIVE || ssp.getState(replica) == Replica.State.RECOVERING) {
               replicaCount.increment(replica.getType());
             }
           });

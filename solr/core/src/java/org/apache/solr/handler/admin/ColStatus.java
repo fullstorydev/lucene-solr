@@ -27,11 +27,12 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.io.SolrClientCache;
 import org.apache.solr.client.solrj.request.QueryRequest;
-import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.RoutingRule;
@@ -52,7 +53,6 @@ import org.slf4j.LoggerFactory;
 public class ColStatus {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final ClusterState clusterState;
   private final ZkNodeProps props;
   private final SolrClientCache solrClientCache;
 
@@ -64,11 +64,12 @@ public class ColStatus {
   public static final String RAW_SIZE_DETAILS_PROP = SegmentsInfoRequestHandler.RAW_SIZE_DETAILS_PARAM;
   public static final String RAW_SIZE_SAMPLING_PERCENT_PROP = SegmentsInfoRequestHandler.RAW_SIZE_SAMPLING_PERCENT_PARAM;
   public static final String SEGMENTS_PROP = "segments";
+  private final ZkStateReader zkStateReader;
 
-  public ColStatus(SolrClientCache solrClientCache, ClusterState clusterState, ZkNodeProps props) {
+  public ColStatus(HttpClient httpClient, ZkStateReader zkStateReader, ZkNodeProps props) {
     this.props = props;
-    this.solrClientCache = solrClientCache;
-    this.clusterState = clusterState;
+    this.solrClientCache = new SolrClientCache(httpClient);
+    this.zkStateReader = zkStateReader;
   }
 
   @SuppressWarnings({"unchecked"})
@@ -76,7 +77,7 @@ public class ColStatus {
     Collection<String> collections;
     String col = props.getStr(ZkStateReader.COLLECTION_PROP);
     if (col == null) {
-      collections = new HashSet<>(clusterState.getCollectionsMap().keySet());
+      collections = new HashSet<>(zkStateReader.getCollections());
     } else {
       collections = Collections.singleton(col);
     }
@@ -96,7 +97,8 @@ public class ColStatus {
       withSegments = true;
     }
     for (String collection : collections) {
-      DocCollection coll = clusterState.getCollectionOrNull(collection);
+      ShardStateProvider ssp = zkStateReader.getShardStateProvider(collection);
+      DocCollection coll = zkStateReader.getCollection(collection);
       if (coll == null) {
         continue;
       }
@@ -124,11 +126,11 @@ public class ColStatus {
         int recoveryFailedReplicas = 0;
         for (Replica r : s.getReplicas()) {
           // replica may still be marked as ACTIVE even though its node is no longer live
-          if (! r.isActive(clusterState.getLiveNodes())) {
+          if (! ssp.isActive(r)) {
             downReplicas++;
             continue;
           }
-          switch (r.getState()) {
+          switch (ssp.getState(r)) {
             case ACTIVE:
               activeReplicas++;
               break;
@@ -155,7 +157,7 @@ public class ColStatus {
           sliceMap.add("routingRules", rules);
         }
         sliceMap.add("replicas", replicaMap);
-        Replica leader = s.getLeader();
+        Replica leader = ssp.getLeader(s);
         if (leader == null) { // pick the first one
           leader = s.getReplicas().size() > 0 ? s.getReplicas().iterator().next() : null;
         }
@@ -166,7 +168,7 @@ public class ColStatus {
         sliceMap.add("leader", leaderMap);
         leaderMap.add("coreNode", leader.getName());
         leaderMap.addAll(leader.getProperties());
-        if (!leader.isActive(clusterState.getLiveNodes())) {
+        if (!ssp.isActive(leader)) {
           continue;
         }
         String url = ZkCoreNodeProps.getCoreUrl(leader);

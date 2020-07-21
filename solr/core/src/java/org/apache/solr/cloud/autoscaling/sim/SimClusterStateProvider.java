@@ -1415,10 +1415,10 @@ public class SimClusterStateProvider implements ClusterStateProvider {
 
     boolean success = false;
     try {
-      CloudUtil.waitForState(cloudManager, collectionName, 30, TimeUnit.SECONDS, (liveNodes, state) -> {
+      CloudUtil.waitForState(cloudManager, collectionName, 30, TimeUnit.SECONDS, (liveNodes, state, ssp) -> {
         for (String subSlice : subSlices) {
           Slice s = state.getSlice(subSlice);
-          if (s.getLeader() == null) {
+          if (ssp.getLeader(s) == null) {
             log.debug("** no leader in {} / {}", collectionName, s);
             return false;
           }

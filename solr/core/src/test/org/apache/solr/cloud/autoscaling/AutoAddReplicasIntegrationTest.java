@@ -60,7 +60,7 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
   protected String getConfigSet() {
     return "cloud-minimal";
   }
-  
+
   @Before
   public void setupCluster() throws Exception {
     configureCluster(3)
@@ -74,7 +74,7 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
         .build()
         .process(cluster.getSolrClient());
   }
-  
+
   @After
   public void tearDown() throws Exception {
     try {
@@ -98,15 +98,15 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
           jetty1.getNodeName(), jetty1.getLocalPort(),
           jetty2.getNodeName(), jetty2.getLocalPort());
     }
-             
+
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 2)
-      .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
-      .setAutoAddReplicas(true)
-      .setMaxShardsPerNode(2)
-      .process(cluster.getSolrClient());
-    
+        .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
+        .setAutoAddReplicas(true)
+        .setMaxShardsPerNode(2)
+        .process(cluster.getSolrClient());
+
     cluster.waitForActiveCollection(COLLECTION, 2, 4);
-    
+
     // start the tests
     JettySolrRunner lostJetty = random().nextBoolean() ? jetty1 : jetty2;
     String lostNodeName = lostJetty.getNodeName();
@@ -115,24 +115,24 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
       log.info("Stopping random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.stop();
-    
+
     cluster.waitForJettyToStop(lostJetty);
     waitForNodeLeave(lostNodeName);
-    
+
     waitForState(COLLECTION + "=(2,4) w/o down replicas",
-                 COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
-                 
+        COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
+
     checkSharedFsReplicasMovedCorrectly(replacedHdfsReplicas, zkStateReader, COLLECTION);
 
     if (log.isInfoEnabled()) {
       log.info("Re-starting (same) random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.start();
-    
+
     waitForNodeLive(lostJetty);
-    
+
     assertTrue("Timeout waiting for all live and active",
-               ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
+        ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
 
   }
 
@@ -152,13 +152,13 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
           jetty1.getNodeName(), jetty1.getLocalPort(),
           jetty2.getNodeName(), jetty2.getLocalPort());
     }
-             
+
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 2)
-      .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
-      .setAutoAddReplicas(true)
-      .setMaxShardsPerNode(2)
-      .process(cluster.getSolrClient());
-    
+        .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
+        .setAutoAddReplicas(true)
+        .setMaxShardsPerNode(2)
+        .process(cluster.getSolrClient());
+
     cluster.waitForActiveCollection(COLLECTION, 2, 4);
 
     // check cluster property is considered
@@ -172,27 +172,27 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
       log.info("Stopping random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.stop();
-    
+
     cluster.waitForJettyToStop(lostJetty);
-    
+
     waitForNodeLeave(lostNodeName);
-    
+
     waitForState(COLLECTION + "=(2,2)", COLLECTION,
-                 clusterShape(2, 2), 90, TimeUnit.SECONDS);
-                 
+        clusterShape(2, 2), 90, TimeUnit.SECONDS);
+
 
     if (log.isInfoEnabled()) {
       log.info("Re-starting (same) random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.start();
-    
+
     waitForNodeLive(lostJetty);
-    
+
     assertTrue("Timeout waiting for all live and active",
-               ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
-    
+        ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
+
     waitForState(COLLECTION + "=(2,4) w/o down replicas",
-                 COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
+        COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
 
   }
 
@@ -211,15 +211,15 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
           jetty1.getNodeName(), jetty1.getLocalPort(),
           jetty2.getNodeName(), jetty2.getLocalPort());
     }
-             
+
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 2)
-      .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
-      .setAutoAddReplicas(false) // NOTE: false
-      .setMaxShardsPerNode(2)
-      .process(cluster.getSolrClient());
-    
+        .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
+        .setAutoAddReplicas(false) // NOTE: false
+        .setMaxShardsPerNode(2)
+        .process(cluster.getSolrClient());
+
     cluster.waitForActiveCollection(COLLECTION, 2, 4);
-    
+
     log.info("Modifying {} to use autoAddReplicas", COLLECTION);
     new CollectionAdminRequest.AsyncCollectionAdminRequest(CollectionParams.CollectionAction.MODIFYCOLLECTION) {
       @Override
@@ -239,24 +239,24 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
       log.info("Stopping random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.stop();
-    
+
     cluster.waitForJettyToStop(lostJetty);
-    
+
     waitForNodeLeave(lostNodeName);
 
     waitForState(COLLECTION + "=(2,4) w/o down replicas",
-                 COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
+        COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
     checkSharedFsReplicasMovedCorrectly(replacedHdfsReplicas, zkStateReader, COLLECTION);
 
     if (log.isInfoEnabled()) {
       log.info("Re-starting (same) random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.start();
-    
+
     waitForNodeLive(lostJetty);
-    
+
     assertTrue("Timeout waiting for all live and active",
-               ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
+        ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
   }
 
   /**
@@ -278,7 +278,7 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
     // This is a collection we'll use as a "marker" to ensure we "wait" for the
     // autoAddReplicas logic (via NodeLostTrigger) to kick in at least once before proceeding...
     final String ALT_COLLECTION = "test_dummy";
-    
+
     final ZkStateReader zkStateReader = cluster.getSolrClient().getZkStateReader();
     final JettySolrRunner jetty1 = cluster.getJettySolrRunner(1);
     final JettySolrRunner jetty2 = cluster.getJettySolrRunner(2);
@@ -288,12 +288,12 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
           jetty1.getNodeName(), jetty1.getLocalPort(),
           jetty2.getNodeName(), jetty2.getLocalPort());
     }
-             
+
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 2)
-      .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
-      .setAutoAddReplicas(false) // NOTE: false
-      .setMaxShardsPerNode(2)
-      .process(cluster.getSolrClient());
+        .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
+        .setAutoAddReplicas(false) // NOTE: false
+        .setMaxShardsPerNode(2)
+        .process(cluster.getSolrClient());
 
     if (log.isInfoEnabled()) {
       log.info("Creating {} using jetty1:{}/{} and jetty2:{}/{}", ALT_COLLECTION,
@@ -302,11 +302,11 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
     }
 
     CollectionAdminRequest.createCollection(ALT_COLLECTION, "conf", 2, 2)
-      .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
-      .setAutoAddReplicas(true) // NOTE: true
-      .setMaxShardsPerNode(2)
-      .process(cluster.getSolrClient());
-    
+        .setCreateNodeSet(jetty1.getNodeName()+","+jetty2.getNodeName())
+        .setAutoAddReplicas(true) // NOTE: true
+        .setMaxShardsPerNode(2)
+        .process(cluster.getSolrClient());
+
     cluster.waitForActiveCollection(COLLECTION, 2, 4);
     cluster.waitForActiveCollection(ALT_COLLECTION, 2, 4);
 
@@ -318,14 +318,14 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
       log.info("Stopping random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.stop();
-    
+
     cluster.waitForJettyToStop(lostJetty);
     waitForNodeLeave(lostNodeName);
-    
+
     // ensure that our marker collection indicates that the autoAddReplicas logic
     // has detected the down node and done some processing
     waitForState(ALT_COLLECTION + "=(2,4) w/o down replicas",
-                 ALT_COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
+        ALT_COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
 
     waitForState(COLLECTION + "=(2,2)", COLLECTION, clusterShape(2, 2));
 
@@ -334,7 +334,7 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
     }
     lostJetty.start();
     // save time, don't bother waiting for lostJetty to start until after updating collection prop...
-    
+
     log.info("Modifying {} to use autoAddReplicas", COLLECTION);
     new CollectionAdminRequest.AsyncCollectionAdminRequest(CollectionParams.CollectionAction.MODIFYCOLLECTION) {
       @Override
@@ -353,7 +353,7 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
       log.info("Re-Stopping (same) random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.stop();
-    
+
     cluster.waitForJettyToStop(lostJetty);
     waitForNodeLeave(lostNodeName);
 
@@ -361,20 +361,20 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
     // wether or not NodeLostTrigger noticed that lostJetty was re-started and shutdown *again*
     // and that the new auoAddReplicas=true since the last time lostJetty was shutdown is respected
     waitForState(COLLECTION + "=(2,4) w/o down replicas",
-                 COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
+        COLLECTION, clusterShapeNoDownReplicas(2,4), 90, TimeUnit.SECONDS);
     checkSharedFsReplicasMovedCorrectly(replacedHdfsReplicas, zkStateReader, COLLECTION);
 
     if (log.isInfoEnabled()) {
       log.info("Re-Re-starting (same) random node: {} / {}", lostNodeName, lostJetty.getLocalPort());
     }
     lostJetty.start();
-    
+
     waitForNodeLive(lostJetty);
-    
+
     assertTrue("Timeout waiting for all live and active",
-               ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
+        ClusterStateUtil.waitForAllActiveAndLiveReplicas(zkStateReader, 90000));
   }
-  
+
   private void disableAutoAddReplicasInCluster() throws SolrServerException, IOException {
     @SuppressWarnings({"rawtypes"})
     Map m = makeMap(
@@ -429,7 +429,7 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
   /** 
    * {@link MiniSolrCloudCluster#waitForNode} Doesn't check isRunning first, and we don't want to 
    * use {@link MiniSolrCloudCluster#waitForAllNodes} because we don't want to waste cycles checking 
-   * nodes we aren't messing with  
+   * nodes we aren't messing with
    */
   private void waitForNodeLive(final JettySolrRunner jetty)
     throws InterruptedException, TimeoutException, IOException {
@@ -453,19 +453,19 @@ public class AutoAddReplicasIntegrationTest extends SolrCloudTestCase {
     }
     cluster.waitForNode(jetty, 30);
   }
-    
+
   private void waitForNodeLeave(String lostNodeName) throws InterruptedException, TimeoutException {
     log.info("waitForNodeLeave: {}", lostNodeName);
     ZkStateReader reader = cluster.getSolrClient().getZkStateReader();
     reader.waitForLiveNodes(30, TimeUnit.SECONDS, (o, n) -> !n.contains(lostNodeName));
   }
 
-  
+
   private static CollectionStatePredicate clusterShapeNoDownReplicas(final int expectedShards,
                                                                      final int expectedReplicas) {
-    return (liveNodes, collectionState)
-      -> (clusterShape(expectedShards, expectedReplicas).matches(liveNodes, collectionState)
-          && collectionState.getReplicas().size() == expectedReplicas);
+    return (liveNodes, collectionState, ssp)
+        -> (clusterShape(expectedShards, expectedReplicas).matches(liveNodes, collectionState, ssp)
+        && collectionState.getReplicas().size() == expectedReplicas);
   }
-  
+
 }

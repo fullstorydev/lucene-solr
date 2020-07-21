@@ -36,6 +36,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.autoscaling.PolicyHelper;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
@@ -115,6 +116,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
     final List<String> nodeList = Assign.getLiveOrLiveAndCreateNodeSetList(
         zkStateReader.getClusterState().getLiveNodes(), message, OverseerCollectionMessageHandler.RANDOM);
 
+    ShardStateProvider ssp = ocmh.cloudManager.getClusterStateProvider().getShardStateProvider(restoreCollectionName);
     int numShards = backupCollectionState.getActiveSlices().size();
 
     int numNrtReplicas;
@@ -131,14 +133,14 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
     int numPullReplicas = getInt(message, PULL_REPLICAS, backupCollectionState.getNumPullReplicas(), 0);
     int totalReplicasPerShard = numNrtReplicas + numTlogReplicas + numPullReplicas;
     assert totalReplicasPerShard > 0;
-    
+
     int maxShardsPerNode = message.getInt(MAX_SHARDS_PER_NODE, backupCollectionState.getMaxShardsPerNode());
     int availableNodeCount = nodeList.size();
     if (maxShardsPerNode != -1 && (numShards * totalReplicasPerShard) > (availableNodeCount * maxShardsPerNode)) {
       throw new SolrException(ErrorCode.BAD_REQUEST,
           String.format(Locale.ROOT, "Solr cloud with available number of nodes:%d is insufficient for"
-              + " restoring a collection with %d shards, total replicas per shard %d and maxShardsPerNode %d."
-              + " Consider increasing maxShardsPerNode value OR number of available nodes.",
+                  + " restoring a collection with %d shards, total replicas per shard %d and maxShardsPerNode %d."
+                  + " Consider increasing maxShardsPerNode value OR number of available nodes.",
               availableNodeCount, numShards, totalReplicasPerShard, maxShardsPerNode));
     }
 
@@ -341,7 +343,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
           for (Replica r : s.getReplicas()) {
             String nodeName = r.getNodeName();
             String coreNodeName = r.getCoreName();
-            Replica.State stateRep = r.getState();
+            Replica.State stateRep = ssp.getState(r);
 
             if (log.isDebugEnabled()) {
               log.debug("Calling REQUESTAPPLYUPDATES on: nodeName={}, coreNodeName={}, state={}", nodeName, coreNodeName,
