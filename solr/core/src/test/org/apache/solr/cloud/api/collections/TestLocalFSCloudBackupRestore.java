@@ -33,6 +33,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ZkConfigManager;
 import org.apache.solr.core.backup.repository.LocalFileSystemRepository;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -89,7 +90,8 @@ public class TestLocalFSCloudBackupRestore extends AbstractCloudBackupRestoreTes
   }
 
   @Override
-  @Test 
+  @Test
+  @Ignore
   public void test() throws Exception {
     super.test();
     

@@ -50,6 +50,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,6 +165,7 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
   }
 
   @Test
+  @Ignore
   public void testRestoreFailure() throws Exception {
     setTestSuffix("testfailure");
     replFactor = TestUtil.nextInt(random(), 1, 2);
