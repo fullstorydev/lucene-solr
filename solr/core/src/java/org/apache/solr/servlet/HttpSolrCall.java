@@ -57,7 +57,10 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.solr.api.ApiBag;
+import org.apache.solr.client.solrj.cloud.OptimisticShardState;
 import org.apache.solr.client.solrj.cloud.ShardStateProvider;
+import org.apache.solr.client.solrj.cloud.ShardTerms;
+import org.apache.solr.client.solrj.cloud.ShardTermsStateProvider;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.common.SolrException;
@@ -116,6 +119,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MarkerFactory;
 
+import static org.apache.solr.client.solrj.cloud.OptimisticShardState.Status.*;
 import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.CORE_NAME_PROP;
@@ -127,13 +131,7 @@ import static org.apache.solr.common.params.CollectionParams.CollectionAction.DE
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.RELOAD;
 import static org.apache.solr.common.params.CommonParams.NAME;
 import static org.apache.solr.common.params.CoreAdminParams.ACTION;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.ADMIN;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.FORWARD;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.PASSTHROUGH;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.PROCESS;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.REMOTEQUERY;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETRY;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETURN;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.*;
 
 /**
  * This class represents a call made to Solr
@@ -173,6 +171,8 @@ public class HttpSolrCall {
   protected String coreUrl;
   protected SolrConfig config;
   protected Map<String, Integer> invalidStates;
+  protected OptimisticShardState requestShardState;
+  protected OptimisticShardState responseShardState;
 
   //The states of client that is invalid in this request
   protected String origCorename; // What's in the URL path; might reference a collection/alias or a Solr core name
@@ -192,6 +192,12 @@ public class HttpSolrCall {
     this.response = response;
     this.retry = retry;
     this.requestType = RequestType.UNKNOWN;
+    String stateHdr = request.getHeader(OptimisticShardState.STATE_HDR);
+    if(stateHdr != null) {
+      requestShardState = new OptimisticShardState.Builder( )
+              .withData(stateHdr)
+              .build();
+    }
     req.setAttribute(HttpSolrCall.class.getName(), this);
     queryParams = SolrRequestParsers.parseQueryString(req.getQueryString());
     // set a request timer which can be reused by requests if needed
@@ -285,9 +291,7 @@ public class HttpSolrCall {
         String collectionName = collectionsList.isEmpty() ? null : collectionsList.get(0); // route to 1st
         //TODO try the other collections if can't find a local replica of the first?   (and do to V2HttpSolrCall)
 
-        boolean isPreferLeader = (path.endsWith("/update") || path.contains("/update/"));
-
-        core = getCoreByCollection(collectionName, isPreferLeader); // find a local replica/core for the collection
+        core = getCoreByCollection(collectionName, isPreferLeader()); // find a local replica/core for the collection
         if (core != null) {
           if (idx > 0) {
             path = path.substring(idx);
@@ -295,6 +299,7 @@ public class HttpSolrCall {
         } else {
           // if we couldn't find it locally, look on other nodes
           if (idx > 0) {
+            if(checkStateHeader(false) != STATUS_DEF) return;
             extractRemotePath(collectionName, origCorename);
             if (action == REMOTEQUERY) {
               path = path.substring(idx);
@@ -337,6 +342,58 @@ public class HttpSolrCall {
     log.debug("no handler or core retrieved for {}, follow through...", path);
 
     action = PASSTHROUGH;
+  }
+
+  protected boolean isPreferLeader() {
+    return (path.endsWith("/update") || path.contains("/update/")) ||
+            (requestShardState != null && requestShardState.expectedType() == OptimisticShardState.ExpectedType.LEADER);
+  }
+
+  /**
+   * Check if the state assumptions at the client is matching our local state
+   * @param canServeRequest
+   * @return
+   */
+  protected OptimisticShardState.Status checkStateHeader(boolean canServeRequest) {
+    int collVer = 0;
+    int sliceVer = 0;
+    if (requestShardState != null) {
+      //the client has made this request optimistically. It's not sure if it is sending the request to the right place
+      if (cores.isZooKeeperAware()) {
+        DocCollection coll = cores.getZkController().zkStateReader.getCollection(requestShardState.getCollection());
+        if (coll.getZNodeVersion() > requestShardState.getCollectionVer()) {
+          collVer = coll.getZNodeVersion();
+        }
+        ShardStateProvider ssp = cores.getZkController().getZkStateReader().getShardStateProvider(requestShardState.getCollection());
+        if (ssp instanceof ShardTermsStateProvider) {
+          ShardTermsStateProvider shardTermsStateProvider = (ShardTermsStateProvider) ssp;
+          ShardTerms termsData = shardTermsStateProvider.getTermsData(requestShardState.getCollection(), requestShardState.getSliceName(), 0);
+          if(termsData != null && termsData.getVersion() > requestShardState.getSliceVersion(null, 0)) {
+            sliceVer = termsData.getVersion();
+          }
+        }
+      }
+    } else {
+      // the client hasn't sent any header . So the system should behave as it earlier used to
+      return STATUS_DEF;
+    }
+    if(collVer > 0 || sliceVer >0) {
+      OptimisticShardState.Builder builder = new OptimisticShardState.Builder();
+      builder.status = canServeRequest? STATUS_OK_UPDATE : STATUS_FAIL_UPDATE;
+      builder.withCollection(requestShardState.getCollection(), collVer);
+      builder.addSlice(requestShardState.getSliceName(), sliceVer);
+      responseShardState = builder.build();
+      if(responseShardState.status() == STATUS_FAIL_UPDATE){
+        action = Action.EMPTYRETURN;
+      }
+
+      responseShardState = builder.build();
+      return responseShardState.status();
+
+    }
+
+    return null;
+
   }
 
   protected void autoCreateSystemColl(String corename) throws Exception {
@@ -946,15 +1003,29 @@ public class HttpSolrCall {
     }
 
     ShardStateProvider ssp = cores.getZkController().getZkStateReader().getShardStateProvider(collectionName);
-
     if (isPreferLeader) {
-      List<Replica> leaderReplicas = collection.getLeaderReplicas(cores.getZkController().getNodeName());
+      if(requestShardState != null && requestShardState.getSliceName() != null) {
+        return getCoreFromShardState(collectionName, ssp);
+      }
+      List<Replica> leaderReplicas = collection.getLeaderReplicas(ssp, cores.getZkController().getNodeName());
       SolrCore core = randomlyGetSolrCore(ssp, leaderReplicas);
       if (core != null) return core;
     }
 
     List<Replica> replicas = collection.getReplicas(cores.getZkController().getNodeName());
     return randomlyGetSolrCore(ssp, replicas);
+  }
+
+  private SolrCore getCoreFromShardState(String collectionName, ShardStateProvider ssp) {
+    Replica r = ssp.getLeader(collectionName, requestShardState.getSliceName());
+    if(r == null) return null;
+    if(!ssp.isActive(r)) return null;
+    if(cores.getZkController().getNodeName().equals( r.getNodeName())) {
+      return cores.getCore(r.getCoreName());
+    } else {
+      //it is not hosted here
+      return null;
+    }
   }
 
   private SolrCore randomlyGetSolrCore(ShardStateProvider ssp, List<Replica> replicas) {

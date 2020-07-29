@@ -63,6 +63,7 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.client.HttpClient;
 import org.apache.lucene.util.Version;
 import org.apache.solr.api.V2HttpCall;
+import org.apache.solr.client.solrj.cloud.OptimisticShardState;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -123,7 +124,12 @@ public class SolrDispatchFilter extends BaseSolrFilter {
    * RETRY:Retry the request. In cases when a core isn't found to work with, this is set.
    */
   public enum Action {
-    PASSTHROUGH, FORWARD, RETURN, RETRY, ADMIN, REMOTEQUERY, PROCESS
+    PASSTHROUGH, FORWARD, RETURN, RETRY, ADMIN, REMOTEQUERY, PROCESS,
+    /**
+     * Return an empty body. But with appropriate details in the header
+     * The response writer is never invoked
+     */
+    EMPTYRETURN
   }
   
   public SolrDispatchFilter() {
@@ -423,6 +429,12 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           case FORWARD:
             request.getRequestDispatcher(call.getPath()).forward(request, response);
             break;
+          case EMPTYRETURN:{
+            if(call.responseShardState != null)
+              response.setStatus(410);
+              response.addHeader(OptimisticShardState.STATE_HDR, call.responseShardState.toString());
+              break;
+          }
           case ADMIN:
           case PROCESS:
           case REMOTEQUERY:

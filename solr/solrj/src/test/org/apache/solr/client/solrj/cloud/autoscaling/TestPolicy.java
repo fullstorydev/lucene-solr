@@ -87,7 +87,6 @@ import static org.apache.solr.client.solrj.cloud.autoscaling.Variable.Type.REPLI
 import static org.apache.solr.common.cloud.ZkStateReader.CLUSTER_STATE;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.MOVEREPLICA;
-@Ignore
 public class TestPolicy extends SolrTestCaseJ4 {
   boolean useNodeset ;
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -2772,6 +2771,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
     assertEquals("127.0.0.1:51147_solr", op.getNode());
   }
 
+  @Ignore
   public void testDiskSpaceReqd() {
     String autoScaleJson = "{" +
         "  cluster-preferences: [" +

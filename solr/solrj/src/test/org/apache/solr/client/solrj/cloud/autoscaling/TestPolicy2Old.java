@@ -17,9 +17,7 @@
 
 package org.apache.solr.client.solrj.cloud.autoscaling;
 
-import org.junit.Ignore;
 
-@Ignore
 public class TestPolicy2Old extends TestPolicy2 {
   public TestPolicy2Old(){
     super();

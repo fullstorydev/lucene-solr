@@ -16,10 +16,12 @@
  */
 package org.apache.solr.common.util;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.util.EntityUtils;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
@@ -765,9 +767,18 @@ public class Utils {
   }
 
   public interface InputStreamConsumer<T> {
-
     T accept(InputStream is) throws IOException;
+  }
 
+  /** Consumer of header data
+   */
+  public interface HeaderConsumer {
+    /**
+     * read all required values from the header
+     * @param status the HTTP status code
+     * @return true to proceed to processing body. if false , ignore the body
+     */
+    boolean readHeader(int status, Function<String, String> headerProvider);
   }
 
   public static final InputStreamConsumer<?> JAVABINCONSUMER = is -> new JavaBinCodec().unmarshal(is);
@@ -794,29 +805,51 @@ public class Utils {
 
 
   public static <T> T executeGET(HttpClient client, String url, InputStreamConsumer<T> consumer) throws SolrException {
-    T result = null;
     HttpGet httpGet = new HttpGet(url);
+    T result = execute(client, url, consumer, httpGet);
+    return result;
+  }
+
+  public static <T> T execute(HttpClient client, String url, InputStreamConsumer<T> consumer, HttpRequestBase httpMethod) {
     HttpResponse rsp = null;
+    T result = null;
     try {
-      rsp = client.execute(httpGet);
+      rsp = client.execute(httpMethod);
     } catch (IOException e) {
       log.error("Error in request to url : {}", url, e);
       throw new SolrException(SolrException.ErrorCode.UNKNOWN, "error sending request");
     }
     int statusCode = rsp.getStatusLine().getStatusCode();
+    if (consumer instanceof HeaderConsumer) {
+      final HttpResponse finalRsp = rsp;
+      boolean proceed = ((HeaderConsumer) consumer).readHeader(statusCode, s -> {
+        Header value = finalRsp.getFirstHeader(s);
+        return value == null ? null : value.getValue();
+      });
+      if(!proceed) {
+        try {
+          HttpEntity entity = rsp.getEntity();
+          Utils.consumeFully(entity);
+        } catch (Exception e) {
+          //eat it up. This was supposed to be ignored
+        }
+        return null;
+      }
+    }
     if (statusCode != 200) {
       try {
-        log.error("Failed a request to: {}, status: {}, body: {}", url, rsp.getStatusLine(), EntityUtils.toString(rsp.getEntity(), StandardCharsets.UTF_8)); // logOk
+        String errMsg = EntityUtils.toString(rsp.getEntity(), UTF_8);
+        log.error("Failed a request to: {}, status: {}, body: {}", url, rsp.getStatusLine(), errMsg); // logOk
       } catch (IOException e) {
         log.error("could not print error", e);
       }
       throw new SolrException(SolrException.ErrorCode.getErrorCode(statusCode), "Unknown error");
     }
     HttpEntity entity = rsp.getEntity();
+    if(entity == null) return null;
     try {
       InputStream is = entity.getContent();
       if (consumer != null) {
-
         result = consumer.accept(is);
       }
     } catch (IOException e) {
@@ -826,34 +859,4 @@ public class Utils {
     }
     return result;
   }
-  /**This uses Solr's native JSON writer {@link SolrJSONWriter} to serilize to json
-   *
-   * @param o the object to write
-   * @param writer A writer object. If null, a {@link StringWriter} is created and returned
-   * @param indent to indent or not
-   * @param compact writes key value without quotes. This is OK for noggit parser that we use. Useful to serialaize
-   *                use {@link Utils#fromJSONString(String)} to deserialize
-   * @return the writer supplied
-   */
-  public static Writer writeJson(Object o, Writer writer, boolean indent, boolean compact) throws IOException {
-    if(writer == null) writer= new StringWriter();
-    SolrJSONWriter jsonw = compact? compactJsonWriter(writer): new SolrJSONWriter(writer);
-    jsonw.setIndent(indent)
-        .writeObj(o)
-        .close();
-    return writer;
-  }
-
-  /**Write a json without double quotes
-   */
-  public static SolrJSONWriter compactJsonWriter(Writer w) {
-    return new SolrJSONWriter(w) {
-      @Override
-      public void writeStr(String name, String val, boolean needsEscaping) throws IOException {
-        super._writeStr(val);
-      }
-    };
-  }
-
-
 }

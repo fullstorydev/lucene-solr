@@ -24,10 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.cloud.*;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
@@ -44,7 +41,7 @@ public class ShardTermsStateProvider implements ShardStateProvider {
   /**
    * This data is cached and probably stale
    */
-  private Map<String, ShardTerms> termsCache = new ConcurrentHashMap<>();
+  private ShardTermsCache termsCache = new ShardTermsCache();
   /**
    * This node may be watching these shards all the time so, we don't need to cache it
    */
@@ -64,22 +61,16 @@ public class ShardTermsStateProvider implements ShardStateProvider {
     return getLeader(sl);
   }
 
-  private ShardTerms getTermsData(String collection, String shard, boolean forceFetch) {
+  /** Get the current terms data for a given collection/shard
+   * @param collection Name of collection
+   * @param shard Name of shard
+   * @param minVersion if the cache has this (or newer) version locally, return from the cache.
+   *                   If not,'0' nfetch fresh data from ZK. If the value is -1 fetch anyway
+   */
+  public ShardTerms getTermsData(String collection, String shard, int minVersion) {
     ShardTerms data = liveTerms.apply(collection, shard);
     if (data != null) return data;
-    String key = collection + "/" + shard;
-    if (forceFetch) termsCache.remove(key);
-    ShardTerms terms = null;//termsCache.get(key); nocommit this is totally eliminating cache for debug purposes
-    if (terms != null) {
-      if (TimeUnit.SECONDS.convert(System.nanoTime() - terms.createTime, TimeUnit.NANOSECONDS) > CACHE_TIMEOUT) {
-        termsCache.remove(key);
-        return readTerms(collection, shard);
-      } else {
-        return terms;
-      }
-    }
-    return readTerms(collection, shard);
-
+    return termsCache.get(collection, shard, minVersion);
   }
 
   private ShardTerms readTerms(String collection, String shard) {
@@ -88,6 +79,8 @@ public class ShardTermsStateProvider implements ShardStateProvider {
       Stat stat = new Stat();
       byte[] data = zkStateReader.getZkClient().getData(znode, null, stat, true);
       return new ShardTerms((Map<String, Long>) Utils.fromJSON(data), stat.getVersion());
+    } catch (KeeperException.NoNodeException nne) {
+      return null;
     } catch (KeeperException e) {
       Thread.interrupted();
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error updating shard term for collection: " + collection, e);
@@ -103,7 +96,7 @@ public class ShardTermsStateProvider implements ShardStateProvider {
     if (!zkStateReader.isNodeLive(replica.getNodeName())) {
       return Replica.State.DOWN;
     }
-    ShardTerms terms = getTermsData(replica.collection, replica.slice, false);
+    ShardTerms terms = getTermsData(replica.collection, replica.slice, 0);
     if (terms == null) {
       return Replica.State.DOWN;
     }
@@ -121,7 +114,8 @@ public class ShardTermsStateProvider implements ShardStateProvider {
 
   @Override
   public Replica getLeader(Slice slice) {
-    ShardTerms termsData = getTermsData(slice.collection, slice.getName(), false);
+    ShardTerms termsData = getTermsData(slice.collection, slice.getName(), 0);
+    if(termsData == null) return null;
     return slice.getReplica(termsData.getLeader());
   }
 
@@ -130,17 +124,18 @@ public class ShardTermsStateProvider implements ShardStateProvider {
     long startTime = System.nanoTime();
     long timeoutAt = startTime + NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS);
     for (; ; ) {
-      ShardTerms t = getTermsData(slice.collection, slice.getName(), false);
-      String leader = t.getLeader();
-      if (leader != null) {
-        return slice.getReplica(leader);
-      }
+      ShardTerms t = getTermsData(slice.collection, slice.getName(), 0);
+      if(t != null) {
+        String leader = t.getLeader();
+        if (leader != null) {
+          return slice.getReplica(leader);
+        }
 
-      if (System.nanoTime() > timeoutAt) {
-        log.info("Could not find leader for {}/{} ", slice.getCollection(), slice.getName());
-        return null;
+        if (System.nanoTime() > timeoutAt) {
+          log.info("Could not find leader for {}/{} ", slice.getCollection(), slice.getName());
+          return null;
+        }
       }
-
       log.trace("waiting for leader of {}/{}", slice.getCollection(), slice.getName());
       Thread.sleep(100);
 
@@ -162,5 +157,43 @@ public class ShardTermsStateProvider implements ShardStateProvider {
     return false;
   }
 
+  class ShardTermsCache {
+
+    private final long TTL = 3 * 60 * 60 * 1000;//3 mins
+    Map<String, Map<String, TermsHolder>> cache = new ConcurrentHashMap<>();
+
+
+    public ShardTerms get(String coll, String slice, int expectedVersion) {
+      Map<String, TermsHolder> slices = cache.get(coll);
+      if (slices == null) {
+        //we are not trying to be threadsafe here.
+        // if multiple threads create this in parallel, there is one extra read from Zk and that's OK
+        cache.put(coll, slices = new ConcurrentHashMap<>());
+      }
+      if (expectedVersion == -1) slices.remove(slice);
+      TermsHolder terms = slices.get(slice);
+      if (terms != null) {
+        if (terms.terms.getVersion() >= expectedVersion && System.currentTimeMillis() < terms.expireAt) {
+          return terms.terms;
+        }
+      }
+      ShardTerms freshTerms = readTerms(coll, slice);
+      if(freshTerms == null) return null;
+      terms = new TermsHolder(freshTerms, System.currentTimeMillis() + TTL);
+      slices.put(slice, terms);
+      return terms.terms;
+    }
+
+
+  }
+  static class TermsHolder {
+    final ShardTerms terms;
+    final long expireAt;
+
+    TermsHolder(ShardTerms terms, long expireAt) {
+      this.terms = terms;
+      this.expireAt = expireAt;
+    }
+  }
 
 }

@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -242,9 +243,24 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
 
   /**
    * Get the list of all leaders hosted on the given node or <code>null</code> if none.
+   * use {@link #getLeaderReplicas(ShardStateProvider, String)} instead
+   *
    */
+  @Deprecated
   public List<Replica> getLeaderReplicas(String nodeName) {
     return nodeNameLeaderReplicas.get(nodeName);
+  }
+  public List<Replica> getLeaderReplicas(ShardStateProvider ssp, String nodeName) {
+    List<Replica> replicas = getReplicas(nodeName);
+    if(replicas == null ) return null;
+    LinkedList<Replica> result  = null;
+    for (Replica replica : replicas) {
+      if(ssp.getLeader(replica.collection, replica.slice) == replica) {
+        if(result == null) result = new LinkedList<>();
+        result.add(replica);
+      }
+    }
+    return result;
   }
 
   public int getZNodeVersion(){

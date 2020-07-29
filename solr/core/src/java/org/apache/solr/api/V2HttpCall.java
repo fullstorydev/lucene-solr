@@ -17,6 +17,18 @@
 
 package org.apache.solr.api;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.lang.invoke.MethodHandles;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+
 import com.google.common.collect.ImmutableSet;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.common.SolrException;
@@ -41,15 +53,12 @@ import org.apache.solr.servlet.SolrRequestParsers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.lang.invoke.MethodHandles;
-import java.util.*;
-import java.util.function.Supplier;
-
+import static org.apache.solr.client.solrj.cloud.OptimisticShardState.Status.STATUS_DEF;
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
 import static org.apache.solr.common.util.PathTrie.getPathSegments;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.*;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.ADMIN;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.PROCESS;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.REMOTEQUERY;
 
 // class that handle the '/v2' path
 @SolrThreadSafe
@@ -107,9 +116,9 @@ public class V2HttpCall extends HttpSolrCall {
             throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "no such collection or alias");
           }
         } else {
-          boolean isPreferLeader = (path.endsWith("/update") || path.contains("/update/"));
-          core = getCoreByCollection(collection.getName(), isPreferLeader);
+          core = getCoreByCollection(collection.getName(), isPreferLeader());
           if (core == null) {
+            if(checkStateHeader(false) != STATUS_DEF) return;
             //this collection exists , but this node does not have a replica for that collection
             extractRemotePath(collection.getName(), collection.getName());
             if (action == REMOTEQUERY) {
@@ -131,6 +140,7 @@ public class V2HttpCall extends HttpSolrCall {
         }
       }
       if (core == null) {
+        if(checkStateHeader(false) != STATUS_DEF) return;
         log.error(">> path: '{}'", path);
         if (path.endsWith(CommonParams.INTROSPECT)) {
           initAdminRequest(path);
