@@ -29,6 +29,7 @@ import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrResponse;
+import org.apache.solr.client.solrj.cloud.OptimisticShardState;
 import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.LBSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -38,6 +39,7 @@ import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.StaleStateException;
 import org.apache.solr.common.annotation.SolrSingleThreaded;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
@@ -123,14 +125,33 @@ public class HttpShardHandler extends ShardHandler {
 
   @Override
   public void submit(final ShardRequest sreq, final String shard, final ModifiableSolrParams params) {
-    // do this outside of the callable for thread safety reasons
-    final List<String> urls = getURLs(shard);
+    ShardStateAwareReplicaSource crs = getCloudReplicaSource();
     final Tracer tracer = GlobalTracer.getTracer();
     final Span span = tracer != null ? tracer.activeSpan() : null;
+    int sliceId = crs == null ? -1 : crs.getSliceId(shard);
+    execRequest(sreq, shard, params, crs, sliceId, tracer, span);
+  }
+
+  private void execRequest(ShardRequest sreq, String shard, ModifiableSolrParams params,
+                           ShardStateAwareReplicaSource crs, int sliceId, Tracer tracer, Span span) {
+    List<String> crsUrls =null;
+    if(sliceId > -1 && crs != null) {
+      crsUrls = crs.getReplicasBySlice(sliceId);
+    }
+    // avoid parsing and computing urls because we already have this list readily available
+    // do this outside of the callable for thread safety reasons
+    final List<String> urls = crsUrls == null ? getURLs(shard) : crsUrls;
+
 
     params.remove(CommonParams.WT); // use default (currently javabin)
     params.remove(CommonParams.VERSION);
     QueryRequest req = makeQueryRequest(sreq, params, shard);
+    OptimisticShardState oss = null;
+    if(crs != null && sliceId > -1) {
+      oss = crs.getOptimisticShardState(sliceId);
+      if(oss != null) req.addHeader(OptimisticShardState.STATE_HDR, oss.toString());
+    }
+
     req.setMethod(SolrRequest.METHOD.POST);
 
     LBSolrClient.Req lbReq = httpShardHandlerFactory.newLBHttpSolrClientReq(req, urls);
@@ -178,6 +199,12 @@ public class HttpShardHandler extends ShardHandler {
       }
 
       public void onFailure(Throwable throwable) {
+        if (throwable instanceof StaleStateException) {
+          StaleStateException staleStateException = (StaleStateException) throwable;
+          ShardStateAwareReplicaSource newCrs = crs.refreshState(staleStateException.getOptimisticShardState());
+          execRequest(sreq, shard, params, newCrs, sliceId, tracer, span);
+          return;
+        }
         ssr.elapsedTime = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
         srsp.setException(throwable);
         if (throwable instanceof SolrException) {
@@ -186,6 +213,19 @@ public class HttpShardHandler extends ShardHandler {
         responses.add(srsp);
       }
     }));
+  }
+
+  private ShardStateAwareReplicaSource getCloudReplicaSource() {
+    SolrRequestInfo sri = SolrRequestInfo.getRequestInfo();
+    if (sri != null) {
+      ResponseBuilder rb = sri.getResponseBuilder();
+      if (rb != null) {
+        if (rb.replicaSource instanceof ShardStateAwareReplicaSource) {
+          return (ShardStateAwareReplicaSource) rb.replicaSource;
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -278,7 +318,7 @@ public class HttpShardHandler extends ShardHandler {
     if (zkController != null) {
       boolean onlyNrt = Boolean.TRUE == req.getContext().get(ONLY_NRT_REPLICAS);
 
-      replicaSource = new CloudReplicaSource.Builder()
+      rb.replicaSource = replicaSource = new CloudReplicaSource.Builder()
           .params(params)
           .zkStateReader(zkController.getZkStateReader())
           .whitelistHostChecker(hostChecker)
@@ -313,7 +353,7 @@ public class HttpShardHandler extends ShardHandler {
 
     rb.shards = new String[rb.slices.length];
     for (int i = 0; i < rb.slices.length; i++) {
-      rb.shards[i] = createSliceShardsStr(replicaSource.getReplicasBySlice(i));
+      rb.shards[i] = replicaSource.getSliceShardsStr(i);
     }
 
     String shards_rows = params.get(ShardParams.SHARDS_ROWS);

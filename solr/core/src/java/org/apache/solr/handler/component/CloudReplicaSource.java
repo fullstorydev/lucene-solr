@@ -24,9 +24,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.apache.solr.client.solrj.cloud.OptimisticShardState;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
+import org.apache.solr.client.solrj.cloud.ShardTermsStateProvider;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrException;
@@ -38,25 +42,78 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.StrUtils;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * A replica source for solr cloud mode
  */
-class CloudReplicaSource implements ReplicaSource {
+class CloudReplicaSource implements ShardStateAwareReplicaSource {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private String[] slices;
   private List<String>[] replicas;
+  private final String[] shardstr;
+
+  private final Builder builder;
+  ShardStateProvider shardStateProvider;
 
   private CloudReplicaSource(Builder builder) {
+    this.builder = builder;
+    if(builder.collection != null) {
+      shardStateProvider = builder.zkStateReader.getShardStateProvider(builder.collection);
+    }
     final String shards = builder.params.get(ShardParams.SHARDS);
     if (shards != null) {
       withShardsParam(builder, shards);
     } else {
       withClusterState(builder, builder.params);
     }
+   shardstr = new String[slices.length];
+  }
+
+  public ShardStateProvider getShardStateProvider() {
+    return shardStateProvider;
+  }
+
+  /**
+   * Get a new instance of {@link CloudReplicaSource} with fresh details
+   */
+  public CloudReplicaSource refreshState(OptimisticShardState oss) {
+    if(oss.getCollectionVer() >0) {
+      //means the version we sent to the other server is stale
+      DocCollection coll = builder.zkStateReader.getCollection(oss.getCollection());
+      if(coll.getZNodeVersion() >=  oss.getCollectionVer()) {
+        try {
+          builder.zkStateReader.forceUpdateCollection(coll.getName());
+        } catch (KeeperException | InterruptedException e) {
+          //cannot update state.json
+          log.error("Error refreshing Collection state ", e);
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        }
+      }
+    }
+    int sliceVersion = oss.getSliceVersion(null, 0);
+    if(sliceVersion >0) {
+      ((ShardTermsStateProvider)shardStateProvider).getTermsData(oss.getCollection(),
+          oss.getSliceName(),
+          sliceVersion);
+    }
+
+    return new CloudReplicaSource(builder);
+  }
+
+  public OptimisticShardState getOptimisticShardState(int idx) {
+    String sliceName = slices[idx];
+    if(sliceName != null && shardStateProvider instanceof ShardTermsStateProvider) {
+      return new OptimisticShardState.Builder()
+          .withCollection(builder.collection, builder.zkStateReader.getCollection(builder.collection).getZNodeVersion())
+          .addSlice(sliceName, ((ShardTermsStateProvider)shardStateProvider).getTermsData(builder.collection, sliceName, 0).getVersion())
+          .build();
+    }
+    return null;
+
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -99,6 +156,19 @@ class CloudReplicaSource implements ReplicaSource {
     }
   }
 
+  @Override
+  public String getSliceShardsStr(int i) {
+    return shardstr[i] = concat(getReplicasBySlice(i));
+  }
+
+  @Override
+  public int getSliceId(String shard) {
+    for (int i = 0; i < shardstr.length; i++) {
+      if(Objects.equals(shardstr[i], shard)) return i;
+    }
+    return -1;
+  }
+
   @SuppressWarnings({"unchecked", "rawtypes"})
   private void withShardsParam(Builder builder, String shardsParam) {
     List<String> sliceOrUrls = StrUtils.splitSmart(shardsParam, ",", true);
@@ -128,15 +198,18 @@ class CloudReplicaSource implements ReplicaSource {
       // if partial results are acceptable
       return Collections.emptyList();
     } else {
-      final Predicate<Replica> isShardLeader = new IsLeaderPredicate(builder.zkStateReader, clusterState, slice.getCollection(), slice.getName());
+      final Predicate<Replica> isShardLeader = new IsLeaderPredicate(shardStateProvider , clusterState, slice.getCollection(), slice.getName());
+      Predicate<Replica> replicaPredicate = replica -> {
+        return shardStateProvider.isActive(replica);
+      };
       List<Replica> list = slice.getReplicas()
           .stream()
-          .filter(replica -> replica.isActive(clusterState.getLiveNodes()))
+          .filter(replicaPredicate)
           .filter(replica -> !builder.onlyNrt || (replica.getType() == Replica.Type.NRT || (replica.getType() == Replica.Type.TLOG && isShardLeader.test(replica))))
           .collect(Collectors.toList());
-      builder.replicaListTransformer.transform(list);
+      if(builder.replicaListTransformer != null) builder.replicaListTransformer.transform(list);
       List<String> collect = list.stream().map(Replica::getCoreUrl).collect(Collectors.toList());
-      builder.hostChecker.checkWhitelist(clusterState, shardsParam, collect);
+      if(builder.hostChecker != null)  builder.hostChecker.checkWhitelist(clusterState, shardsParam, collect);
       return collect;
     }
   }
@@ -169,14 +242,14 @@ class CloudReplicaSource implements ReplicaSource {
    * The result of getLeaderRetry is cached in the first call so that subsequent tests are faster and do not block.
    */
   private static class IsLeaderPredicate implements Predicate<Replica> {
-    private final ZkStateReader zkStateReader;
+    private final ShardStateProvider shardStateProvider;
     private final ClusterState clusterState;
     private final String collectionName;
     private final String sliceName;
     private Replica shardLeader = null;
 
-    public IsLeaderPredicate(ZkStateReader zkStateReader, ClusterState clusterState, String collectionName, String sliceName) {
-      this.zkStateReader = zkStateReader;
+    public IsLeaderPredicate(ShardStateProvider shardStateProvider, ClusterState clusterState, String collectionName, String sliceName) {
+      this.shardStateProvider = shardStateProvider;
       this.clusterState = clusterState;
       this.collectionName = collectionName;
       this.sliceName = sliceName;
@@ -186,7 +259,7 @@ class CloudReplicaSource implements ReplicaSource {
     public boolean test(Replica replica) {
       if (shardLeader == null) {
         try {
-          shardLeader = zkStateReader.getShardStateProvider(collectionName).getLeader(collectionName, sliceName, -1);
+          shardLeader = shardStateProvider.getLeader(collectionName, sliceName, -1);
         } catch (InterruptedException e) {
           throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE,
               "Exception finding leader for shard " + sliceName + " in collection "
@@ -245,4 +318,6 @@ class CloudReplicaSource implements ReplicaSource {
       return new CloudReplicaSource(this);
     }
   }
+
+  public static final String SLICE_ID = "_SLICE_ID";
 }

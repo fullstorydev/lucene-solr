@@ -51,6 +51,7 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.V2RequestSupport;
+import org.apache.solr.client.solrj.cloud.OptimisticShardState;
 import org.apache.solr.client.solrj.embedded.SSLConfig;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -60,6 +61,7 @@ import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.client.solrj.util.Constants;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.StaleStateException;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -691,6 +693,13 @@ public class Http2SolrClient extends SolrClient {
                 + " sent back a redirect (" + httpStatus + ").");
           }
           break;
+        case HttpStatus.SC_GONE: {
+          //this means
+          String hdr = response.getHeaders().get(OptimisticShardState.STATE_HDR);
+          if(hdr != null) {
+            throw new StaleStateException(getBaseURL(), "Stale state", new OptimisticShardState.Builder().withData(hdr).build());
+          }
+        }
         default:
           if (processor == null || mimeType == null) {
             throw new RemoteSolrException(serverBaseUrl, httpStatus, "non ok status: " + httpStatus

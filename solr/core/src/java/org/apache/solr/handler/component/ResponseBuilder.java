@@ -92,6 +92,8 @@ public class ResponseBuilder
 
   public List<SearchComponent> components;
 
+  ReplicaSource replicaSource;
+
   SolrRequestInfo requestInfo;
 
   public ResponseBuilder(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components)
@@ -508,5 +510,9 @@ public class ResponseBuilder
 
   public boolean isOlapAnalytics() {
     return this._isOlapAnalytics;
+  }
+
+  public ReplicaSource getReplicaSource(){
+    return replicaSource;
   }
 }

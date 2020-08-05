@@ -38,8 +38,10 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore//TODO
 public class ShardsWhitelistTest extends MultiSolrCloudTestCase {
 
   /**

@@ -65,7 +65,7 @@ public class ShardTermsStateProvider implements ShardStateProvider {
    * @param collection Name of collection
    * @param shard Name of shard
    * @param minVersion if the cache has this (or newer) version locally, return from the cache.
-   *                   If not,'0' nfetch fresh data from ZK. If the value is -1 fetch anyway
+   *                   If not,'0' fetch fresh data from ZK. If the value is -1 fetch anyway
    */
   public ShardTerms getTermsData(String collection, String shard, int minVersion) {
     ShardTerms data = liveTerms.apply(collection, shard);

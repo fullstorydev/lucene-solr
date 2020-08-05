@@ -39,4 +39,23 @@ interface ReplicaSource {
    * @return the count of slices
    */
   int getSliceCount();
+
+  default String getSliceShardsStr(final int i) {
+    final List<String> shardUrls =  getReplicasBySlice(i);
+    return concat(shardUrls);
+  }
+
+  default String concat(List<String> shardUrls) {
+    final StringBuilder sliceShardsStr = new StringBuilder();
+    boolean first = true;
+    for (String shardUrl : shardUrls) {
+      if (first) {
+        first = false;
+      } else {
+        sliceShardsStr.append('|');
+      }
+      sliceShardsStr.append(shardUrl);
+    }
+    return sliceShardsStr.toString();
+  }
 }

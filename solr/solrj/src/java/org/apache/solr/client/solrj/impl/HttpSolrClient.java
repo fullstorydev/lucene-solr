@@ -72,9 +72,11 @@ import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.V2RequestSupport;
+import org.apache.solr.client.solrj.cloud.OptimisticShardState;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.request.V2Request;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.StaleStateException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
@@ -595,6 +597,13 @@ public class HttpSolrClient extends BaseHttpSolrClient {
         case HttpStatus.SC_BAD_REQUEST:
         case HttpStatus.SC_CONFLICT:  // 409
           break;
+        case HttpStatus.SC_GONE: {
+          //this means
+          Header hdr = response.getFirstHeader(OptimisticShardState.STATE_HDR);
+          if(hdr != null) {
+            throw new StaleStateException(method.getURI().getHost(),  "Stale state", new OptimisticShardState.Builder().withData(hdr.getValue()).build());
+          }
+        }
         case HttpStatus.SC_MOVED_PERMANENTLY:
         case HttpStatus.SC_MOVED_TEMPORARILY:
           if (!followRedirects) {

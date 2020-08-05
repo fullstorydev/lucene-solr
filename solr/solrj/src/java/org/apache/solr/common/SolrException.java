@@ -47,6 +47,8 @@ public class SolrException extends RuntimeException {
     FORBIDDEN( 403 ),
     NOT_FOUND( 404 ),
     CONFLICT( 409 ),
+    //Used when a request is made with wrong expectation of state
+    GONE( 410 ),
     UNSUPPORTED_MEDIA_TYPE( 415 ),
     SERVER_ERROR( 500 ),
     SERVICE_UNAVAILABLE( 503 ),
