@@ -53,6 +53,7 @@ import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.apache.solr.client.solrj.response.CoreAdminResponse;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
@@ -123,7 +124,9 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   public void testCreationAndDeletion() throws Exception {
     String collectionName = "created_and_deleted";
 
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(cluster.getSolrClient());
     assertTrue(CollectionAdminRequest.listCollections(cluster.getSolrClient())
                   .contains(collectionName));
 
@@ -155,6 +158,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     final String collectionName = "halfdeletedcollection";
 
     assertEquals(0, CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setCreateNodeSet("")
         .process(cluster.getSolrClient()).getStatus());
     String dataDir = createTempDir().toFile().getAbsolutePath();
@@ -226,8 +230,9 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   @Test
   public void testTooManyReplicas() {
     @SuppressWarnings({"rawtypes"})
-    CollectionAdminRequest req = CollectionAdminRequest.createCollection("collection", "conf", 2, 10);
-
+    CollectionAdminRequest req = CollectionAdminRequest
+        .createCollection("collection", "conf", 2, 10)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState);
     expectThrows(Exception.class, () -> {
       cluster.getSolrClient().request(req);
     });
@@ -271,6 +276,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   @Test
   public void testCreateShouldFailOnExistingCore() throws Exception {
     assertEquals(0, CollectionAdminRequest.createCollection("halfcollectionblocker", "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setCreateNodeSet("")
         .process(cluster.getSolrClient()).getStatus());
     assertTrue(CollectionAdminRequest.addReplicaToShard("halfcollectionblocker", "shard1")
@@ -279,6 +285,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         .process(cluster.getSolrClient()).isSuccess());
 
     assertEquals(0, CollectionAdminRequest.createCollection("halfcollectionblocker2", "conf",1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setCreateNodeSet("")
         .process(cluster.getSolrClient()).getStatus());
     assertTrue(CollectionAdminRequest.addReplicaToShard("halfcollectionblocker2", "shard1")
@@ -300,6 +307,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   public void testNoConfigSetExist() throws Exception {
     expectThrows(Exception.class, () -> {
       CollectionAdminRequest.createCollection("noconfig", "conf123", 1, 1)
+          .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
           .process(cluster.getSolrClient());
     });
 
@@ -312,6 +320,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   @Test
   public void testCoresAreDistributedAcrossNodes() throws Exception {
     CollectionAdminRequest.createCollection("nodes_used_collection", "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     Set<String> liveNodes = cluster.getSolrClient().getZkStateReader().getClusterState().getLiveNodes();
@@ -337,6 +346,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
     // create another collection should still work
     CollectionAdminRequest.createCollection("acollectionafterbaddelete", "conf", 1, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     waitForState("Collection creation after a bad delete failed", "acollectionafterbaddelete",
         (n, c, ssp) -> DocCollection.isFullyActive(ssp, c, 1, 2));
@@ -344,7 +354,9 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
   @Test
   public void testSpecificConfigsets() throws Exception {
-    CollectionAdminRequest.createCollection("withconfigset2", "conf2", 1, 1).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection("withconfigset2", "conf2", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(cluster.getSolrClient());
     byte[] data = zkClient().getData(ZkStateReader.COLLECTIONS_ZKNODE + "/" + "withconfigset2", null, null, true);
     assertNotNull(data);
     ZkNodeProps props = ZkNodeProps.load(data);
@@ -373,6 +385,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
     CollectionAdminRequest.createCollection("nodeset_collection", "conf", 2, 1)
         .setCreateNodeSet(baseUrls.get(0) + "," + baseUrls.get(1))
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     DocCollection collectionState = getCollectionState("nodeset_collection");
@@ -416,6 +429,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
       createRequests[i]
           = CollectionAdminRequest.createCollection("awhollynewcollection_" + i, "conf2", numShards, replicationFactor)
+          .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
           .setMaxShardsPerNode(maxShardsPerNode);
       createRequests[i].processAsync(cluster.getSolrClient());
       
@@ -488,7 +502,9 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   @Test
   public void testCollectionReload() throws Exception {
     final String collectionName = "reloaded_collection";
-    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(cluster.getSolrClient());
 
     // get core open times
     Map<String, Long> urlToTimeBefore = new HashMap<>();
@@ -612,6 +628,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     String collectionName = "addReplicaColl";
 
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setMaxShardsPerNode(4)
         .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(collectionName, 2, 4);

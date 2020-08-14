@@ -333,7 +333,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     collectionName = "solrj_newstateformat";
 
     response = CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2)
-        .setExternalState(true)
+//        .setExternalState(true)
         .setStateFormat(2)
         .process(cluster.getSolrClient());
     assertEquals(0, response.getStatus());

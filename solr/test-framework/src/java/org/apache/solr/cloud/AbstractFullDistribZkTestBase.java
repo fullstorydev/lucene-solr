@@ -117,6 +117,10 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  public static final boolean useExternalState = Boolean.parseBoolean(
+      System.getProperty(
+      "external.collection.state", "false"));
+
   @BeforeClass
   public static void beforeFullSolrCloudTest() {
 

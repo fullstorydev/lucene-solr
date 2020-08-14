@@ -122,6 +122,9 @@ public class ShardTermsStateProvider implements ShardStateProvider {
   @Override
   public Replica getLeader(Slice slice, int timeout) throws InterruptedException {
     long startTime = System.nanoTime();
+    if(timeout == -1) {
+      timeout = ZkStateReader.GET_LEADER_RETRY_DEFAULT_TIMEOUT;
+    }
     long timeoutAt = startTime + NANOSECONDS.convert(timeout, TimeUnit.MILLISECONDS);
     for (; ; ) {
       ShardTerms t = getTermsData(slice.collection, slice.getName(), 0);

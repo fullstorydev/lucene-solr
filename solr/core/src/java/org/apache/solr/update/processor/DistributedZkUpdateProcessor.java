@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.Overseer;
@@ -161,16 +162,20 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
     List<SolrCmdDistributor.Node> nodes = null;
     Replica leaderReplica = null;
+    ShardStateProvider shardStateProvider = null;
     zkCheck();
     try {
-      leaderReplica = zkController.getZkStateReader().getLeaderRetry(collection, cloudDesc.getShardId());
-    } catch (InterruptedException e) {
-      Thread.interrupted();
+      shardStateProvider = zkController.getZkStateReader().getShardStateProvider(collection);
+      leaderReplica = shardStateProvider.getLeader(collection, cloudDesc.getShardId());
+    } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.interrupted();
+      }
       throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Exception finding leader for shard " + cloudDesc.getShardId(), e);
     }
     isLeader = leaderReplica.getName().equals(cloudDesc.getCoreNodeName());
 
-    nodes = getCollectionUrls(collection, EnumSet.of(Replica.Type.TLOG,Replica.Type.NRT), true);
+    nodes = getCollectionUrls(collection, EnumSet.of(Replica.Type.TLOG,Replica.Type.NRT), true, shardStateProvider);
     if (nodes == null) {
       // This could happen if there are only pull replicas
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
@@ -751,7 +756,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
   }
 
 
-  private List<SolrCmdDistributor.Node> getCollectionUrls(String collection, EnumSet<Replica.Type> types, boolean onlyLeaders) {
+  private List<SolrCmdDistributor.Node> getCollectionUrls(String collection, EnumSet<Replica.Type> types, boolean onlyLeaders, ShardStateProvider shardStateProvider) {
     final DocCollection docCollection = clusterState.getCollectionOrNull(collection);
     if (collection == null || docCollection.getSlicesMap() == null) {
       throw new ZooKeeperException(SolrException.ErrorCode.BAD_REQUEST,
@@ -762,7 +767,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     for (Map.Entry<String,Slice> sliceEntry : slices.entrySet()) {
       Slice replicas = slices.get(sliceEntry.getKey());
       if (onlyLeaders) {
-        Replica replica = docCollection.getLeader(replicas.getName());
+
+        Replica replica = shardStateProvider.getLeader(collection, replicas.getName());// docCollection.getLeader(replicas.getName());
         if (replica != null) {
           ZkCoreNodeProps nodeProps = new ZkCoreNodeProps(replica);
           urls.add(new SolrCmdDistributor.StdNode(nodeProps, collection, replicas.getName()));

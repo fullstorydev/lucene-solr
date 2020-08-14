@@ -68,12 +68,14 @@ public class ZkShardTermsTest extends SolrCloudTestCase {
         .setMaxShardsPerNode(1000)
         .process(cluster.getSolrClient());
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collection, "shard1", cluster.getZkClient())) {
-      waitFor(2, () -> zkShardTerms.getTerms().size());
-      assertArrayEquals(new Long[]{0L, 0L}, zkShardTerms.getTerms().values().toArray(new Long[2]));
+      waitFor(3, () -> zkShardTerms.getTerms().size());
+      assert(zkShardTerms.getTerms().values().contains(-1L));
+      assert(zkShardTerms.getTerms().values().contains(0L));
     }
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collection, "shard2", cluster.getZkClient())) {
-      waitFor(2, () -> zkShardTerms.getTerms().size());
-      assertArrayEquals(new Long[]{0L, 0L}, zkShardTerms.getTerms().values().toArray(new Long[2]));
+      waitFor(3, () -> zkShardTerms.getTerms().size());
+      assertTrue(zkShardTerms.getTerms().values().contains(-1L));
+      assertTrue(zkShardTerms.getTerms().values().contains(0L));
     }
   }
 

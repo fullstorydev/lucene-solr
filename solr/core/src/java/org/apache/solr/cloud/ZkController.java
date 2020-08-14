@@ -1365,8 +1365,9 @@ public class ZkController implements Closeable {
           .getCoreUrl();
 
       // now wait until our currently cloud state contains the latest leader
-      String clusterStateLeaderUrl = zkStateReader.getLeaderUrl(collection,
-          shardId, timeoutms * 2); // since we found it in zk, we are willing to
+      ShardStateProvider shardStateProvider = zkStateReader.getShardStateProvider(collection);
+      Replica leaderReplica = shardStateProvider.getLeader(collection, shardId, -1);
+      String clusterStateLeaderUrl = leaderReplica.getCoreUrl(); // since we found it in zk, we are willing to
       // wait a while to find it in state
       int tries = 0;
       final long msInSec = 1000L;
@@ -1619,7 +1620,10 @@ public class ZkController implements Closeable {
       if (updateLastState) {
         cd.getCloudDescriptor().setLastPublished(state);
       }
-      overseerJobQueue.offer(Utils.toJSON(m));
+      DocCollection coll = zkStateReader.getCollection(collection);
+      if(coll == null || !coll.getExternalState()) {
+        overseerJobQueue.offer(Utils.toJSON(m));
+      }
     } finally {
       MDCLoggingContext.clear();
     }

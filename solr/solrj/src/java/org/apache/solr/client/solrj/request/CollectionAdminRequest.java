@@ -490,7 +490,12 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     public Create setStateFormat(Integer stateFormat) { this.stateFormat = stateFormat; return this; }
     public Create setRule(String... s){ this.rule = s; return this; }
     public Create setSnitch(String... s){ this.snitch = s; return this; }
-    public Create setExternalState(boolean flag){ this.externalState = flag;return this; }
+    public Create setExternalState(boolean flag){
+      this.externalState = flag;
+      if(flag) {
+        System.out.println("Using external state");
+      }
+      return this; }
 
     public Create setAlias(String alias) {
       this.alias = alias;

@@ -27,6 +27,7 @@ import org.apache.solr.client.solrj.cloud.ShardTerms;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkCmdExecutor;
@@ -171,15 +172,25 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       }
     }
     if (!isAlreadyLeader) {
-      ZkNodeProps m = ZkNodeProps.fromKeyVals(Overseer.QUEUE_OPERATION, OverseerAction.LEADER.toLower(),
-          ZkStateReader.SHARD_ID_PROP, shardId,
-          ZkStateReader.COLLECTION_PROP, collection,
-          ZkStateReader.BASE_URL_PROP, leaderProps.get(ZkStateReader.BASE_URL_PROP),
-          ZkStateReader.CORE_NAME_PROP, leaderProps.get(ZkStateReader.CORE_NAME_PROP),
-          ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
-      assert zkController != null;
-      assert zkController.getOverseer() != null;
-      zkController.getOverseer().offerStateUpdate(Utils.toJSON(m));
+      for (; ; ) {
+        ZkShardTerms zkShardTerms = zkController.getShardTerms(collection, shardId);
+        if (zkShardTerms == null) break;
+        ShardTerms shardTerms = zkShardTerms.getShardTerms()
+            .setLeader(leaderProps.getStr(ZkStateReader.CORE_NODE_NAME_PROP));
+        if (zkController.getShardTerms(collection, shardId).saveTerms(shardTerms)) break;
+      }
+      DocCollection collection = this.zkStateReader.getCollection(this.collection);
+      if (collection == null ||  !collection.getExternalState()) {
+        ZkNodeProps m = ZkNodeProps.fromKeyVals(Overseer.QUEUE_OPERATION, OverseerAction.LEADER.toLower(),
+            ZkStateReader.SHARD_ID_PROP, shardId,
+            ZkStateReader.COLLECTION_PROP, this.collection,
+            ZkStateReader.BASE_URL_PROP, leaderProps.get(ZkStateReader.BASE_URL_PROP),
+            ZkStateReader.CORE_NAME_PROP, leaderProps.get(ZkStateReader.CORE_NAME_PROP),
+            ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
+        assert zkController != null;
+        assert zkController.getOverseer() != null;
+        zkController.getOverseer().offerStateUpdate(Utils.toJSON(m));
+      }
     }
   }
 

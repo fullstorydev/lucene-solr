@@ -165,7 +165,7 @@ public class ZkStateReader implements SolrCloseable {
   protected volatile ClusterState clusterState;
 
   private static final int GET_LEADER_RETRY_INTERVAL_MS = 50;
-  private static final int GET_LEADER_RETRY_DEFAULT_TIMEOUT = Integer.parseInt(System.getProperty("zkReaderGetLeaderRetryTimeoutMs", "4000"));
+  public static final int GET_LEADER_RETRY_DEFAULT_TIMEOUT = Integer.parseInt(System.getProperty("zkReaderGetLeaderRetryTimeoutMs", "4000"));
   ;
 
   public static final String LEADER_ELECT_ZKNODE = "leader_elect";
@@ -283,7 +283,7 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public DocCollection getCollection(String coll) {
-    return clusterState.getCollectionOrNull(coll);
+    return clusterState == null? null: clusterState.getCollectionOrNull(coll);
   }
 
   private static class CollectionWatch<T> {
@@ -2407,11 +2407,10 @@ public class ZkStateReader implements SolrCloseable {
     return shardTermsStateProvider;
   }
   public ShardStateProvider getShardStateProvider(String collection) {
-    return directShardState;
-  /*  DocCollection coll = getClusterState().getCollectionOrNull(collection);
-    if(coll == null) return directReplicaState;
+    DocCollection coll = getCollection(collection);
+    if(coll == null) return directShardState;
     return coll.getExternalState()?
         shardTermsStateProvider:
-        directReplicaState;*/
+        directShardState;
   }
 }
