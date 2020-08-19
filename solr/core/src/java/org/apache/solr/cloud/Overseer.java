@@ -70,9 +70,12 @@ import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CloudConfig;
 import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.handler.admin.CollectionsHandler;
 import org.apache.solr.handler.component.HttpShardHandler;
 import org.apache.solr.logging.MDCLoggingContext;
+import org.apache.solr.metrics.SolrMetricProducer;
+import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.update.UpdateShardHandler;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -85,7 +88,7 @@ import com.codahale.metrics.Timer;
  * Cluster leader. Responsible for processing state updates, node assignments, creating/deleting
  * collections, shards, replicas and setting various properties.
  */
-public class Overseer implements SolrCloseable {
+public class Overseer implements SolrCloseable, SolrMetricProducer, SolrInfoBean {
   public static final String QUEUE_OPERATION = "operation";
 
   // System properties are used in tests to make them run fast
@@ -101,6 +104,19 @@ public class Overseer implements SolrCloseable {
   enum LeaderStatus {DONT_KNOW, NO, YES}
 
   private Counter stateUpdateMessages;
+  private SolrMetricsContext ctx;
+  
+  @Override
+  public void initializeMetrics(SolrMetricsContext parentContext, String scope) {
+    stateUpdateMessages = parentContext.counter(this, "stateUpdates", scope);
+    this.ctx = parentContext;
+  }
+
+  @Override
+  public SolrMetricsContext getSolrMetricsContext() {
+    return ctx;
+  }
+
   private class ClusterStateUpdater implements Runnable, Closeable {
 
     private final ZkStateReader reader;
@@ -1010,6 +1026,21 @@ public class Overseer implements SolrCloseable {
       throw new AlreadyClosedException();
     }
     getStateUpdateQueue().offer(data);
+  }
+
+  @Override
+  public String getName() {
+    return "overseer";
+  }
+
+  @Override
+  public String getDescription() {
+    return "Overseer infobean";
+  }
+
+  @Override
+  public Category getCategory() {
+    return SolrInfoBean.Category.CONTAINER;
   }
 
 }
