@@ -233,8 +233,13 @@ public class ClusterStatus {
   @SuppressWarnings("unchecked")
   private Map<String, Object> overlayShard(String coll,  String shard, Map<String, Object> shardInfo, ShardStateProvider ssp) {
     if(ssp.isExternalState()) {
+      if (ssp instanceof ShardTermsStateProvider) {
+        ShardTermsStateProvider shardTermsStateProvider = (ShardTermsStateProvider) ssp;
+        //do a force refresh
+        shardTermsStateProvider.getTermsData(coll, shard, -1);
+      }
       Map<String,Object> replicas = (Map<String, Object>) shardInfo.get("replicas");
-      if(replicas != null){
+      if(replicas != null) {
         for (Map.Entry<String, Object> e : replicas.entrySet()) {
            Map<String,Object> replicasDetails = (Map<String, Object>) e.getValue();
            replicasDetails.put("state",  ssp.getState(coll, shard, e.getKey()).toString() );
