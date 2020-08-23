@@ -27,6 +27,8 @@ import org.apache.solr.common.cloud.Slice;
  */
 public interface ShardStateProvider {
 
+  Replica.State getState(String collection, String shard, String replica);
+
   /**Get the state of  a given {@link Replica}
    */
   Replica.State getState(Replica replica);
@@ -58,4 +60,6 @@ public interface ShardStateProvider {
   /**Check if the slice is active
    */
   boolean isActive(Slice slice);
+
+  public boolean isExternalState();
 }

@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
+import org.apache.solr.client.solrj.cloud.ShardTermsStateProvider;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.ClusterState;
@@ -205,7 +207,14 @@ public class ClusterStatus {
     if (collection == null)  {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection: " + name + " not found");
     }
+    ShardStateProvider ssp = zkStateReader.getShardStateProvider(name);
     if (requestedShards == null || requestedShards.isEmpty()) {
+      if(ssp.isExternalState()) {
+        Map<String,Object> shards = (Map<String, Object>) collection.get("shards");
+        for (Map.Entry<String, Object> e : shards.entrySet()) {
+          e.setValue(overlayShard(name, e.getKey(), (Map<String, Object>) e.getValue(), ssp));
+        }
+      }
       return collection;
     } else {
       Map<String, Object> shards = (Map<String, Object>) collection.get("shards");
@@ -214,12 +223,38 @@ public class ClusterStatus {
         if (!shards.containsKey(selectedShard)) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection: " + name + " shard: " + selectedShard + " not found");
         }
-        selected.put(selectedShard, shards.get(selectedShard));
+        selected.put(selectedShard,  overlayShard(name, selectedShard, (Map<String, Object>) shards.get(selectedShard), ssp));
         collection.put("shards", selected);
       }
       return collection;
     }
   }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> overlayShard(String coll,  String shard, Map<String, Object> shardInfo, ShardStateProvider ssp) {
+    if(ssp.isExternalState()) {
+      Map<String,Object> replicas = (Map<String, Object>) shardInfo.get("replicas");
+      if(replicas != null){
+        for (Map.Entry<String, Object> e : replicas.entrySet()) {
+           Map<String,Object> replicasDetails = (Map<String, Object>) e.getValue();
+           replicasDetails.put("state",  ssp.getState(coll, shard, e.getKey()).toString() );
+          Replica leader = ssp.getLeader(coll, shard);
+          if(leader !=null && leader.getName().equals(e.getKey())){
+              replicasDetails.put("leader", "true");
+          } else {
+            replicasDetails.remove("leader");
+          }
+        }
+      }
+
+      return shardInfo;
+
+    } else {
+      return shardInfo;
+    }
+  }
+
+
 
 
 

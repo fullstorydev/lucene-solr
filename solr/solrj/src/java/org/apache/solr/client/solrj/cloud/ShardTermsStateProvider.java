@@ -61,6 +61,16 @@ public class ShardTermsStateProvider implements ShardStateProvider {
     return getLeader(sl);
   }
 
+  @Override
+  public Replica.State getState(String collection, String shard, String replica) {
+    DocCollection coll = zkStateReader.getCollection(collection);
+    Slice s = coll.getSlice(shard);
+    if(s == null) return null;
+    Replica r = s.getReplica(replica);
+    if(r == null) return null;
+    return getState(r);
+  }
+
   /** Get the current terms data for a given collection/shard
    * @param collection Name of collection
    * @param shard Name of shard
@@ -158,6 +168,11 @@ public class ShardTermsStateProvider implements ShardStateProvider {
   @Override
   public boolean isActive(Slice slice) {
     return false;
+  }
+
+  @Override
+  public boolean isExternalState() {
+    return true;
   }
 
   class ShardTermsCache {

@@ -38,6 +38,17 @@ public class DirectShardState implements ShardStateProvider {
   }
 
   @Override
+  public Replica.State getState(String collection, String shard, String replica) {
+    DocCollection c = collectionProvider.apply(collection);
+    if(c == null) return null;
+    Slice s = c.getSlice(shard);
+    if(s == null) return null;
+    Replica r = s.getReplica(replica);
+    if(r == null) return null;
+    return r.getState();
+  }
+
+  @Override
   public Replica.State getState(Replica replica) {
     return replica.getState();
   }
@@ -77,4 +88,8 @@ public class DirectShardState implements ShardStateProvider {
     throw new RuntimeException("Not implemented");
   }
 
+  @Override
+  public boolean isExternalState() {
+    return false;
+  }
 }
