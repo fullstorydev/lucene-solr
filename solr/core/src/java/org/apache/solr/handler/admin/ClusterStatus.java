@@ -212,7 +212,7 @@ public class ClusterStatus {
       if(ssp.isExternalState()) {
         Map<String,Object> shards = (Map<String, Object>) collection.get("shards");
         for (Map.Entry<String, Object> e : shards.entrySet()) {
-          e.setValue(overlayShard(name, e.getKey(), (Map<String, Object>) e.getValue(), ssp));
+          e.setValue(overlayShardState(name, e.getKey(), (Map<String, Object>) e.getValue(), ssp));
         }
       }
       return collection;
@@ -223,7 +223,7 @@ public class ClusterStatus {
         if (!shards.containsKey(selectedShard)) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection: " + name + " shard: " + selectedShard + " not found");
         }
-        selected.put(selectedShard,  overlayShard(name, selectedShard, (Map<String, Object>) shards.get(selectedShard), ssp));
+        selected.put(selectedShard,  overlayShardState(name, selectedShard, (Map<String, Object>) shards.get(selectedShard), ssp));
         collection.put("shards", selected);
       }
       return collection;
@@ -231,7 +231,7 @@ public class ClusterStatus {
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> overlayShard(String coll,  String shard, Map<String, Object> shardInfo, ShardStateProvider ssp) {
+  public static Map<String, Object> overlayShardState(String coll, String shard, Map<String, Object> shardInfo, ShardStateProvider ssp) {
     if(ssp.isExternalState()) {
       if (ssp instanceof ShardTermsStateProvider) {
         ShardTermsStateProvider shardTermsStateProvider = (ShardTermsStateProvider) ssp;

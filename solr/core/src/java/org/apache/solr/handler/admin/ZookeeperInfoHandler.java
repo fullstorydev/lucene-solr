@@ -39,6 +39,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.lucene.util.BytesRef;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -685,8 +686,21 @@ public final class ZookeeperInfoHandler extends RequestHandlerBase {
               String childDataStr = null;
               try {
                 byte[] childData = zkClient.getData(collStatePath, null, null, true);
-                if (childData != null)
+                if (childData != null) {
+                  ShardStateProvider ssp = zkController.getZkStateReader().getShardStateProvider(collection);
+                  if(ssp.isExternalState()) {
+                    Map<String,Object> map = (Map<String, Object>) Utils.fromJSON(childData);
+                    Map<String,Object> c = (Map<String, Object>) map.get(collection);
+                    if(c != null) {
+                      Map<String, Object> shards = (Map<String, Object>) c.get("shards");
+                      for (Map.Entry<String, Object> e : shards.entrySet()) {
+                        ClusterStatus.overlayShardState(collection, e.getKey(), (Map<String, Object>) e.getValue(), ssp);
+                      }
+                      childData = Utils.toJSON(map);
+                    }
+                  }
                   childDataStr = (new BytesRef(childData)).utf8ToString();
+                }
               } catch (KeeperException.NoNodeException nne) {
                 log.warn("State for collection {} not found in /clusterstate.json or /collections/{}/state.json!"
                     , collection, collection);
