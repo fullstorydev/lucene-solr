@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
@@ -241,6 +242,11 @@ public class ZkClientClusterStateProvider implements ClusterStateProvider {
     final String zkHostString = zkBuilder.toString();
     log.debug("Final constructed zkHost string: {}", zkHostString);
     return zkHostString;
+  }
+
+  @Override
+  public ShardStateProvider getShardStateProvider(String coll) {
+    return zkStateReader.getShardStateProvider(coll);
   }
 
   @Override
