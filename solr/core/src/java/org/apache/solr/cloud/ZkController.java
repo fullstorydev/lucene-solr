@@ -1621,7 +1621,7 @@ public class ZkController implements Closeable {
         cd.getCloudDescriptor().setLastPublished(state);
       }
       DocCollection coll = zkStateReader.getCollection(collection);
-      if(coll == null || !coll.getExternalState()) {
+      if(forcePublish || coll == null || !coll.getExternalState()) {
         overseerJobQueue.offer(Utils.toJSON(m));
       }
     } finally {
