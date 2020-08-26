@@ -188,6 +188,10 @@ public class SolrClientCloudManager implements SolrCloudManager {
     }
   }
 
+  public ZkStateReader getZkStateReader(){
+    return zkStateReader;
+  }
+
   @Override
   public DistributedQueueFactory getDistributedQueueFactory() {
     return queueFactory;
