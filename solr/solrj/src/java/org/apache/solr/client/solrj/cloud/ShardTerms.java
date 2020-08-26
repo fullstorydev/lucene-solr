@@ -62,7 +62,7 @@ public class ShardTerms implements MapWriter {
     else this.maxTerm = Collections.max(values.values());
     String leader = "#";//while the system is upgrading , we may not have a leader entry
     for (Map.Entry<String, Long> e : values.entrySet()) {
-      if(e.getKey().endsWith(LEADER_TERM_SUFFIX)){
+      if(e.getKey().endsWith(LEADER_TERM_SUFFIX)) {
         leader = e.getKey().substring(0,e.getKey().length() -  LEADER_TERM_SUFFIX.length());
         break;
       }
@@ -93,7 +93,7 @@ public class ShardTerms implements MapWriter {
       if (entry.getKey().endsWith(LEADER_TERM_SUFFIX)) continue;
       newValues.put(entry.getKey(), entry.getValue());
     }
-    newValues.put(leader + LEADER_TERM_SUFFIX, -1L);
+    if(leader != null) newValues.put(leader + LEADER_TERM_SUFFIX, -1L);
     return new ShardTerms(newValues, version);
   }
 
@@ -130,7 +130,10 @@ public class ShardTerms implements MapWriter {
     long leaderTerm = newValues.get(leader);
     for (Map.Entry<String, Long> entry : newValues.entrySet()) {
       String key = entry.getKey();
-      if (key.endsWith(LEADER_TERM_SUFFIX)) continue;
+      if (key.endsWith(LEADER_TERM_SUFFIX)) {
+        newValues.put(key, -1L);
+        continue;
+      }
       if (replicasNeedingRecovery.contains(key)) foundReplicasInLowerTerms = true;
       if (Objects.equals(entry.getValue(), leaderTerm)) {
         if(skipIncreaseTermOf(key, replicasNeedingRecovery)) {
@@ -163,6 +166,10 @@ public class ShardTerms implements MapWriter {
     else {
       HashMap<String, Long> newValues = new HashMap<>(values);
       for (String replica : values.keySet()) {
+        if (replica.endsWith(LEADER_TERM_SUFFIX)) {
+          newValues.put(replica, -1L);
+          continue;
+        }
         newValues.put(replica, 1L);
       }
       return new ShardTerms(newValues, version);
