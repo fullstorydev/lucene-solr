@@ -180,8 +180,10 @@ public class Replica extends ZkNodeProps {
     return nodeName;
   }
 
-  /** Returns the {@link State} of this replica. use {@link org.apache.solr.client.solrj.cloud.ShardStateProvider#getState(Replica)}  instead*/
-
+  /** Returns the {@link State} of this replica.
+   *
+   * use {@link org.apache.solr.client.solrj.cloud.ShardStateProvider#getState(Replica)}  instead*/
+  @Deprecated
   public State getState() {
     return state;
   }

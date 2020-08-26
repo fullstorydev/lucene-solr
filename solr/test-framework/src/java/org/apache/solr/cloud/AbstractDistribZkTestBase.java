@@ -168,11 +168,12 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
           }
           Map<String,Replica> shards = slice.getReplicasMap();
           for (Map.Entry<String,Replica> shard : shards.entrySet()) {
+            Replica replica = shard.getValue();
             if (verbose) System.out.println("replica:" + shard.getValue().getName() + " rstate:"
-                + shard.getValue().getStr(ZkStateReader.STATE_PROP)
+                + ssp.getState(replica)
                 + " live:"
                 + liveNodes.contains(shard.getValue().getNodeName()));
-            final Replica.State state = shard.getValue().getState();
+            final Replica.State state = ssp.getState(replica);
             if ((state == Replica.State.RECOVERING || state == Replica.State.DOWN
                 || state == Replica.State.RECOVERY_FAILED)
                 && liveNodes.contains(shard.getValue().getStr(ZkStateReader.NODE_NAME_PROP))) {
