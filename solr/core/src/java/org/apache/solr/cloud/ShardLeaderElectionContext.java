@@ -23,6 +23,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -368,9 +369,10 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
       ZkStateReader zkStateReader = zkController.getZkStateReader();
       zkStateReader.forceUpdateCollection(collection);
       ClusterState clusterState = zkStateReader.getClusterState();
+      ShardStateProvider ssp = zkStateReader.getShardStateProvider(collection);
       Replica rep = getReplica(clusterState, collection, leaderProps.getStr(ZkStateReader.CORE_NODE_NAME_PROP));
       if (rep == null) return;
-      if (rep.getState() != Replica.State.ACTIVE || core.getCoreDescriptor().getCloudDescriptor().getLastPublished() != Replica.State.ACTIVE) {
+      if (ssp.isActive(rep)  || core.getCoreDescriptor().getCloudDescriptor().getLastPublished() != Replica.State.ACTIVE) {
         log.debug("We have become the leader after core registration but are not in an ACTIVE state - publishing ACTIVE");
         zkController.publish(core.getCoreDescriptor(), Replica.State.ACTIVE);
       }

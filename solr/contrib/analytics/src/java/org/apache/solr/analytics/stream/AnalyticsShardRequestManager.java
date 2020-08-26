@@ -33,6 +33,7 @@ import org.apache.solr.analytics.AnalyticsRequestManager;
 import org.apache.solr.analytics.AnalyticsRequestParser;
 import org.apache.solr.analytics.TimeExceededStubException;
 import org.apache.solr.client.solrj.SolrRequest;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient.Builder;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -105,6 +106,7 @@ public class AnalyticsShardRequestManager {
     try {
 
       ZkStateReader zkStateReader = cloudSolrClient.getZkStateReader();
+      ShardStateProvider ssp = zkStateReader.getShardStateProvider(collection);
       ClusterState clusterState = zkStateReader.getClusterState();
       Set<String> liveNodes = clusterState.getLiveNodes();
 
@@ -114,7 +116,7 @@ public class AnalyticsShardRequestManager {
         Collection<Replica> replicas = slice.getReplicas();
         List<Replica> shuffler = new ArrayList<>();
         for(Replica replica : replicas) {
-          if(replica.getState() == Replica.State.ACTIVE && liveNodes.contains(replica.getNodeName()))
+          if(ssp.getState(replica) == Replica.State.ACTIVE && liveNodes.contains(replica.getNodeName()))
           shuffler.add(replica);
         }
 

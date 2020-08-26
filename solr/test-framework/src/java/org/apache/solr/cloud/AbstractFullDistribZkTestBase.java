@@ -2135,6 +2135,7 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     long maxWaitMs = maxWaitSecs * 1000L;
     Replica leader = null;
     ZkShardTerms zkShardTerms = new ZkShardTerms(testCollectionName, shardId, cloudClient.getZkStateReader().getZkClient());
+    ShardStateProvider ssp = zkr.getShardStateProvider(testCollectionName);
     while (waitMs < maxWaitMs && !allReplicasUp) {
       cs = cloudClient.getZkStateReader().getClusterState();
       assertNotNull(cs);
@@ -2156,9 +2157,9 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
       // ensure all replicas are "active" and identify the non-leader replica
       for (Replica replica : replicas) {
         if (!zkShardTerms.canBecomeLeader(replica.getName()) ||
-            replica.getState() != Replica.State.ACTIVE) {
+            ssp.getState( replica) != Replica.State.ACTIVE) {
           if (log.isInfoEnabled()) {
-            log.info("Replica {} is currently {}", replica.getName(), replica.getState());
+            log.info("Replica {} is currently {}", replica.getName(), ssp.getState(replica));
           }
           allReplicasUp = false;
         }
@@ -2253,10 +2254,11 @@ public abstract class AbstractFullDistribZkTestBase extends AbstractDistribZkTes
     StringBuilder builder = new StringBuilder();
     zkStateReader.forceUpdateCollection(collectionName);
     DocCollection collection = zkStateReader.getClusterState().getCollection(collectionName);
+    ShardStateProvider ssp = zkStateReader.getShardStateProvider(collectionName);
     for(Slice s:collection.getSlices()) {
-      Replica leader = s.getLeader();
+      Replica leader = ssp.getLeader(s);
       for (Replica r:s.getReplicas()) {
-        if (!r.isActive(zkStateReader.getClusterState().getLiveNodes())) {
+        if (!ssp.isActive(r)) {
           builder.append(String.format(Locale.ROOT, "Replica %s not in liveNodes or is not active%s", r.getName(), System.lineSeparator()));
           continue;
         }

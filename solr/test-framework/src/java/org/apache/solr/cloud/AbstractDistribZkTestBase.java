@@ -248,7 +248,7 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
 
       Slice slice = docCollection.getSlice(shardName);
       Replica leader = sp.getLeader(slice);
-      if (slice != null && leader != null && !leader.equals(oldLeader) && leader.getState() == Replica.State.ACTIVE) {
+      if (slice != null && leader != null && !leader.equals(oldLeader) && ssp.getState(leader) == Replica.State.ACTIVE) {
         if (log.isInfoEnabled()) {
           log.info("Old leader {}, new leader {}. New leader got elected in {} ms"
               , oldLeader, leader, timeOut.timeElapsed(MILLISECONDS));
@@ -265,12 +265,13 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
     reader.waitForState(collection, 15000, TimeUnit.MILLISECONDS,
         (collectionState, ssp) -> collectionState != null && collectionState.getSlice(shard) != null
             && collectionState.getSlice(shard).getReplicasMap().get(coreNodeName) != null
-            && collectionState.getSlice(shard).getReplicasMap().get(coreNodeName).getState() == expectedState);
+            && ssp.getState(collectionState.getSlice(shard).getReplicasMap().get(coreNodeName))== expectedState);
   }
 
   protected static void assertAllActive(String collection, ZkStateReader zkStateReader)
       throws KeeperException, InterruptedException {
 
+    ShardStateProvider ssp = zkStateReader.getShardStateProvider(collection);
     zkStateReader.forceUpdateCollection(collection);
     ClusterState clusterState = zkStateReader.getClusterState();
     final DocCollection docCollection = clusterState.getCollectionOrNull(collection);
@@ -287,8 +288,8 @@ public abstract class AbstractDistribZkTestBase extends BaseDistributedSearchTes
       Map<String,Replica> shards = slice.getReplicasMap();
       for (Map.Entry<String,Replica> shard : shards.entrySet()) {
         Replica replica = shard.getValue();
-        if (replica.getState() != Replica.State.ACTIVE) {
-          fail("Not all replicas are ACTIVE - found a replica " + replica.getName() + " that is: " + replica.getState());
+        if (!ssp.isActive(replica)) {
+          fail("Not all replicas are ACTIVE - found a replica " + replica.getName() + " that is: " + ssp.getState(replica));
         }
       }
     }

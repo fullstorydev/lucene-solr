@@ -124,7 +124,7 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     cluster.getSolrClient().commit(collectionName);
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "shard1", cluster.getZkClient())) {
-      assertEquals(1, zkShardTerms.getTerms().size());
+      assertEquals(2, zkShardTerms.getTerms().size());
       assertEquals(1L, zkShardTerms.getHighestTerm());
     }
 
@@ -151,7 +151,7 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "shard1", cluster.getZkClient())) {
       Replica newLeader = ssp.getLeader(getCollectionState(collectionName).getSlice("shard1"));
-      assertEquals(2, zkShardTerms.getTerms().size()); // two for the replicas, one extra for the leader
+      assertEquals(3, zkShardTerms.getTerms().size()); // two for the replicas, one extra for the leader
       assertEquals(1L, zkShardTerms.getTerm(newLeader.getName()));
     }
 
@@ -209,7 +209,7 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     addDoc(collectionName, 3, cluster.getJettySolrRunner(0));
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "shard1", cluster.getZkClient())) {
-      assertEquals(3, zkShardTerms.getTerms().size()); // three terms for replicas, one more for leader
+      assertEquals(4, zkShardTerms.getTerms().size()); // three terms for replicas, one more for leader
       assertEquals(zkShardTerms.getHighestTerm(), zkShardTerms.getTerm(leader.getName()));
       assertEquals(zkShardTerms.getHighestTerm(), zkShardTerms.getTerm(replica2.getName()));
       assertTrue(zkShardTerms.getHighestTerm() > zkShardTerms.getTerm(replica1.getName()));
@@ -219,7 +219,7 @@ public class LeaderVoteWaitTimeoutTest extends SolrCloudTestCase {
     addDoc(collectionName, 4, cluster.getJettySolrRunner(0));
 
     try (ZkShardTerms zkShardTerms = new ZkShardTerms(collectionName, "shard1", cluster.getZkClient())) {
-      assertEquals(3, zkShardTerms.getTerms().size());
+      assertEquals(4, zkShardTerms.getTerms().size());
       assertEquals(zkShardTerms.getHighestTerm(), zkShardTerms.getTerm(leader.getName()));
       assertTrue(zkShardTerms.getHighestTerm() > zkShardTerms.getTerm(replica2.getName()));
       assertTrue(zkShardTerms.getHighestTerm() > zkShardTerms.getTerm(replica1.getName()));
