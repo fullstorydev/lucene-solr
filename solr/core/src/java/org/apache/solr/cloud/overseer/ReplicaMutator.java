@@ -32,7 +32,6 @@ import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
-import org.apache.solr.client.solrj.impl.SolrClientCloudManager;
 import org.apache.solr.cloud.CloudUtil;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.Assign;
@@ -385,20 +384,15 @@ public class ReplicaMutator {
     if (slice.getState() == Slice.State.RECOVERY) {
       log.info("Shard: {} is in recovery state", sliceName);
       // is this replica active?
-      ShardStateProvider ssp = null;
-      if (cloudManager instanceof SolrClientCloudManager) {
-        SolrClientCloudManager manager = (SolrClientCloudManager) cloudManager;
-        ssp = manager.getZkStateReader().getShardStateProvider(collection.getName());
-      }
-
-      Replica.State state = ssp== null  ? replica.getState() : ssp.getState(replica);//nocommit
+      ShardStateProvider ssp = cloudManager.getShardStateProvider(collection.getName());
+      Replica.State state = ssp.getState(replica);
       if (state == Replica.State.ACTIVE) {
         log.info("Shard: {} is in recovery state and coreNodeName: {} is active", sliceName, coreNodeName);
         // are all other replicas also active?
         boolean allActive = true;
         for (Map.Entry<String, Replica> entry : slice.getReplicasMap().entrySet()) {
           Replica r = entry.getValue();
-          Replica.State st = ssp == null? r.getState(): ssp.getState(r);//nocommit
+          Replica.State st = ssp.getState(r);
           if (coreNodeName.equals(entry.getKey())) continue;
           if (st != Replica.State.ACTIVE) {
             allActive = false;
@@ -425,7 +419,7 @@ public class ReplicaMutator {
                 // this is a fellow sub shard so check if all replicas are active
                 for (Map.Entry<String, Replica> sliceEntry : otherSlice.getReplicasMap().entrySet()) {
                   Replica r = sliceEntry.getValue();
-                  Replica.State st = ssp == null? r.getState(): ssp.getState(r);//nocommit
+                  Replica.State st = ssp.getState(r);
                   if (st != Replica.State.ACTIVE) {
                     allActive = false;
                     break outer;

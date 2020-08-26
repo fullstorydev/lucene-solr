@@ -19,11 +19,15 @@ package org.apache.solr.client.solrj.cloud;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
 import org.apache.solr.common.SolrCloseable;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.util.ObjectCache;
 import org.apache.solr.common.util.TimeSource;
 
@@ -37,6 +41,17 @@ public interface SolrCloudManager extends SolrCloseable {
   ClusterStateProvider getClusterStateProvider();
 
   NodeStateProvider getNodeStateProvider();
+
+  default ShardStateProvider getShardStateProvider(String coll){
+    return new DirectShardState(s -> getClusterStateProvider().getLiveNodes().contains(s),
+        s -> {
+      try {
+        return getClusterStateProvider().getCollection(s);
+      } catch (IOException e) {
+        throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, "Unable to fetch collection", e);
+      }
+    });
+  }
 
   DistribStateManager getDistribStateManager();
 

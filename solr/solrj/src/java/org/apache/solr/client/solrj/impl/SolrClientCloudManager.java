@@ -40,6 +40,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.DistributedQueueFactory;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
+import org.apache.solr.client.solrj.cloud.ShardStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -188,8 +189,9 @@ public class SolrClientCloudManager implements SolrCloudManager {
     }
   }
 
-  public ZkStateReader getZkStateReader(){
-    return zkStateReader;
+  @Override
+  public ShardStateProvider getShardStateProvider(String coll) {
+    return zkStateReader.getShardStateProvider(coll);
   }
 
   @Override
