@@ -27,6 +27,7 @@ import java.util.List;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.CompositeIdRouter;
@@ -154,6 +155,7 @@ public class SplitByPrefixTest extends SolrCloudTestCase {
 
     CollectionAdminRequest
         .createCollection(COLLECTION_NAME, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setMaxShardsPerNode(100)
         .process(cluster.getSolrClient());
 

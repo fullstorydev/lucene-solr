@@ -51,6 +51,7 @@ public class SimpleCollectionCreateDeleteTest extends AbstractFullDistribZkTestB
     }
     String collectionName = "SimpleCollectionCreateDeleteTest";
     CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collectionName,1,1)
+            .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
             .setCreateNodeSet(overseerNode)
             .setStateFormat(2);
 
@@ -93,6 +94,7 @@ public class SimpleCollectionCreateDeleteTest extends AbstractFullDistribZkTestB
 
       // create collection again on a node other than the overseer leader
       create = CollectionAdminRequest.createCollection(collectionName,1,1)
+              .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
               .setCreateNodeSet(notOverseerNode)
               .setStateFormat(2);
       request = create.process(cloudClient).getResponse();

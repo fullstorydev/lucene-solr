@@ -111,6 +111,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
   public void testCreateWithDefaultConfigSet() throws Exception {
     String collectionName = "solrj_default_configset";
     CollectionAdminResponse response = CollectionAdminRequest.createCollection(collectionName, 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -420,6 +421,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 
     final String collection = "aliasedCollection";
     CollectionAdminRequest.createCollection(collection, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     CollectionAdminResponse response
@@ -435,6 +437,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 
     final String collectionName = "solrj_test_splitshard";
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     cluster.waitForActiveCollection(collectionName, 2, 2);
@@ -491,6 +494,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     CollectionAdminResponse response = CollectionAdminRequest.createCollection(collectionName, "conf", 1, 1)
         .withProperty(CoreAdminParams.DATA_DIR, dataDir.toString())
         .withProperty(CoreAdminParams.ULOG_DIR, ulogDir.toString())
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     assertEquals(0, response.getStatus());
@@ -515,6 +519,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 
     final String collectionName = "solrj_replicatests";
     CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 1, 2);
@@ -585,6 +590,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     final String propName = "testProperty";
 
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -616,6 +622,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
   public void testColStatus() throws Exception {
     final String collectionName = "collectionStatusTest";
     CollectionAdminRequest.createCollection(collectionName, "conf2", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -688,6 +695,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     CloudSolrClient solrClient = cluster.getSolrClient();
 
     CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(solrClient);
 
     solrClient.setDefaultCollection(collectionName);
@@ -831,9 +839,11 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     String collectionName1 = "testRename1_" + followAliases;
     String collectionName2 = "testRename2_" + followAliases;
     CollectionAdminRequest.createCollection(collectionName1, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setAlias("col1")
         .process(cluster.getSolrClient());
     CollectionAdminRequest.createCollection(collectionName2, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setAlias("col2")
         .process(cluster.getSolrClient());
 
@@ -918,8 +928,12 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     CloudSolrClient solrClient = cluster.getSolrClient();
     String collectionName1 = "aliasedCollection1";
     String collectionName2 = "aliasedCollection2";
-    CollectionAdminRequest.createCollection(collectionName1, "conf", 1, 1).process(solrClient);
-    CollectionAdminRequest.createCollection(collectionName2, "conf", 1, 1).process(solrClient);
+    CollectionAdminRequest.createCollection(collectionName1, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(solrClient);
+    CollectionAdminRequest.createCollection(collectionName2, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(solrClient);
 
     cluster.waitForActiveCollection(collectionName1, 1, 1);
     cluster.waitForActiveCollection(collectionName2, 1, 1);
@@ -1021,6 +1035,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 
     final String collection = "replicaProperties";
     CollectionAdminRequest.createCollection(collection, "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collection, 2, 4);
@@ -1050,6 +1065,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 
     final String collection = "balancedProperties";
     CollectionAdminRequest.createCollection(collection, "conf", 2, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     
    cluster.waitForActiveCollection(collection, 2, 4);
@@ -1077,6 +1093,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
   public void testModifyCollectionAttribute() throws IOException, SolrServerException {
     final String collection = "testAddAndDeleteCollectionAttribute";
     CollectionAdminRequest.createCollection(collection, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collection, 1, 1);

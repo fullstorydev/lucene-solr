@@ -68,6 +68,7 @@ public class DeleteNodeTest extends SolrCloudTestCase {
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 1, 0, 0),
         CollectionAdminRequest.createCollection(coll, "conf1", 5, 0, 1, 0)
         );
+    create.setExternalState(AbstractFullDistribZkTestBase.useExternalState);
     create.setCreateNodeSet(StrUtils.join(l, ',')).setMaxShardsPerNode(3);
     cloudClient.request(create);
     state = cloudClient.getZkStateReader().getClusterState();

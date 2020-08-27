@@ -22,6 +22,7 @@ import org.apache.lucene.util.TestUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
@@ -64,6 +65,7 @@ public class CustomCollectionTest extends SolrCloudTestCase {
     int maxShardsPerNode = (((numShards + 1) * replicationFactor) / NODE_COUNT) + 1;
 
     CollectionAdminRequest.createCollectionWithImplicitRouter(collection, "conf", "a,b,c", replicationFactor)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setMaxShardsPerNode(maxShardsPerNode)
         .process(cluster.getSolrClient());
 
@@ -132,6 +134,7 @@ public class CustomCollectionTest extends SolrCloudTestCase {
     final String collection = "withShardField";
 
     CollectionAdminRequest.createCollectionWithImplicitRouter(collection, "conf", "a,b,c,d", replicationFactor)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setMaxShardsPerNode(maxShardsPerNode)
         .setRouterField(shard_fld)
         .process(cluster.getSolrClient());
@@ -158,6 +161,7 @@ public class CustomCollectionTest extends SolrCloudTestCase {
     String shard_fld = "shard_s";
 
     CollectionAdminRequest.createCollection(collectionName, "conf", numShards, replicationFactor)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setMaxShardsPerNode(maxShardsPerNode)
         .setRouterField(shard_fld)
         .process(cluster.getSolrClient());
@@ -189,6 +193,7 @@ public class CustomCollectionTest extends SolrCloudTestCase {
   public void testCreateShardRepFactor() throws Exception  {
     final String collectionName = "testCreateShardRepFactor";
     CollectionAdminRequest.createCollectionWithImplicitRouter(collectionName, "conf", "a,b", 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     CollectionAdminRequest.createShard(collectionName, "x")

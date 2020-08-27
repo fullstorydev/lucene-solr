@@ -95,6 +95,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
     final String collectionName = "delLiveColl";
 
     Create req = CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2);
+    req.setExternalState(AbstractFullDistribZkTestBase.useExternalState);
     req.process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -151,7 +152,9 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   public void deleteReplicaAndVerifyDirectoryCleanup() throws Exception {
 
     final String collectionName = "deletereplica_test";
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(cluster.getSolrClient());
 
     Replica leader = cluster.getSolrClient().getZkStateReader().getShardStateProvider(collectionName). getLeader(collectionName, "shard1", -1);
 
@@ -177,7 +180,9 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
 
     final String collectionName = "deleteByCount";
 
-    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 3).process(cluster.getSolrClient());
+    CollectionAdminRequest.createCollection(collectionName, "conf", 1, 3)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+        .process(cluster.getSolrClient());
     waitForState("Expected a single shard with three replicas", collectionName, clusterShape(1, 3));
 
     CollectionAdminRequest.deleteReplicasFromShard(collectionName, "shard1", 2).process(cluster.getSolrClient());
@@ -200,6 +205,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
 
     final String collectionName = "deleteByCountNew";
     Create req = CollectionAdminRequest.createCollection(collectionName, "conf", 2, 2);
+    req.setExternalState(AbstractFullDistribZkTestBase.useExternalState);
     req.process(cluster.getSolrClient());
     
     cluster.waitForActiveCollection(collectionName, 2, 4);
@@ -443,6 +449,7 @@ public class DeleteReplicaTest extends SolrCloudTestCase {
   public void deleteReplicaOnIndexing() throws Exception {
     final String collectionName = "deleteReplicaOnIndexing";
     CollectionAdminRequest.createCollection(collectionName, "conf", 1, 2)
+        .setExternalState(true)
         .process(cluster.getSolrClient());
     waitForState("", collectionName, clusterShape(1, 2));
     AtomicBoolean closed = new AtomicBoolean(false);

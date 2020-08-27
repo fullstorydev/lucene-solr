@@ -24,7 +24,9 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.RequestStatusState;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.BasicDistributedZkTest;
+import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -52,6 +54,7 @@ public class TestRequestStatusCollectionAPI extends BasicDistributedZkTest {
     params.set("maxShardsPerNode", 100);
     params.set("collection.configName", "conf1");
     params.set(CommonAdminParams.ASYNC, "1000");
+    if(AbstractFullDistribZkTestBase.useExternalState) params.set(DocCollection.EXT_STATE, "true");
     try {
       sendRequest(params);
     } catch (SolrServerException | IOException e) {

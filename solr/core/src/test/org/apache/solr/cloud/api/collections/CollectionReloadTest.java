@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -52,6 +53,7 @@ public class CollectionReloadTest extends SolrCloudTestCase {
 
     final String testCollectionName = "c8n_1x1";
     CollectionAdminRequest.createCollection(testCollectionName, "conf", 1, 1)
+        .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .process(cluster.getSolrClient());
 
     ZkStateReader zkStateReader = cluster.getSolrClient().getZkStateReader();

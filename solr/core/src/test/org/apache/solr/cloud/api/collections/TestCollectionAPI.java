@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.Lists;
 import org.apache.solr.client.solrj.impl.BaseHttpSolrClient.RemoteSolrException;
+import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.cloud.ZkTestServer;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -72,11 +73,17 @@ public class TestCollectionAPI extends ReplicaPropertiesBase {
       } else {
         req = CollectionAdminRequest.createCollection(COLLECTION_NAME, "conf1",2, 1, 0, 1);
       }
+      req.setExternalState(AbstractFullDistribZkTestBase.useExternalState);
       req.setMaxShardsPerNode(2);
       setV2(req);
       client.request(req);
       assertV2CallsCount();
-      createCollection(null, COLLECTION_NAME1, 1, 1, 1, client, null, "conf1");
+      req = CollectionAdminRequest.createCollection(COLLECTION_NAME1,
+          "conf1",
+          2, 1);
+      req.setExternalState(AbstractFullDistribZkTestBase.useExternalState);
+      client.request(req);
+//      createCollection(null, COLLECTION_NAME1, 1, 1, 1, client, null, "conf1");
     }
 
     waitForCollection(cloudClient.getZkStateReader(), COLLECTION_NAME, 2);
@@ -201,6 +208,7 @@ public class TestCollectionAPI extends ReplicaPropertiesBase {
       //Test that you can't specify both replicationFactor and nrtReplicas
       ModifiableSolrParams params = new ModifiableSolrParams();
       params.set("action", CollectionParams.CollectionAction.CREATE.toString());
+      if(AbstractFullDistribZkTestBase.useExternalState) params.set(DocCollection.EXT_STATE, "true");
       params.set("name", "test_repFactorColl");
       params.set("numShards", "1");
       params.set("replicationFactor", "1");
@@ -1131,7 +1139,9 @@ public class TestCollectionAPI extends ReplicaPropertiesBase {
       assertNotSame(0, rse.code());
 
       CollectionAdminResponse rsp = CollectionAdminRequest.createCollection
-          ("testcollection", "conf1", 1, 2).process(client);
+          ("testcollection", "conf1", 1, 2)
+          .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
+          .process(client);
       assertNull(rsp.getErrorMessages());
       assertSame(0, rsp.getStatus());
     }
