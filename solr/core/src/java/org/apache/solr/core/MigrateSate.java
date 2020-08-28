@@ -17,7 +17,6 @@
 
 package org.apache.solr.core;
 
-import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.api.EndPoint;
