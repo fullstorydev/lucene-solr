@@ -51,9 +51,12 @@ import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.client.solrj.request.CoreStatus;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
+import org.apache.solr.client.solrj.request.V2Request;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.apache.solr.client.solrj.response.CoreAdminResponse;
+import org.apache.solr.client.solrj.response.V2Response;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
+import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
@@ -69,6 +72,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.MigrateSate;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrInfoBean.Category;
 import org.apache.solr.util.TestInjection;
@@ -79,6 +83,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.solr.client.solrj.SolrRequest.METHOD.POST;
 import static org.apache.solr.common.cloud.ZkStateReader.CORE_NAME_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.REPLICATION_FACTOR;
 
@@ -108,7 +113,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         .withSolrXml(TEST_PATH().resolve("solr.xml"))
         .configure();
   }
-  
+
   @After
   public void tearDownCluster() throws Exception {
     try {
@@ -118,6 +123,32 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
       System.clearProperty("solr.allowPaths");
       super.tearDown();
     }
+  }
+
+  public void testMigrateCollectionCommmand() throws Exception {
+    String collectionName = "toMigrate";
+    CollectionAdminRequest.createCollection(collectionName, "conf", 2, 1)
+        .process(cluster.getSolrClient());
+    MigrateSate.MigrateInfo info = new MigrateSate.MigrateInfo();
+    info.collection = collectionName;
+    info.isUpgrade = true;
+    V2Request req = new V2Request.Builder("/cluster/state-migrate")
+        .forceV2(true)
+        .withMethod(POST)
+        .withPayload(info)
+        .build();
+    req.process(cluster.getSolrClient());
+
+    DocCollection coll = cluster.getSolrClient().getClusterStateProvider().getCollection(collectionName);
+
+    assertTrue(coll.getExternalState());
+
+
+    info.isUpgrade = false;
+    req.process(cluster.getSolrClient());
+    coll = cluster.getSolrClient().getClusterStateProvider().getCollection(collectionName);
+    assertFalse(coll.getExternalState());
+
   }
 
   @Test
@@ -229,7 +260,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
   @Test
   public void testTooManyReplicas() {
-    @SuppressWarnings({"rawtypes"})
+    @SuppressWarnings({"rawtypes" })
     CollectionAdminRequest req = CollectionAdminRequest
         .createCollection("collection", "conf", 2, 10)
         .setExternalState(AbstractFullDistribZkTestBase.useExternalState);
@@ -247,8 +278,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     params.set(REPLICATION_FACTOR, 10);
     params.set("collection.configName", "conf");
 
-    @SuppressWarnings({"rawtypes"})
-    final SolrRequest request = new QueryRequest(params);
+    @SuppressWarnings({"rawtypes" }) final SolrRequest request = new QueryRequest(params);
     request.setPath("/admin/collections");
 
     expectThrows(Exception.class, () -> {
@@ -265,8 +295,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     params.set("numShards", 0);
     params.set("collection.configName", "conf");
 
-    @SuppressWarnings({"rawtypes"})
-    final SolrRequest request = new QueryRequest(params);
+    @SuppressWarnings({"rawtypes" }) final SolrRequest request = new QueryRequest(params);
     request.setPath("/admin/collections");
     expectThrows(Exception.class, () -> {
       cluster.getSolrClient().request(request);
@@ -284,7 +313,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         .setCoreName("halfcollection_shard1_replica_n1")
         .process(cluster.getSolrClient()).isSuccess());
 
-    assertEquals(0, CollectionAdminRequest.createCollection("halfcollectionblocker2", "conf",1, 1)
+    assertEquals(0, CollectionAdminRequest.createCollection("halfcollectionblocker2", "conf", 1, 1)
         .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
         .setCreateNodeSet("")
         .process(cluster.getSolrClient()).getStatus());
@@ -367,7 +396,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
   @Test
   public void testMaxNodesPerShard() {
     int numLiveNodes = cluster.getJettySolrRunners().size();
-    int numShards = (numLiveNodes/2) + 1;
+    int numShards = (numLiveNodes / 2) + 1;
     int replicationFactor = 2;
 
     expectThrows(SolrException.class, () -> {
@@ -412,13 +441,13 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     // create new collections rapid fire
     int cnt = random().nextInt(TEST_NIGHTLY ? 3 : 1) + 1;
     CollectionAdminRequest.Create[] createRequests = new CollectionAdminRequest.Create[cnt];
-    
+
     class Coll {
       String name;
       int numShards;
       int replicationFactor;
     }
-    
+
     List<Coll> colls = new ArrayList<>();
 
     for (int i = 0; i < cnt; i++) {
@@ -432,7 +461,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
           .setExternalState(AbstractFullDistribZkTestBase.useExternalState)
           .setMaxShardsPerNode(maxShardsPerNode);
       createRequests[i].processAsync(cluster.getSolrClient());
-      
+
       Coll coll = new Coll();
       coll.name = "awhollynewcollection_" + i;
       coll.numShards = numShards;
@@ -449,12 +478,12 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     for (int i = 0; i < cluster.getJettySolrRunners().size(); i++) {
       checkInstanceDirs(cluster.getJettySolrRunner(i));
     }
-    
+
     String collectionName = createRequests[random().nextInt(createRequests.length)].getCollectionName();
-    
+
     // TODO: we should not need this...beast test well when trying to fix
     Thread.sleep(1000);
-    
+
     cluster.getSolrClient().getZkStateReader().forciblyRefreshAllClusterStateSlow();
 
     new UpdateRequest()
@@ -473,7 +502,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
 
       Thread.sleep(500);
     }
-    
+
     if (timeOut.hasTimedOut()) {
       fail("Timeout waiting to see 3 found, instead saw " + numFound + " for collection " + collectionName);
     }
@@ -490,11 +519,11 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
             CollectionAdminRequest.Create req = createRequests[j];
             return DocCollection.isFullyActive(ssp, c, req.getNumShards(), req.getReplicationFactor());
           });
-      
+
       ZkStateReader zkStateReader = cluster.getSolrClient().getZkStateReader();
       // make sure we have leaders for each shard
       for (int z = 1; z < createRequests[j].getNumShards(); z++) {
-        zkStateReader. getShardStateProvider(collectionName).getLeader(collectionName, "shard" + z, 10000);
+        zkStateReader.getShardStateProvider(collectionName).getLeader(collectionName, "shard" + z, 10000);
       }      // make sure we again have leaders for each shard
     }
   }
@@ -532,17 +561,17 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     }
   }
 
-  private boolean waitForReloads(String collectionName, Map<String,Long> urlToTimeBefore) throws SolrServerException, IOException {
+  private boolean waitForReloads(String collectionName, Map<String, Long> urlToTimeBefore) throws SolrServerException, IOException {
     TimeOut timeout = new TimeOut(45, TimeUnit.SECONDS, TimeSource.NANO_TIME);
 
     boolean allTimesAreCorrect = false;
-    while (! timeout.hasTimedOut()) {
-      Map<String,Long> urlToTimeAfter = new HashMap<>();
+    while (!timeout.hasTimedOut()) {
+      Map<String, Long> urlToTimeAfter = new HashMap<>();
       collectStartTimes(collectionName, urlToTimeAfter);
-      
+
       boolean retry = false;
-      Set<Entry<String,Long>> entries = urlToTimeBefore.entrySet();
-      for (Entry<String,Long> entry : entries) {
+      Set<Entry<String, Long>> entries = urlToTimeBefore.entrySet();
+      for (Entry<String, Long> entry : entries) {
         Long beforeTime = entry.getValue();
         Long afterTime = urlToTimeAfter.get(entry.getKey());
         assertNotNull(afterTime);
@@ -560,7 +589,7 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
     return allTimesAreCorrect;
   }
 
-  private void collectStartTimes(String collectionName, Map<String,Long> urlToTime)
+  private void collectStartTimes(String collectionName, Map<String, Long> urlToTime)
       throws SolrServerException, IOException {
 
     DocCollection collectionState = getCollectionState(collectionName);
@@ -580,10 +609,10 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
       throw new IllegalArgumentException("Could not find collection " + collectionName);
     }
   }
-  
+
   private void checkNoTwoShardsUseTheSameIndexDir() {
     Map<String, Set<String>> indexDirToShardNamesMap = new HashMap<>();
-    
+
     List<MBeanServer> servers = new LinkedList<>();
     servers.add(ManagementFactory.getPlatformMBeanServer());
     servers.addAll(MBeanServerFactory.findMBeanServer(null));
@@ -609,12 +638,12 @@ public class CollectionsAPIDistributedZkTest extends SolrCloudTestCase {
         }
       }
     }
-    
+
     assertTrue(
         "Something is broken in the assert for no shards using the same indexDir - probably something was changed in the attributes published in the MBean of "
             + SolrCore.class.getSimpleName() + " : " + indexDirToShardNamesMap,
         indexDirToShardNamesMap.size() > 0);
-    for (Entry<String,Set<String>> entry : indexDirToShardNamesMap.entrySet()) {
+    for (Entry<String, Set<String>> entry : indexDirToShardNamesMap.entrySet()) {
       if (entry.getValue().size() > 1) {
         fail("We have shards using the same indexDir. E.g. shards "
             + entry.getValue().toString() + " all use indexDir "

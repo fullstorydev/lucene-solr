@@ -891,6 +891,7 @@ public class CoreContainer {
       autoScalingHandler = new AutoScalingHandler(getZkController().getSolrCloudManager(), loader);
       containerHandlers.put(AutoScalingHandler.HANDLER_PATH, autoScalingHandler);
       autoScalingHandler.initializeMetrics(solrMetricsContext, AutoScalingHandler.HANDLER_PATH);
+      containerHandlers.getApiBag().registerObject(new MigrateSate(this));
     }
     // This is a bit redundant but these are two distinct concepts for all they're accomplished at the same time.
     status |= LOAD_COMPLETE | INITIAL_CORE_LOAD_COMPLETE;
