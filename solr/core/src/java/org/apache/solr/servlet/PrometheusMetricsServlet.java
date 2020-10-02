@@ -16,21 +16,32 @@
  */
 package org.apache.solr.servlet;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.management.UnixOperatingSystemMXBean;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponseWrapper;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.lang.invoke.MethodHandles;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
@@ -41,6 +52,7 @@ import java.util.function.Supplier;
  */
 public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private enum PromType {
     counter,
@@ -64,13 +76,20 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     response.setContentType("application/json");
     PrintWriter pw = new PrintWriter(out);
     writeStats(pw, (CoreContainer) request.getAttribute(CoreContainer.class.getName()));
+
+    try {
+      scrapeMetricsApi(request, response, "&group=solr.jvm&prefix=", null);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
   }
 
   static void writeStats(PrintWriter writer, CoreContainer coreContainer) {
     // GC stats
     for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
       writeProm(writer, "collection_count_" + gcBean.getName(), PromType.counter, "the number of GC invocations for " + gcBean.getName(), gcBean.getCollectionCount());
-      writeProm(writer, "colleciton_time_" + gcBean.getName(), PromType.counter, "the total number of milliseconds of time spent in gc for " + gcBean.getName(), gcBean.getCollectionTime());
+      writeProm(writer, "collection_time_" + gcBean.getName(), PromType.counter, "the total number of milliseconds of time spent in gc for " + gcBean.getName(), gcBean.getCollectionTime());
     }
 
     // Write heap memory stats
@@ -118,4 +137,73 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     }
   }
   public static final String SHARED_CACHE_METRIC_NAME =  "fs-shared-caches";
+
+  static class PromEntry {
+
+    private final String name;
+    private final PromType type;
+    private final String description;
+    private final Number value;
+
+    public PromEntry(String name, PromType type, String description, Number value) {
+      this.name = name;
+      this.type = type;
+      this.description = description;
+      this.value = value;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public PromType getType() {
+      return type;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+
+    public Number getValue() {
+      return value;
+    }
+  }
+
+  @FunctionalInterface
+  static interface ScrapeResponseHandler {
+    void handle(List<PromEntry> result, JsonNode metrics) throws Exception;
+  }
+
+  void scrapeMetricsApi(HttpServletRequest oldRequest, HttpServletResponse oldResponse, String queryString, ScrapeResponseHandler handler) throws Exception {
+    final RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/metrics?wt=json&compact=true&indent=false" + queryString);
+    if (dispatcher == null) {
+      throw new IllegalStateException("/admin/metrics does not have a dispatcher");
+    }
+    final ByteArrayOutputStream output = new ByteArrayOutputStream();
+    final HttpServletResponse newResponse = new HttpServletResponseWrapper(oldResponse) {
+      @Override
+      public ServletOutputStream getOutputStream() throws IOException {
+        return new ServletOutputStream() {
+
+          @Override
+          public void write(int b) throws IOException {
+            output.write(b);
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+
+          @Override
+          public void setWriteListener(WriteListener writeListener) {
+
+          }
+        };
+      }
+    };
+    dispatcher.include(oldRequest, newResponse);
+    String json = output.toString(StandardCharsets.UTF_8.name());
+    json.hashCode();
+  }
 }
