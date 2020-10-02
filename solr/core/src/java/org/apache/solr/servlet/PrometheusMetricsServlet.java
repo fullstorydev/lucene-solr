@@ -78,7 +78,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     writeStats(pw, (CoreContainer) request.getAttribute(CoreContainer.class.getName()));
 
     try {
-      scrapeMetricsApi(request, response, "&group=solr.jvm&prefix=", null);
+      scrapeMetricsApi(request, response, "&group=solr.jvm&prefix=memory.pools", null);
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -175,7 +175,8 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
 
   void scrapeMetricsApi(HttpServletRequest oldRequest, HttpServletResponse oldResponse, String queryString, ScrapeResponseHandler handler) throws Exception {
-    final RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/metrics?wt=json&compact=true&indent=false" + queryString);
+    // final RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/metrics?wt=json&compact=true&indent=false" + queryString);
+    final RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/metrics");
     if (dispatcher == null) {
       throw new IllegalStateException("/admin/metrics does not have a dispatcher");
     }
