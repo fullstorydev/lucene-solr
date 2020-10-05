@@ -199,8 +199,6 @@ public class HttpSolrCall {
     return path;
   }
 
-  public SolrDispatchFilter getSolrDispatchFilter() { return solrDispatchFilter; }
-
   public HttpServletRequest getReq() {
     return req;
   }

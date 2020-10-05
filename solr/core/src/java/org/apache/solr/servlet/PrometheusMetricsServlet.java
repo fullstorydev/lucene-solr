@@ -17,7 +17,9 @@
 package org.apache.solr.servlet;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.management.UnixOperatingSystemMXBean;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
@@ -31,6 +33,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
@@ -45,11 +48,15 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
@@ -200,50 +207,234 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
   void scrapeMetricsApi(HttpServletRequest oldRequest, HttpServletResponse oldResponse, String queryString, ScrapeResponseHandler handler) throws Exception {
     HttpSolrCall oldCall = (HttpSolrCall) oldRequest.getAttribute(HttpSolrCall.class.getName());
-    SolrDispatchFilter filter = oldCall.getSolrDispatchFilter();
+    SolrDispatchFilter filter = oldCall.solrDispatchFilter;
     CoreContainer cores = filter.getCores();
-    final HttpServletRequest newRequest = new HttpServletRequestWrapper(oldRequest) {
-
-      @Override
-      public String getServletPath() {
-        return CommonParams.METRICS_PATH;
-      }
-
-      @Override
-      public String getPathInfo() {
-        return null;
-      }
-
-      @Override
-      public String getQueryString() {
-        return "group=solr.jvm&prefix=threads";
-      }
-    };
-    final ByteArrayOutputStream output = new ByteArrayOutputStream();
-    final HttpServletResponse newResponse = new HttpServletResponseWrapper(oldResponse) {
-      @Override
-      public ServletOutputStream getOutputStream() throws IOException {
-        return new ServletOutputStream() {
-
-          @Override
-          public void write(int b) throws IOException {
-            output.write(b);
-          }
-
-          @Override
-          public boolean isReady() {
-            return true;
-          }
-
-          @Override
-          public void setWriteListener(WriteListener writeListener) {}
-        };
-      }
-    };
+    final HttpServletRequest newRequest = new MetricsApiRequest(oldRequest, "solr.jvm", "threads");
+    final MetricsApiResponse newResponse = new MetricsApiResponse();
     HttpSolrCall call = new HttpSolrCall(filter, cores, newRequest, newResponse, false);
-    Object result = call.call();
+    Object result = call.call(); // should be RETURN
     result.hashCode();
-    String json = output.toString(StandardCharsets.UTF_8.name());
+    JsonNode json = newResponse.getJsonNode();
     json.hashCode();
+  }
+
+  // represents a request to e.g., /solr/admin/metrics?wt=json&indent=false&compact=true&group=solr.jvm&prefix=memory.pools.
+  // see ServletUtils.getPathAfterContext() for setting getServletPath() and getPathInfo().
+  static class MetricsApiRequest extends HttpServletRequestWrapper {
+
+    private final String queryString;
+
+    MetricsApiRequest(HttpServletRequest request, String group, String prefix) throws IOException {
+      super(request);
+      queryString = String.format(
+          "wt=json&indent=false&compact=true&group=%s&prefix=%s",
+          URLEncoder.encode(group, StandardCharsets.UTF_8.name()),
+          URLEncoder.encode(prefix, StandardCharsets.UTF_8.name()));
+    }
+
+    @Override
+    public String getServletPath() {
+      return CommonParams.METRICS_PATH;
+    }
+
+    @Override
+    public String getPathInfo() {
+      return null;
+    }
+
+    @Override
+    public String getQueryString() {
+      return queryString;
+    }
+  }
+
+  static class ByteArrayServletOutputStream extends ServletOutputStream {
+
+    private ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+    @Override
+    public void write(int b) throws IOException {
+      output.write(b);
+    }
+
+    @Override
+    public boolean isReady() {
+      return true;
+    }
+
+    @Override
+    public void setWriteListener(WriteListener writeListener) {}
+
+    public byte[] getBytes() {
+      return output.toByteArray();
+    }
+  };
+
+  static class MetricsApiResponse implements HttpServletResponse {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private int statusCode = 0;
+    private ByteArrayServletOutputStream body = new ByteArrayServletOutputStream();
+
+    @Override
+    public void setStatus(int code) {
+      statusCode = code;
+    }
+
+    @Override
+    public void setStatus(int code, String s) {
+      statusCode = code;
+    }
+
+    @Override
+    public void sendError(int code, String s) throws IOException {
+      statusCode = code;
+    }
+
+    @Override
+    public void sendError(int code) throws IOException {
+      statusCode = code;
+    }
+
+    @Override
+    public int getStatus() {
+      return statusCode;
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+      return body;
+    }
+
+    public JsonNode getJsonNode() throws IOException {
+      if (statusCode != 0 && statusCode / 100 != 2) {
+        throw new IOException(String.format(Locale.ROOT, "metrics api failed with status code %s.", statusCode));
+      }
+      return OBJECT_MAPPER.readTree(body.getBytes());
+    }
+
+    @Override
+    public String encodeURL(String s) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String encodeRedirectURL(String s) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String encodeUrl(String s) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String encodeRedirectUrl(String s) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void sendRedirect(String s) throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void addCookie(Cookie cookie) {}
+
+    @Override
+    public void setDateHeader(String s, long l) {}
+
+    @Override
+    public void addDateHeader(String s, long l) {}
+
+    @Override
+    public void setHeader(String s, String s1) {}
+
+    @Override
+    public void addHeader(String s, String s1) {}
+
+    @Override
+    public void setIntHeader(String s, int i) {}
+
+    @Override
+    public void addIntHeader(String s, int i) {}
+
+    @Override
+    public void setCharacterEncoding(String s) {}
+
+    @Override
+    public void setContentLength(int i) {}
+
+    @Override
+    public void setContentLengthLong(long l) {}
+
+    @Override
+    public void setContentType(String s) {}
+
+    @Override
+    public void setBufferSize(int i) {}
+
+    @Override
+    public void flushBuffer() throws IOException {}
+
+    @Override
+    public void resetBuffer() {}
+
+    @Override
+    public void reset() {}
+
+    @Override
+    public void setLocale(Locale locale) {}
+
+    @Override
+    public boolean containsHeader(String s) {
+      return false;
+    }
+
+    @Override
+    public String getHeader(String s) {
+      return null;
+    }
+
+    @Override
+    public Collection<String> getHeaders(String s) {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public Collection<String> getHeaderNames() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public String getCharacterEncoding() {
+      return StandardCharsets.UTF_8.name();
+    }
+
+    @Override
+    public String getContentType() {
+      return null;
+    }
+
+    @Override
+    public PrintWriter getWriter() throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int getBufferSize() {
+      return 0;
+    }
+
+    @Override
+    public boolean isCommitted() {
+      return false;
+    }
+
+    @Override
+    public Locale getLocale() {
+      return Locale.ROOT;
+    }
   }
 }
