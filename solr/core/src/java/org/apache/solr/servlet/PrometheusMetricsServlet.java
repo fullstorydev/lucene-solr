@@ -18,12 +18,17 @@ package org.apache.solr.servlet;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.management.UnixOperatingSystemMXBean;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.DispatcherType;
+import javax.servlet.FilterRegistration;
 import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
@@ -41,6 +46,8 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -71,11 +78,6 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    Writer out = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
-    response.setCharacterEncoding("UTF-8");
-    response.setContentType("application/json");
-    PrintWriter pw = new PrintWriter(out);
-    writeStats(pw, (CoreContainer) request.getAttribute(CoreContainer.class.getName()));
 
     try {
       scrapeMetricsApi(request, response, "&group=solr.jvm&prefix=memory.pools", null);
@@ -83,6 +85,11 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       e.printStackTrace();
     }
 
+    Writer out = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
+    response.setCharacterEncoding("UTF-8");
+    response.setContentType("application/json");
+    PrintWriter pw = new PrintWriter(out);
+    writeStats(pw, (CoreContainer) request.getAttribute(CoreContainer.class.getName()));
   }
 
   static void writeStats(PrintWriter writer, CoreContainer coreContainer) {
@@ -109,7 +116,24 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     writeProm(writer, "open_file_descriptors", PromType.gauge, "the number of open file descriptors on the filesystem", osBean.getOpenFileDescriptorCount());
 
     writeCacheMetrics(writer, coreContainer);
+    writeExtraMetrics(writer);
     writer.flush();
+  }
+
+  private static void writeExtraMetrics(PrintWriter writer) {
+    writeProm(writer, "solr_request_count", PromType.counter, "number of requests received by solr", 73);
+    writeProm(writer, "solr_G1-Eden-Space_size", PromType.counter, "size of eden space in bytes", 703594496);
+    writeProm(writer, "solr_G1-Eden-Space_used", PromType.counter, "used eden space in bytes", 36700160);
+    writeProm(writer, "solr_G1-Old-Gen_size", PromType.counter, "size of old gen in bytes", 1422917632);
+    writeProm(writer, "solr_G1-Old-Gen_used", PromType.counter, "used old gen in bytes", 22624256);
+    writeProm(writer, "solr_G1-Survivor-Space_size", PromType.counter, "size of survivor space in bytes", 20971520);
+    writeProm(writer, "solr_G1-Survivor-Space_used", PromType.counter, "used survivor space in bytes", 20971520);
+    writeProm(writer, "solr_thread_runnable_count", PromType.counter, "number of runnable threads", 16);
+    writeProm(writer, "solr_thread_terminated_count", PromType.counter, "number of terminated threads", 0);
+    writeProm(writer, "solr_thread_timed_waiting_count", PromType.counter, "number of timed waiting threads", 14);
+    writeProm(writer, "solr_thread_waiting_count", PromType.counter, "number of waiting threads", 13);
+    writeProm(writer, "solr_delete_by_query_count", PromType.counter, "number of deletes by query across cores", 0);
+    writeProm(writer, "solr_delete_by_id_count", PromType.counter, "number of deletes by id across cores", 0);
   }
 
   private static void writeCacheMetrics(PrintWriter writer, CoreContainer coreContainer) {
@@ -175,11 +199,26 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
 
   void scrapeMetricsApi(HttpServletRequest oldRequest, HttpServletResponse oldResponse, String queryString, ScrapeResponseHandler handler) throws Exception {
-    // final RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/metrics?wt=json&compact=true&indent=false" + queryString);
-    final RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/metrics");
-    if (dispatcher == null) {
-      throw new IllegalStateException("/admin/metrics does not have a dispatcher");
-    }
+    HttpSolrCall oldCall = (HttpSolrCall) oldRequest.getAttribute(HttpSolrCall.class.getName());
+    SolrDispatchFilter filter = oldCall.getSolrDispatchFilter();
+    CoreContainer cores = filter.getCores();
+    final HttpServletRequest newRequest = new HttpServletRequestWrapper(oldRequest) {
+
+      @Override
+      public String getServletPath() {
+        return CommonParams.METRICS_PATH;
+      }
+
+      @Override
+      public String getPathInfo() {
+        return null;
+      }
+
+      @Override
+      public String getQueryString() {
+        return "group=solr.jvm&prefix=threads";
+      }
+    };
     final ByteArrayOutputStream output = new ByteArrayOutputStream();
     final HttpServletResponse newResponse = new HttpServletResponseWrapper(oldResponse) {
       @Override
@@ -197,13 +236,13 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
           }
 
           @Override
-          public void setWriteListener(WriteListener writeListener) {
-
-          }
+          public void setWriteListener(WriteListener writeListener) {}
         };
       }
     };
-    dispatcher.include(oldRequest, newResponse);
+    HttpSolrCall call = new HttpSolrCall(filter, cores, newRequest, newResponse, false);
+    Object result = call.call();
+    result.hashCode();
     String json = output.toString(StandardCharsets.UTF_8.name());
     json.hashCode();
   }

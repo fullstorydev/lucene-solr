@@ -192,13 +192,14 @@ public class HttpSolrCall {
     req.setAttribute(SolrRequestParsers.REQUEST_TIMER_SERVLET_ATTRIBUTE, new RTimerTree());
     // put the core container in request attribute
     req.setAttribute("org.apache.solr.CoreContainer", cores);
-    req.setAttribute(CoreContainer.class.getName(), cores);
     path = ServletUtils.getPathAfterContext(req);
   }
 
   public String getPath() {
     return path;
   }
+
+  public SolrDispatchFilter getSolrDispatchFilter() { return solrDispatchFilter; }
 
   public HttpServletRequest getReq() {
     return req;
