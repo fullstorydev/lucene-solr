@@ -16,28 +16,12 @@
  */
 package org.apache.solr.servlet;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.management.UnixOperatingSystemMXBean;
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.core.CoreContainer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.DispatcherType;
-import javax.servlet.FilterRegistration;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpServletResponseWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -52,13 +36,24 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.management.UnixOperatingSystemMXBean;
+import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.CoreContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * FullStory: a simple servlet to produce a few prometheus metrics.
@@ -223,6 +218,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   static class MetricsApiRequest extends HttpServletRequestWrapper {
 
     private final String queryString;
+    private final Map<String, Object> attributes = new HashMap<>();
 
     MetricsApiRequest(HttpServletRequest request, String group, String prefix) throws IOException {
       super(request);
@@ -245,6 +241,30 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     @Override
     public String getQueryString() {
       return queryString;
+    }
+
+    @Override
+    public Object getAttribute(String name) {
+      Object value = attributes.get(name);
+      if (value == null) {
+        value = super.getAttribute(name);
+      }
+      return value;
+    }
+
+    @Override
+    public Enumeration<String> getAttributeNames() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void setAttribute(String name, Object value) {
+      attributes.put(name, value);
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+      throw new UnsupportedOperationException();
     }
   }
 
