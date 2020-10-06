@@ -16,7 +16,6 @@
  */
 package org.apache.solr.servlet;
 
-import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.Cookie;
@@ -25,14 +24,8 @@ import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.Writer;
 import java.lang.invoke.MethodHandles;
-import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
-import java.lang.management.MemoryUsage;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -41,19 +34,19 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.management.UnixOperatingSystemMXBean;
+import com.google.common.collect.ImmutableMap;
+import org.apache.solr.client.solrj.cloud.SolrCloudManager;
+import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
@@ -73,6 +66,14 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       new DeletesByMetricsApiCaller()
   ));
 
+  private final Map<String, PrometheusMetricType> cacheMetricTypes = ImmutableMap.of(
+      "bytes", PrometheusMetricType.GAUGE,
+      "lookups", PrometheusMetricType.COUNTER,
+      "hits", PrometheusMetricType.COUNTER,
+      "puts", PrometheusMetricType.COUNTER,
+      "evictions", PrometheusMetricType.COUNTER
+  );
+
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
     List<PrometheusMetric> metrics = new ArrayList<>();
@@ -80,29 +81,17 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     for(MetricsApiCaller caller : callers) {
       caller.call(qTime, metrics, request);
     }
+    getSharedCacheMetrics(metrics, getSolrDispatchFilter(request).getCores(), cacheMetricTypes);
+    metrics.add(new PrometheusMetric("metrics_qtime", PrometheusMetricType.GAUGE, "QTime for calling metrics api", qTime));
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     PrintWriter writer = response.getWriter();
     for(PrometheusMetric metric : metrics) {
       metric.write(writer);
     }
-    new PrometheusMetric("metrics_qtime", PrometheusMetricType.GAUGE, "QTime for calling metrics api", qTime).write(writer);
     writer.flush();
   }
 
 /*
-    try {
-      scrapeMetricsApi(request, response, "&group=solr.jvm&prefix=memory.pools", null);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-
-    Writer out = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8);
-    response.setCharacterEncoding("UTF-8");
-    response.setContentType("application/json");
-    PrintWriter pw = new PrintWriter(out);
-    writeStats(pw, (CoreContainer) request.getAttribute(CoreContainer.class.getName()));
-  }
-
   static void writeStats(PrintWriter writer, CoreContainer coreContainer) {
     // GC stats
     for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
@@ -125,10 +114,6 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     // Write OS stats
     UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     writeProm(writer, "open_file_descriptors", PromType.gauge, "the number of open file descriptors on the filesystem", osBean.getOpenFileDescriptorCount());
-
-    writeCacheMetrics(writer, coreContainer);
-    writeExtraMetrics(writer);
-    writer.flush();
   }
 
   private static void writeExtraMetrics(PrintWriter writer) {
@@ -140,34 +125,35 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     writeProm(writer, "solr_G1-Survivor-Space_size", PromType.counter, "size of survivor space in bytes", 20971520);
     writeProm(writer, "solr_G1-Survivor-Space_used", PromType.counter, "used survivor space in bytes", 20971520);
   }
+ */
 
-  private static void writeCacheMetrics(PrintWriter writer, CoreContainer coreContainer) {
-    if (coreContainer == null || coreContainer.getZkController() == null ) {
+  static void getSharedCacheMetrics(List<PrometheusMetric> results, CoreContainer cores, Map<String, PrometheusMetricType> types) {
+    Object value = Optional.of(cores)
+        .map(CoreContainer::getZkController)
+        .map(ZkController::getSolrCloudManager)
+        .map(SolrCloudManager::getObjectCache)
+        .map(cache -> cache.get("fs-shared-caches")) // see AbstractSharedCache.statsSupplier in plugin.
+        .filter(Supplier.class::isInstance)
+        .map(Supplier.class::cast)
+        .map(Supplier::get)
+        .orElse(null);
+    if (value == null) {
       return;
     }
-    Supplier<Map> supplier = (Supplier<Map>) coreContainer.getZkController().getSolrCloudManager().getObjectCache().get(SHARED_CACHE_METRIC_NAME);
-    if (supplier == null) {
-      return;
-    }
-    Map<String, NamedList> cacheStats = supplier.get();
-    if (cacheStats != null) {
-      cacheStats.forEach((cacheName, namedList) -> {
-        namedList.forEach((BiConsumer<String, Object>) (statName, v) -> {
-          if (v instanceof Number) {
-            Number number = (Number) v;
-            writeProm(writer,
-                "cache."+cacheName + "."+ statName,
-                PromType.gauge,
-                "cache info:" + statName,
-                number.longValue());
-          }
-        });
-      });
+    Map<String, NamedList<Number>> cacheStats = (Map<String, NamedList<Number>>) value;
+    for(Map.Entry<String, NamedList<Number>> cacheStat : cacheStats.entrySet()) {
+      String cache = cacheStat.getKey().replace("-", "");
+      for(Map.Entry<String, Number> stat : cacheStat.getValue()) {
+        String name = stat.getKey();
+        PrometheusMetricType type = types.get(name);
+        if (type != null) {
+          results.add(new PrometheusMetric(String.format(Locale.ROOT, "cache_%s_%s", cache, name), type,
+              String.format(Locale.ROOT, "%s %s for cache %s", name, type.name().toLowerCase(Locale.ROOT), cache),
+              stat.getValue()));
+        }
+      }
     }
   }
-  public static final String SHARED_CACHE_METRIC_NAME =  "fs-shared-caches";
-
- */
 
   static class ThreadMetricsApiCaller extends MetricsApiCaller {
 
@@ -264,6 +250,14 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     }
   }
 
+  static SolrDispatchFilter getSolrDispatchFilter(HttpServletRequest request) throws IOException {
+    Object value = request.getAttribute(HttpSolrCall.class.getName());
+    if (!(value instanceof HttpSolrCall)) {
+      throw new IOException(String.format(Locale.ROOT, "request attribute %s does not exist.", HttpSolrCall.class.getName()));
+    }
+    return ((HttpSolrCall) value).solrDispatchFilter;
+  }
+
   static abstract class MetricsApiCaller {
 
     protected final String group;
@@ -276,13 +270,9 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       this.property = property;
     }
 
+    // use HttpSolrCall to simulate a call to the metrics api.
     void call(AtomicInteger qTime, List<PrometheusMetric> results, HttpServletRequest originalRequest) throws IOException {
-      Object value = originalRequest.getAttribute(HttpSolrCall.class.getName());
-      if (!(value instanceof HttpSolrCall)) {
-        throw new IOException(String.format(Locale.ROOT, "request attribute %s does not exist.", HttpSolrCall.class.getName()));
-      }
-      HttpSolrCall originalCall = (HttpSolrCall) value;
-      SolrDispatchFilter filter = originalCall.solrDispatchFilter;
+      SolrDispatchFilter filter = getSolrDispatchFilter(originalRequest);
       CoreContainer cores = filter.getCores();
       HttpServletRequest request = new MetricsApiRequest(originalRequest, group, prefix, property);
       MetricsApiResponse response = new MetricsApiResponse();
