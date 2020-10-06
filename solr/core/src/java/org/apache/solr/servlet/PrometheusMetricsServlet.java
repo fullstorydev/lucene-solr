@@ -16,6 +16,7 @@
  */
 package org.apache.solr.servlet;
 
+import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.Cookie;
@@ -34,6 +35,8 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -43,6 +46,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
@@ -63,24 +68,28 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private enum PromType {
-    counter,
-    gauge
-  }
-
-  private static void writeProm(PrintWriter writer, String inName, PromType type, String desc, long value) {
-    String name = inName.toLowerCase().replace(" ", "_");
-    writer.printf("# HELP %s %s", name, desc);
-    writer.println();
-    writer.printf("# TYPE %s %s", name, type);
-    writer.println();
-    writer.printf("%s %d", name, value);
-    writer.println();
-  }
+  private final List<MetricsApiCaller> callers = Collections.unmodifiableList(Arrays.asList(
+      new ThreadMetricsApiCaller(),
+      new DeletesByMetricsApiCaller()
+  ));
 
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    List<PrometheusMetric> metrics = new ArrayList<>();
+    AtomicInteger qTime = new AtomicInteger();
+    for(MetricsApiCaller caller : callers) {
+      caller.call(qTime, metrics, request);
+    }
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    PrintWriter writer = response.getWriter();
+    for(PrometheusMetric metric : metrics) {
+      metric.write(writer);
+    }
+    new PrometheusMetric("metrics_qtime", PrometheusMetricType.GAUGE, "QTime for calling metrics api", qTime).write(writer);
+    writer.flush();
+  }
 
+/*
     try {
       scrapeMetricsApi(request, response, "&group=solr.jvm&prefix=memory.pools", null);
     } catch (Exception e) {
@@ -130,12 +139,6 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     writeProm(writer, "solr_G1-Old-Gen_used", PromType.counter, "used old gen in bytes", 22624256);
     writeProm(writer, "solr_G1-Survivor-Space_size", PromType.counter, "size of survivor space in bytes", 20971520);
     writeProm(writer, "solr_G1-Survivor-Space_used", PromType.counter, "used survivor space in bytes", 20971520);
-    writeProm(writer, "solr_thread_runnable_count", PromType.counter, "number of runnable threads", 16);
-    writeProm(writer, "solr_thread_terminated_count", PromType.counter, "number of terminated threads", 0);
-    writeProm(writer, "solr_thread_timed_waiting_count", PromType.counter, "number of timed waiting threads", 14);
-    writeProm(writer, "solr_thread_waiting_count", PromType.counter, "number of waiting threads", 13);
-    writeProm(writer, "solr_delete_by_query_count", PromType.counter, "number of deletes by query across cores", 0);
-    writeProm(writer, "solr_delete_by_id_count", PromType.counter, "number of deletes by id across cores", 0);
   }
 
   private static void writeCacheMetrics(PrintWriter writer, CoreContainer coreContainer) {
@@ -164,53 +167,143 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
   public static final String SHARED_CACHE_METRIC_NAME =  "fs-shared-caches";
 
-  static class PromEntry {
+ */
+
+  static class ThreadMetricsApiCaller extends MetricsApiCaller {
+
+    ThreadMetricsApiCaller() {
+      super("jvm", "threads.", "");
+    }
+
+    /*
+  "metrics":{
+    "solr.jvm":{
+      "threads.blocked.count":0,
+      "threads.count":2019,
+      "threads.daemon.count":11,
+      "threads.deadlock.count":0,
+      "threads.deadlocks":[],
+      "threads.new.count":0,
+      "threads.runnable.count":16,
+      "threads.terminated.count":0,
+      "threads.timed_waiting.count":247,
+      "threads.waiting.count":1756}}}
+     */
+    @Override
+    protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
+      JsonNode parent = metrics.path("solr.jvm");
+      results.add(new PrometheusMetric("threads_count", PrometheusMetricType.GAUGE, "number of threads", getNumber(parent, "threads.count")));
+      results.add(new PrometheusMetric("threads_blocked_count", PrometheusMetricType.GAUGE, "number of blocked threads", getNumber(parent, "threads.blocked.count")));
+      results.add(new PrometheusMetric("threads_deadlock_count", PrometheusMetricType.GAUGE, "number of deadlock threads", getNumber(parent, "threads.deadlock.count")));
+      results.add(new PrometheusMetric("threads_runnable_count", PrometheusMetricType.GAUGE, "number of runnable threads", getNumber(parent, "threads.runnable.count")));
+      results.add(new PrometheusMetric("threads_terminated_count", PrometheusMetricType.GAUGE, "number of terminated threads", getNumber(parent, "threads.terminated.count")));
+      results.add(new PrometheusMetric("threads_timed_waiting_count", PrometheusMetricType.GAUGE, "number of timed waiting threads", getNumber(parent, "threads.timed_waiting.count")));
+      results.add(new PrometheusMetric("threads_waiting_count", PrometheusMetricType.GAUGE, "number of waiting threads", getNumber(parent, "threads.waiting.count")));
+    }
+  }
+
+  static class DeletesByMetricsApiCaller extends MetricsApiCaller {
+
+    DeletesByMetricsApiCaller() {
+      super("core", "UPDATE.updateHandler.cumulativeDeletesBy", "count");
+    }
+
+    /*
+  "metricss":{
+    "solr.core.6A7GA.shard23.replica_n23":{
+      "UPDATE.updateHandler.cumulativeDeletesById":{"count":0},
+      "UPDATE.updateHandler.cumulativeDeletesByQuery":{"count":0}},
+    ...
+   */
+    @Override
+    protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
+      int byId = 0;
+      int byQuery = 0;
+      for(JsonNode core : metrics) {
+        byId += getNumber(core, "UPDATE.updateHandler.cumulativeDeletesById", property).intValue();
+        byQuery += getNumber(core, "UPDATE.updateHandler.cumulativeDeletesByQuery", property).intValue();
+      }
+      results.add(new PrometheusMetric("deletes_by_id", PrometheusMetricType.COUNTER, "cumulative number of deletes by id across cores", Integer.valueOf(byId)));
+      results.add(new PrometheusMetric("deletes_by_query", PrometheusMetricType.COUNTER, "cumulative number of deletes by query across cores", Integer.valueOf(byQuery)));
+    }
+  }
+
+  enum PrometheusMetricType {
+    COUNTER, GAUGE
+  }
+
+  static class PrometheusMetric {
 
     private final String name;
-    private final PromType type;
+    private final String type;
     private final String description;
     private final Number value;
 
-    public PromEntry(String name, PromType type, String description, Number value) {
-      this.name = name;
-      this.type = type;
+    PrometheusMetric(String name, PrometheusMetricType type, String description, Number value) {
+      this.name = name.toLowerCase().replace(" ", "_");
+      this.type = type.name().toLowerCase();
       this.description = description;
       this.value = value;
     }
 
-    public String getName() {
-      return name;
-    }
-
-    public PromType getType() {
-      return type;
-    }
-
-    public String getDescription() {
-      return description;
-    }
-
-    public Number getValue() {
-      return value;
+    void write(PrintWriter writer) throws IOException {
+      writer.append("# HELP ").append(name).append(' ').append(description).println();
+      writer.append("# TYPE ").append(name).append(' ').append(type).println();
+      writer.append(name).append(' ').append(value.toString()).println();
     }
   }
 
-  @FunctionalInterface
-  static interface ScrapeResponseHandler {
-    void handle(List<PromEntry> result, JsonNode metrics) throws Exception;
+  static Number getNumber(JsonNode node, String... names) throws IOException {
+    for(String name : names) {
+      node = node.path(name);
+    }
+    if (node.isNumber()) {
+      return node.numberValue();
+    } else {
+      throw new IOException(String.format(Locale.ROOT, "%s is not a number value.", Arrays.toString(names)));
+    }
   }
 
-  void scrapeMetricsApi(HttpServletRequest oldRequest, HttpServletResponse oldResponse, String queryString, ScrapeResponseHandler handler) throws Exception {
-    HttpSolrCall oldCall = (HttpSolrCall) oldRequest.getAttribute(HttpSolrCall.class.getName());
-    SolrDispatchFilter filter = oldCall.solrDispatchFilter;
-    CoreContainer cores = filter.getCores();
-    final HttpServletRequest newRequest = new MetricsApiRequest(oldRequest, "solr.jvm", "threads");
-    final MetricsApiResponse newResponse = new MetricsApiResponse();
-    HttpSolrCall call = new HttpSolrCall(filter, cores, newRequest, newResponse, false);
-    Object result = call.call(); // should be RETURN
-    result.hashCode();
-    JsonNode json = newResponse.getJsonNode();
-    json.hashCode();
+  static abstract class MetricsApiCaller {
+
+    protected final String group;
+    protected final String prefix;
+    protected final String property;
+
+    MetricsApiCaller(String group, String prefix, String property) {
+      this.group = group;
+      this.prefix = prefix;
+      this.property = property;
+    }
+
+    void call(AtomicInteger qTime, List<PrometheusMetric> results, HttpServletRequest originalRequest) throws IOException {
+      Object value = originalRequest.getAttribute(HttpSolrCall.class.getName());
+      if (!(value instanceof HttpSolrCall)) {
+        throw new IOException(String.format(Locale.ROOT, "request attribute %s does not exist.", HttpSolrCall.class.getName()));
+      }
+      HttpSolrCall originalCall = (HttpSolrCall) value;
+      SolrDispatchFilter filter = originalCall.solrDispatchFilter;
+      CoreContainer cores = filter.getCores();
+      HttpServletRequest request = new MetricsApiRequest(originalRequest, group, prefix, property);
+      MetricsApiResponse response = new MetricsApiResponse();
+      SolrDispatchFilter.Action action = new HttpSolrCall(filter, cores, request, response, false).call();
+      if (action != SolrDispatchFilter.Action.RETURN) {
+        throw new IOException(String.format(Locale.ROOT, "metrics api call returns %s; expected %s.", action, SolrDispatchFilter.Action.RETURN));
+      }
+      handleResponse(qTime, results, response.getJsonNode());
+    }
+
+    void handleResponse(AtomicInteger qTime, List<PrometheusMetric> results, JsonNode response) throws IOException {
+      JsonNode header = response.path("responseHeader");
+      int status = getNumber(header, "status").intValue();
+      if (status != 0) {
+        throw new IOException(String.format(Locale.ROOT, "metrics api response status is %d; expected 0.", status));
+      }
+      qTime.addAndGet(getNumber(header, "QTime").intValue());
+      handle(results, response.path("metrics"));
+    }
+
+    protected abstract void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException;
   }
 
   // represents a request to e.g., /solr/admin/metrics?wt=json&indent=false&compact=true&group=solr.jvm&prefix=memory.pools.
@@ -220,12 +313,13 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     private final String queryString;
     private final Map<String, Object> attributes = new HashMap<>();
 
-    MetricsApiRequest(HttpServletRequest request, String group, String prefix) throws IOException {
+    MetricsApiRequest(HttpServletRequest request, String group, String prefix, String property) throws IOException {
       super(request);
       queryString = String.format(
-          "wt=json&indent=false&compact=true&group=%s&prefix=%s",
+          "wt=json&indent=false&compact=true&group=%s&prefix=%s&property=%s",
           URLEncoder.encode(group, StandardCharsets.UTF_8.name()),
-          URLEncoder.encode(prefix, StandardCharsets.UTF_8.name()));
+          URLEncoder.encode(prefix, StandardCharsets.UTF_8.name()),
+          URLEncoder.encode(property, StandardCharsets.UTF_8.name()));
     }
 
     @Override
