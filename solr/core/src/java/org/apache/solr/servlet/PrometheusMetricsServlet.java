@@ -26,6 +26,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.invoke.MethodHandles;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -62,6 +65,9 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private final List<MetricsApiCaller> callers = Collections.unmodifiableList(Arrays.asList(
+      new GarbageCollectorMetricsApiCaller(),
+      new MemoryMetricsApiCaller(),
+      new OsMetricsApiCaller(),
       new ThreadMetricsApiCaller(),
       new DeletesByMetricsApiCaller()
   ));
@@ -91,42 +97,6 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     writer.flush();
   }
 
-/*
-  static void writeStats(PrintWriter writer, CoreContainer coreContainer) {
-    // GC stats
-    for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
-      writeProm(writer, "collection_count_" + gcBean.getName(), PromType.counter, "the number of GC invocations for " + gcBean.getName(), gcBean.getCollectionCount());
-      writeProm(writer, "collection_time_" + gcBean.getName(), PromType.counter, "the total number of milliseconds of time spent in gc for " + gcBean.getName(), gcBean.getCollectionTime());
-    }
-
-    // Write heap memory stats
-    MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
-
-    MemoryUsage heap = memoryBean.getHeapMemoryUsage();
-    writeProm(writer, "committed_memory_heap", PromType.gauge, "amount of memory in bytes that is committed for the Java virtual machine to use in the heap", heap.getCommitted());
-    writeProm(writer, "used_memory_heap", PromType.gauge, "amount of used memory in bytes in the heap", heap.getUsed());
-
-
-    MemoryUsage nonHeap = memoryBean.getNonHeapMemoryUsage();
-    writeProm(writer, "committed_memory_nonheap", PromType.gauge, "amount of memory in bytes that is committed for the Java virtual machine to use in the heap", nonHeap.getCommitted());
-    writeProm(writer, "used_memory_nonheap", PromType.gauge, "amount of used memory in bytes in the heap", nonHeap.getUsed());
-
-    // Write OS stats
-    UnixOperatingSystemMXBean osBean = (UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-    writeProm(writer, "open_file_descriptors", PromType.gauge, "the number of open file descriptors on the filesystem", osBean.getOpenFileDescriptorCount());
-  }
-
-  private static void writeExtraMetrics(PrintWriter writer) {
-    writeProm(writer, "solr_request_count", PromType.counter, "number of requests received by solr", 73);
-    writeProm(writer, "solr_G1-Eden-Space_size", PromType.counter, "size of eden space in bytes", 703594496);
-    writeProm(writer, "solr_G1-Eden-Space_used", PromType.counter, "used eden space in bytes", 36700160);
-    writeProm(writer, "solr_G1-Old-Gen_size", PromType.counter, "size of old gen in bytes", 1422917632);
-    writeProm(writer, "solr_G1-Old-Gen_used", PromType.counter, "used old gen in bytes", 22624256);
-    writeProm(writer, "solr_G1-Survivor-Space_size", PromType.counter, "size of survivor space in bytes", 20971520);
-    writeProm(writer, "solr_G1-Survivor-Space_used", PromType.counter, "used survivor space in bytes", 20971520);
-  }
- */
-
   static void getSharedCacheMetrics(List<PrometheusMetric> results, CoreContainer cores, Map<String, PrometheusMetricType> types) {
     Object value = Optional.of(cores)
         .map(CoreContainer::getZkController)
@@ -148,10 +118,139 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
         PrometheusMetricType type = types.get(name);
         if (type != null) {
           results.add(new PrometheusMetric(String.format(Locale.ROOT, "cache_%s_%s", cache, name), type,
-              String.format(Locale.ROOT, "%s %s for cache %s", name, type.name().toLowerCase(Locale.ROOT), cache),
+              String.format(Locale.ROOT, "%s %s for cache %s", name, type.getDisplayName(), cache),
               stat.getValue()));
         }
       }
+    }
+  }
+
+  static class GarbageCollectorMetricsApiCaller extends MetricsApiCaller {
+
+    GarbageCollectorMetricsApiCaller() {
+      super("jvm", "gc.G1-,memory.pools.G1-", "");
+    }
+
+    /*
+  "metrics":{
+    "solr.jvm":{
+      "gc.G1-Old-Generation.count":0,
+      "gc.G1-Old-Generation.time":0,
+      "gc.G1-Young-Generation.count":7,
+      "gc.G1-Young-Generation.time":75,
+      "memory.pools.G1-Eden-Space.committed":374341632,
+      "memory.pools.G1-Eden-Space.init":113246208,
+      "memory.pools.G1-Eden-Space.max":-1,
+      "memory.pools.G1-Eden-Space.usage":0.025210084033613446,
+      "memory.pools.G1-Eden-Space.used":9437184,
+      "memory.pools.G1-Eden-Space.used-after-gc":0,
+      "memory.pools.G1-Old-Gen.committed":1752170496,
+      "memory.pools.G1-Old-Gen.init":2034237440,
+      "memory.pools.G1-Old-Gen.max":2147483648,
+      "memory.pools.G1-Old-Gen.usage":0.010585308074951172,
+      "memory.pools.G1-Old-Gen.used":22731776,
+      "memory.pools.G1-Old-Gen.used-after-gc":0,
+      "memory.pools.G1-Survivor-Space.committed":20971520,
+      "memory.pools.G1-Survivor-Space.init":0,
+      "memory.pools.G1-Survivor-Space.max":-1,
+      "memory.pools.G1-Survivor-Space.usage":1.0,
+      "memory.pools.G1-Survivor-Space.used":20971520,
+      "memory.pools.G1-Survivor-Space.used-after-gc":20971520}}}
+     */
+    @Override
+    protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
+      JsonNode parent = metrics.path("solr.jvm");
+      results.add(new PrometheusMetric("collection_count_g1_young_generation", PrometheusMetricType.COUNTER,
+          "the number of GC invocations for G1 Young Generation", getNumber(parent, "gc.G1-Young-Generation.count")));
+      results.add(new PrometheusMetric("collection_time_g1_young_generation", PrometheusMetricType.COUNTER,
+          "the total number of milliseconds of time spent in gc for G1 Young Generation", getNumber(parent, "gc.G1-Young-Generation.time")));
+      results.add(new PrometheusMetric("collection_count_g1_old_generation", PrometheusMetricType.COUNTER,
+          "the number of GC invocations for G1 Old Generation", getNumber(parent, "gc.G1-Old-Generation.count")));
+      results.add(new PrometheusMetric("collection_time_g1_old_generation", PrometheusMetricType.COUNTER,
+          "the total number of milliseconds of time spent in gc for G1 Old Generation", getNumber(parent, "gc.G1-Old-Generation.time")));
+      results.add(new PrometheusMetric("committed_g1_young_eden", PrometheusMetricType.GAUGE,
+          "committed bytes for G1 Young Generation eden space", getNumber(parent, "memory.pools.G1-Eden-Space.committed")));
+      results.add(new PrometheusMetric("used_g1_young_eden", PrometheusMetricType.GAUGE,
+          "used bytes for G1 Young Generation eden space", getNumber(parent, "memory.pools.G1-Eden-Space.used")));
+      results.add(new PrometheusMetric("committed_g1_young_survivor", PrometheusMetricType.GAUGE,
+          "committed bytes for G1 Young Generation survivor space", getNumber(parent, "memory.pools.G1-Survivor-Space.committed")));
+      results.add(new PrometheusMetric("used_g1_young_survivor", PrometheusMetricType.GAUGE,
+          "used bytes for G1 Young Generation survivor space", getNumber(parent, "memory.pools.G1-Survivor-Space.used")));
+      results.add(new PrometheusMetric("committed_g1_old", PrometheusMetricType.GAUGE,
+          "committed bytes for G1 Old Generation", getNumber(parent, "memory.pools.G1-Old-Gen.committed")));
+      results.add(new PrometheusMetric("used_g1_old", PrometheusMetricType.GAUGE,
+          "used bytes for G1 Old Generation", getNumber(parent, "memory.pools.G1-Old-Gen.used")));
+    }
+  }
+
+  static class MemoryMetricsApiCaller extends MetricsApiCaller {
+
+    MemoryMetricsApiCaller() {
+      super("jvm", "memory.heap.,memory.non-heap.", "");
+    }
+
+    /*
+  "metrics":{
+    "solr.jvm":{
+      "memory.heap.committed":2147483648,
+      "memory.heap.init":2147483648,
+      "memory.heap.max":2147483648,
+      "memory.heap.usage":0.1012108325958252,
+      "memory.heap.used":217348608,
+      "memory.non-heap.committed":96886784,
+      "memory.non-heap.init":7667712,
+      "memory.non-heap.max":-1,
+      "memory.non-heap.usage":-9.313556E7,
+      "memory.non-heap.used":93135560}}}
+     */
+    @Override
+    protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
+      JsonNode parent = metrics.path("solr.jvm");
+      results.add(new PrometheusMetric("committed_memory_heap", PrometheusMetricType.GAUGE,
+          "amount of memory in bytes that is committed for the Java virtual machine to use in the heap",
+          getNumber(parent, "memory.heap.committed")));
+      results.add(new PrometheusMetric("used_memory_heap", PrometheusMetricType.GAUGE,
+          "amount of used memory in bytes in the heap",
+          getNumber(parent, "memory.heap.used")));
+      results.add(new PrometheusMetric("committed_memory_nonheap", PrometheusMetricType.GAUGE,
+          "amount of memory in bytes that is committed for the Java virtual machine to use in the nonheap",
+          getNumber(parent, "memory.non-heap.committed")));
+      results.add(new PrometheusMetric("used_memory_nonheap", PrometheusMetricType.GAUGE,
+          "amount of used memory in bytes in the nonheap",
+          getNumber(parent, "memory.non-heap.used")));
+    }
+  }
+
+  static class OsMetricsApiCaller extends MetricsApiCaller {
+
+    OsMetricsApiCaller() {
+      super("jvm", "os.", "");
+    }
+
+    /*
+  "metrics":{
+    "solr.jvm":{
+      "os.arch":"x86_64",
+      "os.availableProcessors":12,
+      "os.committedVirtualMemorySize":10852392960,
+      "os.freePhysicalMemorySize":1097367552,
+      "os.freeSwapSpaceSize":1423704064,
+      "os.maxFileDescriptorCount":10000,
+      "os.name":"Mac OS X",
+      "os.openFileDescriptorCount":188,
+      "os.processCpuLoad":1.391126878589777E-4,
+      "os.processCpuTime":141437037000,
+      "os.systemCpuLoad":0.09213820553771189,
+      "os.systemLoadAverage":1.67724609375,
+      "os.totalPhysicalMemorySize":17179869184,
+      "os.totalSwapSpaceSize":9663676416,
+      "os.version":"10.15.7"}}}
+     */
+    @Override
+    protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
+      JsonNode parent = metrics.path("solr.jvm");
+      results.add(new PrometheusMetric("open_file_descriptors", PrometheusMetricType.GAUGE, "the number of open file descriptors on the filesystem", getNumber(parent, "os.openFileDescriptorCount")));
+      results.add(new PrometheusMetric("max_file_descriptors", PrometheusMetricType.GAUGE, "the number of max file descriptors on the filesystem", getNumber(parent, "os.maxFileDescriptorCount")));
     }
   }
 
@@ -215,7 +314,18 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
 
   enum PrometheusMetricType {
-    COUNTER, GAUGE
+
+    COUNTER("counter"), GAUGE("gauge");
+
+    private final String displayName;
+
+    PrometheusMetricType(String displayName) {
+      this.displayName = displayName;
+    }
+
+    String getDisplayName() {
+      return displayName;
+    }
   }
 
   static class PrometheusMetric {
@@ -227,7 +337,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
     PrometheusMetric(String name, PrometheusMetricType type, String description, Number value) {
       this.name = name.toLowerCase().replace(" ", "_");
-      this.type = type.name().toLowerCase();
+      this.type = type.getDisplayName();
       this.description = description;
       this.value = value;
     }
