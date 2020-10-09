@@ -73,7 +73,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   ));
 
   private final Map<String, PrometheusMetricType> cacheMetricTypes = ImmutableMap.of(
-      "bytes", PrometheusMetricType.GAUGE,
+      "bytesUsed", PrometheusMetricType.GAUGE,
       "lookups", PrometheusMetricType.COUNTER,
       "hits", PrometheusMetricType.COUNTER,
       "puts", PrometheusMetricType.COUNTER,
@@ -112,7 +112,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     }
     Map<String, NamedList<Number>> cacheStats = (Map<String, NamedList<Number>>) value;
     for(Map.Entry<String, NamedList<Number>> cacheStat : cacheStats.entrySet()) {
-      String cache = cacheStat.getKey().replace("-", "");
+      String cache = cacheStat.getKey();
       for(Map.Entry<String, Number> stat : cacheStat.getValue()) {
         String name = stat.getKey();
         PrometheusMetricType type = types.get(name);
@@ -412,7 +412,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     private final Number value;
 
     PrometheusMetric(String name, PrometheusMetricType type, String description, Number value) {
-      this.name = name.toLowerCase().replace(" ", "_");
+      this.name = normalize(name);
       this.type = type.getDisplayName();
       this.description = description;
       this.value = value;
@@ -422,6 +422,25 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       writer.append("# HELP ").append(name).append(' ').append(description).println();
       writer.append("# TYPE ").append(name).append(' ').append(type).println();
       writer.append(name).append(' ').append(value.toString()).println();
+    }
+
+    static String normalize(String name) {
+      StringBuilder builder = new StringBuilder();
+      boolean modified = false;
+      for(char ch : name.toCharArray()) {
+        if (ch == ' ') {
+          builder.append('_');
+          modified = true;
+        } else if (ch == '-') {
+          modified = true;
+        } else if (Character.isUpperCase(ch)) {
+          builder.append('_').append(Character.toLowerCase(ch));
+          modified = true;
+        } else {
+          builder.append(ch);
+        }
+      }
+      return modified ? builder.toString() : name;
     }
   }
 
