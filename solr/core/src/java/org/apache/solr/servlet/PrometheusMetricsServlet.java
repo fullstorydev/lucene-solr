@@ -112,7 +112,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     }
     Map<String, NamedList<Number>> cacheStats = (Map<String, NamedList<Number>>) value;
     for(Map.Entry<String, NamedList<Number>> cacheStat : cacheStats.entrySet()) {
-      String cache = cacheStat.getKey();
+      String cache = cacheStat.getKey().toLowerCase(Locale.ROOT);
       for(Map.Entry<String, Number> stat : cacheStat.getValue()) {
         String name = stat.getKey();
         PrometheusMetricType type = types.get(name);
