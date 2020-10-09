@@ -68,7 +68,7 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
       new MemoryMetricsApiCaller(),
       new OsMetricsApiCaller(),
       new ThreadMetricsApiCaller(),
-      new ResponsesMetricsApiCaller(),
+      new StatusCodeMetricsApiCaller(),
       new CoresMetricsApiCaller()
   ));
 
@@ -287,9 +287,9 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     }
   }
 
-  static class ResponsesMetricsApiCaller extends MetricsApiCaller {
+  static class StatusCodeMetricsApiCaller extends MetricsApiCaller {
 
-    ResponsesMetricsApiCaller() {
+    StatusCodeMetricsApiCaller() {
       super("jetty", "org.eclipse.jetty.server.handler.DefaultHandler.", "count");
     }
 
@@ -308,14 +308,14 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     @Override
     protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
       JsonNode parent = metrics.path("solr.jetty");
-      results.add(new PrometheusMetric("responses_200", PrometheusMetricType.COUNTER,
-          "cumulative number of requests with 200 responses",
+      results.add(new PrometheusMetric("status_codes_2xx", PrometheusMetricType.COUNTER,
+          "cumulative number of responses with 2xx status codes",
           getNumber(parent, "org.eclipse.jetty.server.handler.DefaultHandler.2xx-responses", property)));
-      results.add(new PrometheusMetric("responses_400", PrometheusMetricType.COUNTER,
-          "cumulative number of requests with 400 responses",
+      results.add(new PrometheusMetric("status_codes_4xx", PrometheusMetricType.COUNTER,
+          "cumulative number of responses with 4xx status codes",
           getNumber(parent, "org.eclipse.jetty.server.handler.DefaultHandler.4xx-responses", property)));
-      results.add(new PrometheusMetric("responses_500", PrometheusMetricType.COUNTER,
-          "cumulative number of requests with 500 responses",
+      results.add(new PrometheusMetric("status_codes_5xx", PrometheusMetricType.COUNTER,
+          "cumulative number of responses with 5xx status codes",
           getNumber(parent, "org.eclipse.jetty.server.handler.DefaultHandler.5xx-responses", property)));
     }
   }
