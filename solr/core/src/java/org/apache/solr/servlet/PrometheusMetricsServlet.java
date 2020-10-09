@@ -26,9 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.invoke.MethodHandles;
-import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryPoolMXBean;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -40,7 +37,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -64,12 +60,16 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  // values less than this threshold are considered invalid; mark the invalid values instead of failing the call.
+  private static final Integer INVALID_NUMBER = -1;
+
   private final List<MetricsApiCaller> callers = Collections.unmodifiableList(Arrays.asList(
       new GarbageCollectorMetricsApiCaller(),
       new MemoryMetricsApiCaller(),
       new OsMetricsApiCaller(),
       new ThreadMetricsApiCaller(),
-      new DeletesByMetricsApiCaller()
+      new ResponsesMetricsApiCaller(),
+      new CoresMetricsApiCaller()
   ));
 
   private final Map<String, PrometheusMetricType> cacheMetricTypes = ImmutableMap.of(
@@ -287,29 +287,105 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
     }
   }
 
-  static class DeletesByMetricsApiCaller extends MetricsApiCaller {
+  static class ResponsesMetricsApiCaller extends MetricsApiCaller {
 
-    DeletesByMetricsApiCaller() {
-      super("core", "UPDATE.updateHandler.cumulativeDeletesBy", "count");
+    ResponsesMetricsApiCaller() {
+      super("jetty", "org.eclipse.jetty.server.handler.DefaultHandler.", "count");
     }
 
     /*
-  "metricss":{
-    "solr.core.6A7GA.shard23.replica_n23":{
+  "metrics":{
+    "solr.jetty":{
+      "org.eclipse.jetty.server.handler.DefaultHandler.1xx-responses":{"count":0},
+      "org.eclipse.jetty.server.handler.DefaultHandler.2xx-responses":{"count":8816245},
+      "org.eclipse.jetty.server.handler.DefaultHandler.3xx-responses":{"count":0},
+      "org.eclipse.jetty.server.handler.DefaultHandler.4xx-responses":{"count":1692},
+      "org.eclipse.jetty.server.handler.DefaultHandler.5xx-responses":{"count":2066},
+      "org.eclipse.jetty.server.handler.DefaultHandler.active-dispatches":0,
+      "org.eclipse.jetty.server.handler.DefaultHandler.active-requests":0,
+      ...
+     */
+    @Override
+    protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
+      JsonNode parent = metrics.path("solr.jetty");
+      results.add(new PrometheusMetric("responses_200", PrometheusMetricType.COUNTER,
+          "cumulative number of requests with 200 responses",
+          getNumber(parent, "org.eclipse.jetty.server.handler.DefaultHandler.2xx-responses", property)));
+      results.add(new PrometheusMetric("responses_400", PrometheusMetricType.COUNTER,
+          "cumulative number of requests with 400 responses",
+          getNumber(parent, "org.eclipse.jetty.server.handler.DefaultHandler.4xx-responses", property)));
+      results.add(new PrometheusMetric("responses_500", PrometheusMetricType.COUNTER,
+          "cumulative number of requests with 500 responses",
+          getNumber(parent, "org.eclipse.jetty.server.handler.DefaultHandler.5xx-responses", property)));
+    }
+  }
+
+  // Aggregating across all the cores on the node.
+  // Report only local requests, excluding forwarded requests to other nodes.
+  static class CoresMetricsApiCaller extends MetricsApiCaller {
+
+    CoresMetricsApiCaller() {
+      super("core", "INDEX.merge.,QUERY./get.local.requestTimes,QUERY./select.local.requestTimes,UPDATE./update.local.requestTimes,UPDATE.updateHandler.autoCommits,UPDATE.updateHandler.cumulativeDeletesBy,UPDATE.updateHandler.softAutoCommits", "count");
+    }
+
+    /*
+  "metrics":{
+    "solr.core.loadtest.shard1_1.replica_n8":{
+      "INDEX.merge.errors":0,
+      "INDEX.merge.major":{"count":0},
+      "INDEX.merge.major.running":0,
+      "INDEX.merge.major.running.docs":0,
+      "INDEX.merge.major.running.segments":0,
+      "INDEX.merge.minor":{"count":0},
+      "INDEX.merge.minor.running":0,
+      "INDEX.merge.minor.running.docs":0,
+      "INDEX.merge.minor.running.segments":0,
+      "QUERY./get.local.requestTimes":{"count":0},
+      "QUERY./select.local.requestTimes":{"count":0},
+      "UPDATE./update.local.requestTimes":{"count":0},
+      "UPDATE.updateHandler.autoCommits":0,
       "UPDATE.updateHandler.cumulativeDeletesById":{"count":0},
-      "UPDATE.updateHandler.cumulativeDeletesByQuery":{"count":0}},
+      "UPDATE.updateHandler.cumulativeDeletesByQuery":{"count":0},
+      "UPDATE.updateHandler.softAutoCommits":0},
     ...
    */
     @Override
     protected void handle(List<PrometheusMetric> results, JsonNode metrics) throws IOException {
-      int byId = 0;
-      int byQuery = 0;
+      long mergeMajor = 0;
+      long mergeMajorDocs = 0;
+      long mergeMinor = 0;
+      long mergeMinorDocs = 0;
+      long get = 0;
+      long select = 0;
+      long update = 0;
+      long hardCommit = 0;
+      long deleteById = 0;
+      long deleteByQuery = 0;
+      long softCommit = 0;
       for(JsonNode core : metrics) {
-        byId += getNumber(core, "UPDATE.updateHandler.cumulativeDeletesById", property).intValue();
-        byQuery += getNumber(core, "UPDATE.updateHandler.cumulativeDeletesByQuery", property).intValue();
+        mergeMajor += getNumber(core, "INDEX.merge.major", property).longValue();
+        mergeMajorDocs += getNumber(core, "INDEX.merge.major.running.docs").longValue();
+        mergeMinor += getNumber(core, "INDEX.merge.minor", property).longValue();
+        mergeMinorDocs += getNumber(core, "INDEX.merge.minor.running.docs").longValue();
+        get += getNumber(core, "QUERY./get.local.requestTimes", property).longValue();
+        select += getNumber(core, "QUERY./select.local.requestTimes", property).longValue();
+        update += getNumber(core, "UPDATE./update.local.requestTimes", property).longValue();
+        hardCommit += getNumber(core, "UPDATE.updateHandler.autoCommits").longValue();
+        deleteById += getNumber(core, "UPDATE.updateHandler.cumulativeDeletesById", property).longValue();
+        deleteByQuery += getNumber(core, "UPDATE.updateHandler.cumulativeDeletesByQuery", property).longValue();
+        softCommit += getNumber(core, "UPDATE.updateHandler.softAutoCommits").longValue();
       }
-      results.add(new PrometheusMetric("deletes_by_id", PrometheusMetricType.COUNTER, "cumulative number of deletes by id across cores", Integer.valueOf(byId)));
-      results.add(new PrometheusMetric("deletes_by_query", PrometheusMetricType.COUNTER, "cumulative number of deletes by query across cores", Integer.valueOf(byQuery)));
+      results.add(new PrometheusMetric("merges_major", PrometheusMetricType.COUNTER, "cumulative number of major merges across cores", mergeMajor));
+      results.add(new PrometheusMetric("merges_major_current_docs", PrometheusMetricType.GAUGE, "current number of docs in major merges across cores", mergeMajorDocs));
+      results.add(new PrometheusMetric("merges_minor", PrometheusMetricType.COUNTER, "cumulative number of minor merges across cores", mergeMinor));
+      results.add(new PrometheusMetric("merges_minor_current_docs", PrometheusMetricType.GAUGE, "current number of docs in minor merges across cores", mergeMinorDocs));
+      results.add(new PrometheusMetric("local_requests_get", PrometheusMetricType.COUNTER, "cumulative number of local gets across cores", get));
+      results.add(new PrometheusMetric("local_requests_select", PrometheusMetricType.COUNTER, "cumulative number of local selects across cores", select));
+      results.add(new PrometheusMetric("local_requests_update", PrometheusMetricType.COUNTER, "cumulative number of local updates across cores", update));
+      results.add(new PrometheusMetric("commits_hard", PrometheusMetricType.COUNTER, "cumulative number of hard commits across cores", hardCommit));
+      results.add(new PrometheusMetric("commits_soft", PrometheusMetricType.COUNTER, "cumulative number of soft commits across cores", softCommit));
+      results.add(new PrometheusMetric("deletes_by_id", PrometheusMetricType.COUNTER, "cumulative number of deletes by id across cores", deleteById));
+      results.add(new PrometheusMetric("deletes_by_query", PrometheusMetricType.COUNTER, "cumulative number of deletes by query across cores", deleteByQuery));
     }
   }
 
@@ -350,13 +426,15 @@ public final class PrometheusMetricsServlet extends BaseSolrServlet {
   }
 
   static Number getNumber(JsonNode node, String... names) throws IOException {
+    JsonNode originalNode = node;
     for(String name : names) {
       node = node.path(name);
     }
     if (node.isNumber()) {
       return node.numberValue();
     } else {
-      throw new IOException(String.format(Locale.ROOT, "%s is not a number value.", Arrays.toString(names)));
+      LOGGER.error("node {} does not have a number at the path {}.", originalNode, Arrays.toString(names));
+      return INVALID_NUMBER;
     }
   }
 
