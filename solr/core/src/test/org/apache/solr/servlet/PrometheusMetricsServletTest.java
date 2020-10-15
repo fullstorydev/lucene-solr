@@ -285,6 +285,7 @@ public class PrometheusMetricsServletTest {
         "      \"QUERY./select.local.requestTimes\":{\"count\":11},\n" +
         "      \"UPDATE./update.local.requestTimes\":{\"count\":12},\n" +
         "      \"UPDATE.updateHandler.autoCommits\":13,\n" +
+        "      \"UPDATE.updateHandler.commits\":{\"count\":33}," +
         "      \"UPDATE.updateHandler.cumulativeDeletesById\":{\"count\":14},\n" +
         "      \"UPDATE.updateHandler.cumulativeDeletesByQuery\":{\"count\":15},\n" +
         "      \"UPDATE.updateHandler.softAutoCommits\":16},\n" +
@@ -302,6 +303,7 @@ public class PrometheusMetricsServletTest {
         "      \"QUERY./select.local.requestTimes\":{\"count\":27},\n" +
         "      \"UPDATE./update.local.requestTimes\":{\"count\":28},\n" +
         "      \"UPDATE.updateHandler.autoCommits\":29,\n" +
+        "      \"UPDATE.updateHandler.commits\":{\"count\":34}," +
         "      \"UPDATE.updateHandler.cumulativeDeletesById\":{\"count\":30},\n" +
         "      \"UPDATE.updateHandler.cumulativeDeletesByQuery\":{\"count\":31},\n" +
         "      \"UPDATE.updateHandler.softAutoCommits\":32}}}";
@@ -326,12 +328,15 @@ public class PrometheusMetricsServletTest {
         "# HELP local_requests_update cumulative number of local updates across cores\n" +
         "# TYPE local_requests_update counter\n" +
         "local_requests_update 40\n" +
-        "# HELP commits_hard cumulative number of hard commits across cores\n" +
-        "# TYPE commits_hard counter\n" +
-        "commits_hard 42\n" +
-        "# HELP commits_soft cumulative number of soft commits across cores\n" +
-        "# TYPE commits_soft counter\n" +
-        "commits_soft 48\n" +
+        "# HELP auto_commits_hard cumulative number of hard auto commits across cores\n" +
+        "# TYPE auto_commits_hard counter\n" +
+        "auto_commits_hard 42\n" +
+        "# HELP auto_commits_soft cumulative number of soft auto commits across cores\n" +
+        "# TYPE auto_commits_soft counter\n" +
+        "auto_commits_soft 48\n" +
+        "# HELP commits cumulative number of commits across cores\n" +
+        "# TYPE commits counter\n" +
+        "commits 67\n" +
         "# HELP deletes_by_id cumulative number of deletes by id across cores\n" +
         "# TYPE deletes_by_id counter\n" +
         "deletes_by_id 44\n" +
