@@ -16,12 +16,11 @@
  */
 package org.apache.solr.update;
 
+import java.util.Locale;
+
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
-
-import java.util.Locale;
-
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -69,13 +68,13 @@ public class TestExceedMaxTermLength extends SolrTestCaseJ4 {
       } else {
         doc = adoc("id", "1", longFieldName, longFieldValue);
       }
-      assertFailedU(doc);
+      assertU(doc);
     } else {
       //Use JSON
       try {
         if(includeOkayFields) {
           String jsonStr = "[{'id':'1','%s':'%s', '%s': '%s'}]";
-          jsonStr = String.format(Locale.ROOT, jsonStr, longFieldName, longFieldValue, 
+          jsonStr = String.format(Locale.ROOT, jsonStr, longFieldName, longFieldValue,
                                   okayFieldName, okayFieldValue);
           updateJ(json(jsonStr), null);
         } else {
@@ -93,7 +92,7 @@ public class TestExceedMaxTermLength extends SolrTestCaseJ4 {
 
     assertU(commit());
 
-    assertQ(req("q", "*:*"), "//*[@numFound='0']");
+    assertQ(req("q", "*:*"), "//*[@numFound='1']");
   }
 
   @Test
@@ -127,7 +126,7 @@ public class TestExceedMaxTermLength extends SolrTestCaseJ4 {
       try {
         if(includeOkayFields) {
           jsonStr = "[{'id':'1','%s':'%s', '%s': '%s'}]";
-          jsonStr = String.format(Locale.ROOT, jsonStr, longFieldName, longFieldValue, 
+          jsonStr = String.format(Locale.ROOT, jsonStr, longFieldName, longFieldValue,
                                   okayFieldName, okayFieldValue);
           updateJ(json(jsonStr), null);
         } else {

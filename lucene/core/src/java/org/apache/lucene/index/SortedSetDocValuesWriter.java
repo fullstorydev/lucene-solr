@@ -79,7 +79,7 @@ class SortedSetDocValuesWriter extends DocValuesWriter {
       throw new IllegalArgumentException("field \"" + fieldInfo.name + "\": null value not allowed");
     }
     if (value.length > (BYTE_BLOCK_SIZE - 2)) {
-      throw new IllegalArgumentException("DocValuesField \"" + fieldInfo.name + "\" is too large, must be <= " + (BYTE_BLOCK_SIZE - 2));
+      value = new BytesRef(value.bytes, 0, BYTE_BLOCK_SIZE - 2);
     }
 
     if (docID != currentDoc) {
@@ -90,7 +90,7 @@ class SortedSetDocValuesWriter extends DocValuesWriter {
     addOneValue(value);
     updateBytesUsed();
   }
-  
+
   // finalize currentDoc: this deduplicates the current term ids
   private void finishCurrentDoc() {
     if (currentDoc == -1) {
@@ -131,16 +131,16 @@ class SortedSetDocValuesWriter extends DocValuesWriter {
       // 2. when flushing, we need 1 int per value (slot in the ordMap).
       iwBytesUsed.addAndGet(2 * Integer.BYTES);
     }
-    
+
     if (currentUpto == currentValues.length) {
       currentValues = ArrayUtil.grow(currentValues, currentValues.length+1);
       iwBytesUsed.addAndGet((currentValues.length - currentUpto) * Integer.BYTES);
     }
-    
+
     currentValues[currentUpto] = termID;
     currentUpto++;
   }
-  
+
   private void updateBytesUsed() {
     final long newBytesUsed = pending.ramBytesUsed() + pendingCounts.ramBytesUsed();
     iwBytesUsed.addAndGet(newBytesUsed - bytesUsed);
@@ -245,7 +245,7 @@ class SortedSetDocValuesWriter extends DocValuesWriter {
     final PackedLongValues.Iterator ordCountsIter;
     final DocIdSetIterator docsWithField;
     final int currentDoc[];
-    
+
     private int ordCount;
     private int ordUpto;
 
@@ -273,7 +273,7 @@ class SortedSetDocValuesWriter extends DocValuesWriter {
         for (int i = 0; i < ordCount; i++) {
           currentDoc[i] = ordMap[Math.toIntExact(ordsIter.next())];
         }
-        Arrays.sort(currentDoc, 0, ordCount);          
+        Arrays.sort(currentDoc, 0, ordCount);
         ordUpto = 0;
       }
       return docID;
