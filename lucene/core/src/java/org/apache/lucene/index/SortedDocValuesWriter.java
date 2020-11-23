@@ -70,7 +70,7 @@ class SortedDocValuesWriter extends DocValuesWriter {
       throw new IllegalArgumentException("field \"" + fieldInfo.name + "\": null value not allowed");
     }
     if (value.length > (BYTE_BLOCK_SIZE - 2)) {
-      throw new IllegalArgumentException("DocValuesField \"" + fieldInfo.name + "\" is too large, must be <= " + (BYTE_BLOCK_SIZE - 2));
+      value = new BytesRef(value.bytes, 0, BYTE_BLOCK_SIZE - 2);
     }
 
     addOneValue(value);

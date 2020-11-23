@@ -69,7 +69,7 @@ public class TestExceedMaxTermLength extends SolrTestCaseJ4 {
       } else {
         doc = adoc("id", "1", longFieldName, longFieldValue);
       }
-      assertFailedU(doc);
+      assertU(doc);
     } else {
       //Use JSON
       try {
@@ -93,7 +93,7 @@ public class TestExceedMaxTermLength extends SolrTestCaseJ4 {
 
     assertU(commit());
 
-    assertQ(req("q", "*:*"), "//*[@numFound='0']");
+    assertQ(req("q", "*:*"), "//*[@numFound='1']");
   }
 
   @Test

@@ -1534,11 +1534,10 @@ public class TestIndexWriter extends LuceneTestCase {
     final String bigTerm = new String(chars);
 
     // This contents produces a too-long term:
-    String contents = "abc xyz x" + bigTerm + " another term";
+    // This contents produces a too-long term "abc + `bigTerm`":
+    String contents = "abc xyz abc" + bigTerm + " another term";
     hugeDoc.add(new TextField("content", contents, Field.Store.NO));
-    expectThrows(IllegalArgumentException.class, () -> {
-      w.addDocument(hugeDoc);
-    });
+    w.addDocument(hugeDoc);
 
     // Make sure we can add another normal document
     Document doc = new Document();
@@ -1552,13 +1551,17 @@ public class TestIndexWriter extends LuceneTestCase {
     w.close();
 
     // Make sure all terms < max size were indexed
-    assertEquals(1, reader.docFreq(new Term("content", "abc")));
+    assertEquals(2, reader.docFreq(new Term("content", "abc")));
     assertEquals(1, reader.docFreq(new Term("content", "bbb")));
-    assertEquals(0, reader.docFreq(new Term("content", "term")));
+    assertEquals(1, reader.docFreq(new Term("content", "term")));
+    assertEquals(1, reader.docFreq(new Term("content", "another")));
+    assertEquals(1, reader.docFreq(new Term("content", "ccc")));
+    //find the term "abc + `bigTerm`"
+    assertEquals(1, reader.docFreq(new Term("content", "abc" + bigTerm.substring(0, bigTerm.length() - 3))));
 
-    // Make sure the doc that has the massive term is NOT in
+    // Make sure the doc that has the massive term is in
     // the index:
-    assertEquals("document with wicked long term is in the index!", 1, reader.numDocs());
+    assertEquals("document with wicked long term is in the index!", 2, reader.numDocs());
 
     reader.close();
     dir.close();
