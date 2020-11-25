@@ -349,7 +349,7 @@ public class ZkController implements Closeable {
               }
 
               cc.cancelCoreRecoveries();
-              
+
               try {
                 registerAllCoresAsDown(registerOnReconnect, false);
               } catch (SessionExpiredException e) {
@@ -359,7 +359,7 @@ public class ZkController implements Closeable {
                 // this is really best effort - in case of races or failure cases where we now need to be the leader, if anything fails,
                 // just continue
                 log.warn("Exception while trying to register all cores as DOWN", e);
-              } 
+              }
 
               // we have to register as live first to pick up docs in the buffer
               createEphemeralLiveNode();
@@ -1589,10 +1589,34 @@ public class ZkController implements Closeable {
       if (updateLastState) {
         cd.getCloudDescriptor().setLastPublished(state);
       }
-      overseerJobQueue.offer(Utils.toJSON(m));
+      DocCollection coll = zkStateReader.getCollection(collection);
+      if(forcePublish || sendToOverseer(coll, coreNodeName)) {
+        overseerJobQueue.offer(Utils.toJSON(m));
+      } else {
+        if(log.isDebugEnabled()) {
+          log.debug("bypassed overseer for message : {}", Utils.toJSONString(m));
+        }
+        PerReplicaStates perReplicaStates = coll.getPerReplicaStates(zkClient);
+        PerReplicaStates.WriteOps ops = PerReplicaStates.WriteOps.flipState(coreNodeName, state, perReplicaStates);
+        PerReplicaStates.persist(ops, perReplicaStates.path, zkClient);
+      }
     } finally {
       MDCLoggingContext.clear();
     }
+  }
+
+  private boolean sendToOverseer(DocCollection coll, String coreNodeName) {
+    if (coll == null || !coll.isPerReplicaState()) return true;
+    Replica r = coll.getReplica(coreNodeName);
+    if (r == null) return true;
+    Slice shard = coll.getSlice(r.slice);
+    if (shard == null) return true;//very unlikely
+    if (shard.getState() == Slice.State.RECOVERY) return true;
+    if (shard.getParent() != null) return true;
+    for (Slice slice : coll.getSlices()) {
+      if (Objects.equals(shard.getName(), slice.getParent())) return true;
+    }
+    return false;
   }
 
   public ZkShardTerms getShardTerms(String collection, String shardId) {
@@ -2157,7 +2181,7 @@ public class ZkController implements Closeable {
     try {
       if (electionNode != null) {
         // Check whether we came to this node by mistake
-        if ( overseerElector.getContext() != null && overseerElector.getContext().leaderSeqPath == null 
+        if ( overseerElector.getContext() != null && overseerElector.getContext().leaderSeqPath == null
             && !overseerElector.getContext().leaderSeqPath.endsWith(electionNode)) {
           log.warn("Asked to rejoin with wrong election node : {}, current node is {}", electionNode, overseerElector.getContext().leaderSeqPath);
           //however delete it . This is possible when the last attempt at deleting the election node failed.
