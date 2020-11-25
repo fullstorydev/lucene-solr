@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -30,6 +31,8 @@ import java.util.stream.Collectors;
 
 import org.apache.solr.common.cloud.Replica.Type;
 import org.noggit.JSONWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.common.util.Utils.toJSONString;
 
@@ -37,6 +40,8 @@ import static org.apache.solr.common.util.Utils.toJSONString;
  * A Slice contains immutable information about a logical shard (all replicas that share the same shard id).
  */
 public class Slice extends ZkNodeProps implements Iterable<Replica> {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
   public final String collection;
 
   /** Loads multiple slices into a Map from a generic Map that probably came from deserialized JSON. */
@@ -59,6 +64,15 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
   @Override
   public Iterator<Replica> iterator() {
     return replicas.values().iterator();
+  }
+
+  public Slice copyWith(Collection<PerReplicaStates.State> modifiedStates) {
+    log.debug("modified states : {}", modifiedStates);
+    Map<String, Replica> replicasCopy = new LinkedHashMap<>(replicas);
+    for (PerReplicaStates.State state : modifiedStates) {
+      replicasCopy.put(state.replica, replicasCopy.get(state.replica).copyWith(state));
+    }
+    return new Slice(name, replicasCopy, propMap, collection);
   }
 
   /** The slice's state. */
@@ -107,7 +121,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
 
     /** Converts the state string to a State instance. */
     public static State getState(String stateStr) {
-      return State.valueOf(stateStr.toUpperCase(Locale.ROOT));
+      return Slice.State.valueOf(stateStr.toUpperCase(Locale.ROOT));
     }
   }
 
@@ -138,9 +152,9 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
 
     Object rangeObj = propMap.get(RANGE);
     if (propMap.get(ZkStateReader.STATE_PROP) != null) {
-      this.state = State.getState((String) propMap.get(ZkStateReader.STATE_PROP));
+      this.state = Slice.State.getState((String) propMap.get(ZkStateReader.STATE_PROP));
     } else {
-      this.state = State.ACTIVE;                         //Default to ACTIVE
+      this.state = Slice.State.ACTIVE;                         //Default to ACTIVE
       propMap.put(ZkStateReader.STATE_PROP, state.toString());
     }
     DocRouter.Range tmpRange = null;
@@ -210,7 +224,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
 
   private Replica findLeader() {
     for (Replica replica : replicas.values()) {
-      if (replica.getStr(LEADER) != null) {
+      if (replica.isLeader()) {
         assert replica.getType() == Type.TLOG || replica.getType() == Type.NRT: "Pull replica should not become leader!";
         return replica;
       }

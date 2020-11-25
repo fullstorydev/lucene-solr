@@ -443,6 +443,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     protected Integer nrtReplicas;
     protected Integer pullReplicas;
     protected Integer tlogReplicas;
+    protected Boolean perReplicaState;
 
     protected Properties properties;
     protected Boolean autoAddReplicas;
@@ -489,6 +490,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     public Create setStateFormat(Integer stateFormat) { this.stateFormat = stateFormat; return this; }
     public Create setRule(String... s){ this.rule = s; return this; }
     public Create setSnitch(String... s){ this.snitch = s; return this; }
+    public Create setPerReplicaState(Boolean b) {this.perReplicaState =  b; return this; }
 
     public Create setAlias(String alias) {
       this.alias = alias;
@@ -507,6 +509,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     public Boolean getAutoAddReplicas() { return autoAddReplicas; }
     public Integer getNumTlogReplicas() {return tlogReplicas;}
     public Integer getNumPullReplicas() {return pullReplicas;}
+    public Boolean getPerReplicaState() {return perReplicaState;}
 
     public Integer getStateFormat() { return stateFormat; }
 
@@ -587,6 +590,9 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
       }
       if (tlogReplicas != null) {
         params.set(ZkStateReader.TLOG_REPLICAS, tlogReplicas);
+      }
+      if(Boolean.TRUE.equals(perReplicaState)) {
+        params.set(DocCollection.PER_REPLICA_STATE, perReplicaState);
       }
       if (rule != null) params.set(DocCollection.RULE, rule);
       if (snitch != null) params.set(DocCollection.SNITCH, snitch);

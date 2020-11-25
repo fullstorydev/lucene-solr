@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -32,7 +33,10 @@ import java.util.function.BiPredicate;
 import org.apache.solr.client.solrj.cloud.autoscaling.Policy;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.zookeeper.KeeperException;
 import org.noggit.JSONWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.common.cloud.ZkStateReader.AUTO_ADD_REPLICAS;
 import static org.apache.solr.common.cloud.ZkStateReader.MAX_SHARDS_PER_NODE;
@@ -47,9 +51,12 @@ import static org.apache.solr.common.util.Utils.toJSONString;
  * Models a Collection in zookeeper (but that Java name is obviously taken, hence "DocCollection")
  */
 public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
 
   public static final String DOC_ROUTER = "router";
   public static final String SHARDS = "shards";
+  public static final String PER_REPLICA_STATE = "perReplicaState";
   public static final String STATE_FORMAT = "stateFormat";
   /** @deprecated to be removed in Solr 9.0 (see SOLR-14930)
    *
@@ -80,6 +87,10 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   private final Boolean autoAddReplicas;
   private final String policy;
   private final Boolean readOnly;
+  private final Boolean perReplicaState;
+  private final Map<String, Replica> replicaMap = new HashMap<>();
+  private volatile PerReplicaStates perReplicaStates;
+
 
   public DocCollection(String name, Map<String, Slice> slices, Map<String, Object> props, DocRouter router) {
     this(name, slices, props, router, Integer.MAX_VALUE, ZkStateReader.CLUSTER_STATE);
@@ -105,8 +116,10 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     this.numTlogReplicas = (Integer) verifyProp(props, TLOG_REPLICAS, 0);
     this.numPullReplicas = (Integer) verifyProp(props, PULL_REPLICAS, 0);
     this.maxShardsPerNode = (Integer) verifyProp(props, MAX_SHARDS_PER_NODE);
+    this.perReplicaState = (Boolean) verifyProp(props, PER_REPLICA_STATE, Boolean.FALSE);
     Boolean autoAddReplicas = (Boolean) verifyProp(props, AUTO_ADD_REPLICAS);
     this.policy = (String) props.get(Policy.POLICY);
+    ClusterState.getReplicaStatesProvider().get().ifPresent(it -> perReplicaStates = it.getStates());
     this.autoAddReplicas = autoAddReplicas == null ? Boolean.FALSE : autoAddReplicas;
     Boolean readOnly = (Boolean) verifyProp(props, READ_ONLY);
     this.readOnly = readOnly == null ? Boolean.FALSE : readOnly;
@@ -122,12 +135,44 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
       }
       for (Replica replica : slice.getValue()) {
         addNodeNameReplica(replica);
+        if(perReplicaState) {
+          replicaMap.put(replica.getName(), replica);
+        }
       }
     }
     this.activeSlicesArr = activeSlices.values().toArray(new Slice[activeSlices.size()]);
     this.router = router;
     this.znode = znode == null? ZkStateReader.CLUSTER_STATE : znode;
     assert name != null && slices != null;
+  }
+
+  /**Update our state with a state of a {@link Replica}
+   * Used to create a new Collection State when only a replica is updated
+   */
+  public DocCollection copyWith( PerReplicaStates newPerReplicaStates) {
+    log.debug("collection :{} going to be updated :  per-replica state :{} -> {}",name, this.perReplicaStates==null? -1: this.perReplicaStates.cversion, newPerReplicaStates.cversion );
+    if(this.perReplicaStates != null && this.perReplicaStates.cversion == newPerReplicaStates.cversion) return this;
+    Map<String, PerReplicaStates.State> replicaNameVsNodeName = PerReplicaStates.findModifiedStates(newPerReplicaStates, this);
+    if(replicaNameVsNodeName.isEmpty()) {
+      this.perReplicaStates = newPerReplicaStates;
+      return this;//nothing is modified
+    }
+
+    Map<String, List<PerReplicaStates.State>> slicesVsReplicaVsReplicaStates = new HashMap<>();
+    replicaNameVsNodeName.forEach((r, rs) -> {
+      Replica replica =  getReplica(r);
+      slicesVsReplicaVsReplicaStates
+          .computeIfAbsent(replica.slice, s -> new ArrayList<>())
+      .add(rs);
+    });
+    Map<String, Slice> newSlices =  new LinkedHashMap<>(getSlicesMap());
+    slicesVsReplicaVsReplicaStates.forEach((slice, rs) -> {
+      newSlices.put(slice, getSlice(slice).copyWith(rs));
+    });
+    DocCollection result = new DocCollection(getName(), newSlices, propMap, router, znodeVersion, znode);
+    result.perReplicaStates = newPerReplicaStates;
+    return result;
+
   }
 
   private void addNodeNameReplica(Replica replica) {
@@ -165,6 +210,8 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
       case AUTO_ADD_REPLICAS:
       case READ_ONLY:
         return Boolean.parseBoolean(o.toString());
+      case PER_REPLICA_STATE:
+        return Boolean.parseBoolean(o.toString());
       case "snitch":
       case "rule":
         return (List) o;
@@ -178,8 +225,10 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
    * @param slices the new set of Slices
    * @return the resulting DocCollection
    */
-  public DocCollection copyWithSlices(Map<String, Slice> slices){
-    return new DocCollection(getName(), slices, propMap, router, znodeVersion,znode);
+  public DocCollection copyWithSlices(Map<String, Slice> slices) {
+    DocCollection result = new DocCollection(getName(), slices, propMap, router, znodeVersion, znode);
+    result.perReplicaStates = perReplicaStates;
+    return result;
   }
 
   /**
@@ -304,6 +353,9 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   }
 
   public Replica getReplica(String coreNodeName) {
+    if(perReplicaState) {
+      return replicaMap.get(coreNodeName);
+    }
     for (Slice slice : slices.values()) {
       Replica replica = slice.getReplica(coreNodeName);
       if (replica != null) return replica;
@@ -431,6 +483,34 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
   public String getPolicyName() {
     return policy;
   }
+
+  public boolean isPerReplicaState() {
+    return Boolean.TRUE.equals(perReplicaState);
+  }
+
+  public PerReplicaStates getPerReplicaStates() {
+    return perReplicaStates;
+  }
+
+  /**
+   * for internal use only
+   */
+  public PerReplicaStates getPerReplicaStates(SolrZkClient zkClient)  {
+    try {
+      if(perReplicaStates == null) {
+        return perReplicaStates = PerReplicaStates.fetch(znode, zkClient);
+      } else {
+        return perReplicaStates = PerReplicaStates.fetch(zkClient, perReplicaStates);
+      }
+    } catch (KeeperException e) {
+      throw new RuntimeException(e);
+    } catch (InterruptedException e) {
+      SolrZkClient.checkInterrupted(e);
+      throw new SolrException(ErrorCode.SERVER_ERROR, "Thread interrupted when loading replica states for collection " + name, e);
+    }
+
+  }
+
 
   public int getExpectedReplicaCount(Replica.Type type, int def) {
     Integer result = null;
