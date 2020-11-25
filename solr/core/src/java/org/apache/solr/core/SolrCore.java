@@ -947,9 +947,6 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       IndexSchema schema = configSet.getIndexSchema();
 
       this.configSetProperties = configSet.getProperties();
-
-      resourceLoader.core = this;
-
       // Initialize the metrics manager
       this.coreMetricManager = initCoreMetricManager(solrConfig);
       this.circuitBreakerManager = initCircuitBreakerManager();
