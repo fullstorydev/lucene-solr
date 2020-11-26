@@ -460,7 +460,7 @@ public class PerReplicaStates implements ReflectMapWriter {
       return ops;
     }
 
-    /**To be executed before collection is persisted
+    /**To be executed before collection state.json is persisted
      */
     public boolean isPreOp() {
       return preOp;

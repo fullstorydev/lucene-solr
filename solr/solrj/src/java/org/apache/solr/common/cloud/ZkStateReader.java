@@ -1387,33 +1387,12 @@ public class ZkStateReader implements SolrCloseable {
     public void refreshAndWatch(EventType eventType) {
       try {
         if(eventType == null  || eventType == EventType.NodeChildrenChanged) {
-          Stat stat = new Stat();
-          List<String> replicaStates = null;
-          try {
-            replicaStates = zkClient.getChildren(collectionPath, this,stat,true);
-          } catch (KeeperException.NoNodeException e) {
-            log.info("{} is deleted", collectionPath);
-            return;
-          }
-          log.debug("node : {} updated per-replica states changed for: {}, ver: {} , new vals: {}",nodeName, coll,stat.getCversion(), replicaStates);
-          PerReplicaStates newStates = new PerReplicaStates(collectionPath, stat.getCversion(), replicaStates);
-          DocCollection oldState = watchedCollectionStates.get(coll);
-          DocCollection newState = null;
-          if(oldState != null) {
-            newState = oldState.copyWith(newStates);
-          } else {
-            newState = fetchCollectionState(coll, null, collectionPath);
-          }
-          updateWatchedCollection(coll, newState);
-          synchronized (getUpdateLock()) {
-            constructState(Collections.singleton(coll));
-          }
+         refreshAndWatchChildren();
           if(eventType == EventType.NodeChildrenChanged) {
             //only per-replica states modified. return
             return;
           }
         }
-
 
         DocCollection newState = fetchCollectionState(coll, this, collectionPath);
         updateWatchedCollection(coll, newState);
@@ -1429,6 +1408,32 @@ public class ZkStateReader implements SolrCloseable {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         log.error("Unwatched collection: [{}]", coll, e);
+      }
+    }
+
+    private void refreshAndWatchChildren() throws KeeperException, InterruptedException {
+      Stat stat = new Stat();
+      List<String> replicaStates = null;
+      try {
+        replicaStates = zkClient.getChildren(collectionPath, this,stat,true);
+        PerReplicaStates newStates = new PerReplicaStates(collectionPath, stat.getCversion(), replicaStates);
+        DocCollection oldState = watchedCollectionStates.get(coll);
+        DocCollection newState = null;
+        if(oldState != null) {
+          newState = oldState.copyWith(newStates);
+        } else {
+          newState = fetchCollectionState(coll, null, collectionPath);
+        }
+        updateWatchedCollection(coll, newState);
+        synchronized (getUpdateLock()) {
+          constructState(Collections.singleton(coll));
+        }
+        if(log.isDebugEnabled()) {
+          log.debug("node : {} updated per-replica states changed for: {}, ver: {} , new vals: {}", nodeName, coll, stat.getCversion(), replicaStates);
+        }
+
+      } catch (NoNodeException e) {
+        log.info("{} is deleted, stop watching children", collectionPath);
       }
     }
   }
