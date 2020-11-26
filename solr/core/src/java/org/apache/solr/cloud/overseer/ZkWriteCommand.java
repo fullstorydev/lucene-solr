@@ -23,9 +23,6 @@ public class ZkWriteCommand {
 
   public final String name;
   public final DocCollection collection;
-  /**
-   * if newState != null and priorState == null a new one is created
-   */
 
   public final boolean noop;
   // persist the collection state. If this is false, it means the collection state is not modified

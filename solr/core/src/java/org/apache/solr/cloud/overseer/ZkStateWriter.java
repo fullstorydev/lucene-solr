@@ -232,8 +232,9 @@ public class ZkStateWriter {
           ZkWriteCommand cmd = entry.getValue();
           DocCollection c = cmd.collection;
 
-          if(cmd.ops != null && !cmd.ops.get().isEmpty() && cmd.ops.isPreOp()) {
+          if(cmd.ops != null && cmd.ops.isPreOp()) {
             PerReplicaStates.persist(cmd.ops, path, reader.getZkClient());
+            //nocommit
             /*PerReplicaStates prs = PerReplicaStates.fetch(ZkStateReader.getCollectionPath(cmd.collection.getName()), reader.getZkClient());
             log.debug("node {} ,per-replica states persisted {}->{}",reader.nodeName,
                 cmd.ops.getPerReplicaStates(),

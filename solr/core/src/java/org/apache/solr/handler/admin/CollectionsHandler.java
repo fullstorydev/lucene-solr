@@ -1430,7 +1430,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
     try {
       cc.getZkController().getZkStateReader().waitForState(collectionName, seconds, TimeUnit.SECONDS, (n, c) -> {
-        log.info("state changed callback for collection : {}", collectionName);
+        log.debug("state changed callback for collection : {}", collectionName);//nocommit
 
         if (c == null) {
           // the collection was not created, don't wait
@@ -1455,7 +1455,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
               }
               if (!n.contains(replica.getNodeName())
                   || !state.equals(Replica.State.ACTIVE.toString())) {
-                log.info("inactive replica {} , state {}", replica.getName(), replica.getReplicaState());
+                log.debug("inactive replica {} , state {}", replica.getName(), replica.getReplicaState());
                 replicaNotAliveCnt++;
                 return false;
               }
