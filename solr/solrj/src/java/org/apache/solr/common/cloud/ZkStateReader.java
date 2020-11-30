@@ -1852,9 +1852,9 @@ public class ZkStateReader implements SolrCloseable {
       docCollection.set(c);
       boolean matches = predicate.matches(n, c);
       if(!matches) {
-/*
-        try {
-          if(c.isPerReplicaState()) {
+
+       /* try {
+          if(c!= null && c.isPerReplicaState()) {
             //nocommit
             Stat stat = zkClient.exists(getCollectionPath(collection), null, true);
             if(c.isPerReplicaState() && c.getPerReplicaStates().cversion <stat.getCversion()) {
@@ -1872,8 +1872,10 @@ public class ZkStateReader implements SolrCloseable {
           e.printStackTrace();
 
         }*/
-        log.debug(" CollectionStatePredicate failed for {}, after {} secs, cversion : {}",collection, (System.currentTimeMillis() - waitStartTime),
-            (c==null || c.getPerReplicaStates() == null ?-1: c.getPerReplicaStates().cversion));
+        if(log.isDebugEnabled()) {
+          log.debug(" CollectionStatePredicate failed for {}, after {} secs, cversion : {}", collection, (System.currentTimeMillis() - waitStartTime),
+              (c == null || c.getPerReplicaStates() == null ? "-1" : c.getPerReplicaStates()));
+        }
       }
       if (matches)
         latch.countDown();
@@ -2477,6 +2479,6 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   public DocCollection getCollection(String collection) {
-    return clusterState.getCollectionOrNull(collection);
+    return clusterState == null ? null : clusterState.getCollectionOrNull(collection);
   }
 }

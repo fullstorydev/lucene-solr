@@ -330,7 +330,9 @@ public class PerReplicaStates implements ReflectMapWriter {
             ops.add(new Op(Op.Type.ADD, new State(replica, newState, existing.isLeader, existing.version + 1)));
             addDeleteStaleNodes(ops, existing);
           }
-          log.debug("flipState {} -> {}, ops :{}", replica, newState, ops);
+          if(log.isDebugEnabled()) {
+            log.debug("flipState on {}, {} -> {}, ops :{}", rs.path, replica, newState, ops);
+          }
           return ops;
         }
       }.init(rs);
@@ -364,7 +366,9 @@ public class PerReplicaStates implements ReflectMapWriter {
               ops.add(new Op(Op.Type.DELETE, st));
             }
           }
-          log.debug("flipLeader {} -> {}, ops: {}", old, next, ops);
+          if(log.isDebugEnabled()) {
+            log.debug("flipLeader on:{}, {} -> {}, ops: {}", rs.path, old, next, ops);
+          }
           return ops;
         }
 
@@ -416,8 +420,9 @@ public class PerReplicaStates implements ReflectMapWriter {
               addDeleteStaleNodes(ops, r);
             }
           }
-          if(log.isDebugEnabled())
-            log.debug("for coll: {} down replicas {}, ops {}",  rs.path, replicas, ops);
+          if(log.isDebugEnabled()) {
+            log.debug("for coll: {} down replicas {}, ops {}", rs.path, replicas, ops);
+          }
           return ops;
         }
       }.init(rs);
@@ -434,7 +439,9 @@ public class PerReplicaStates implements ReflectMapWriter {
           State st = new State(".dummy." + System.nanoTime(), Replica.State.DOWN, Boolean.FALSE, 0);
           ops.add(new Op(Op.Type.ADD, st));
           ops.add(new Op(Op.Type.DELETE, st));
-          log.debug("touchChildren {}", ops );
+          if(log.isDebugEnabled()) {
+            log.debug("touchChildren {}", ops);
+          }
           return ops;
         }
       };

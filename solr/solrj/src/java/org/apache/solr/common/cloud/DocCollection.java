@@ -341,7 +341,9 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
 
   @Override
   public String toString() {
-    return "DocCollection("+name+"/" + znode + "/" + znodeVersion + ")=" + toJSONString(this);
+    return "DocCollection("+name+"/" + znode + "/" + znodeVersion
+        + (perReplicaStates == null ? "": perReplicaStates.toString())+")="
+        + toJSONString(this);
   }
 
   @Override

@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.PerReplicaStates;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkCmdExecutor;
@@ -161,9 +163,11 @@ class ShardLeaderElectionContextBase extends ElectionContext {
 
     assert shardId != null;
     boolean isAlreadyLeader = false;
+    String currentLeader = null;
     if (zkStateReader.getClusterState() != null &&
         zkStateReader.getClusterState().getCollection(collection).getSlice(shardId).getReplicas().size() < 2) {
       Replica leader = zkStateReader.getLeader(collection, shardId);
+      if(leader != null) currentLeader = leader.getName();
       if (leader != null
           && leader.getBaseUrl().equals(leaderProps.get(ZkStateReader.BASE_URL_PROP))
           && leader.getCoreName().equals(leaderProps.get(ZkStateReader.CORE_NAME_PROP))) {
@@ -179,7 +183,15 @@ class ShardLeaderElectionContextBase extends ElectionContext {
           ZkStateReader.STATE_PROP, Replica.State.ACTIVE.toString());
       assert zkController != null;
       assert zkController.getOverseer() != null;
-      zkController.getOverseer().offerStateUpdate(Utils.toJSON(m));
+      DocCollection coll = zkStateReader.getCollection(this.collection);
+      if (coll == null || coll.getStateFormat() < 2 || ZkController.sendToOverseer(coll, id)) {
+        zkController.getOverseer().offerStateUpdate(Utils.toJSON(m));
+      } else {
+        PerReplicaStates prs = coll.getPerReplicaStates(zkStateReader.getZkClient());
+        PerReplicaStates.WriteOps writeOps = PerReplicaStates.WriteOps.flipLeader(currentLeader, id, prs);
+        log.debug("bypassed Zookeeper for leader election for {}/{}", this.collection, shardId);
+        PerReplicaStates.persist(writeOps, prs.path, zkStateReader.getZkClient());
+      }
     }
   }
 

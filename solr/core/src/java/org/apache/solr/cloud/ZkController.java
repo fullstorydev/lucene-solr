@@ -1605,9 +1605,12 @@ public class ZkController implements Closeable {
     }
   }
 
-  private boolean sendToOverseer(DocCollection coll, String coreNodeName) {
-    if (coll == null || !coll.isPerReplicaState()) return true;
-    Replica r = coll.getReplica(coreNodeName);
+  /**Whether a message needs to be sent to oversereer or not
+   */
+  static boolean sendToOverseer(DocCollection coll, String replicaName) {
+    if (coll == null) return true;
+    if (coll.getStateFormat() < 2 || !coll.isPerReplicaState()) return true;
+    Replica r = coll.getReplica(replicaName);
     if (r == null) return true;
     Slice shard = coll.getSlice(r.slice);
     if (shard == null) return true;//very unlikely

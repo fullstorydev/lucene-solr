@@ -49,8 +49,8 @@ import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.response.RequestStatusState;
-import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.client.solrj.response.SolrPingResponse;
+import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.cloud.AbstractDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrDocument;
@@ -145,7 +145,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
   @Test
   public void testParallelUpdateQTime() throws Exception {
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1)
-        .setPerReplicaState(Boolean.TRUE)
+        .setPerReplicaState(USE_PER_REPLICA_STATE)
         .process(cluster.getSolrClient());
     cluster.waitForActiveCollection(COLLECTION, 2, 2);
     UpdateRequest req = new UpdateRequest();
@@ -1084,17 +1084,19 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
         .process(cluster.getSolrClient());
 
     final String testCollection = "perReplicaState_test";
-    CollectionAdminRequest.createCollection(testCollection, "conf", 2, 1)
+    int liveNodes = cluster.getJettySolrRunners().size();
+    CollectionAdminRequest.createCollection(testCollection, "conf", 2, 2)
+        .setMaxShardsPerNode(liveNodes)
         .setPerReplicaState(Boolean.TRUE)
         .process(cluster.getSolrClient());
-    cluster.waitForActiveCollection(testCollection, 2, 2);
+    cluster.waitForActiveCollection(testCollection, 2, 4);
     final SolrClient clientUnderTest = getRandomClient();
     final SolrPingResponse response = clientUnderTest.ping(testCollection);
     assertEquals("This should be OK", 0, response.getStatus());
     DocCollection c = cluster.getSolrClient().getZkStateReader().getCollection(testCollection);
     c.forEachReplica((s, replica) -> assertNotNull(replica.getReplicaState()));
     PerReplicaStates prs = PerReplicaStates.fetch(ZkStateReader.getCollectionPath(testCollection), cluster.getZkClient());
-    assertEquals(2, prs.states.size());
+    assertEquals(4, prs.states.size());
   }
 
 }
