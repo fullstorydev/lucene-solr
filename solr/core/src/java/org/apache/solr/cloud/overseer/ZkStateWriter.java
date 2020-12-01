@@ -138,8 +138,9 @@ public class ZkStateWriter {
       //there are more than one commands created as a result of this message
       for (ZkWriteCommand cmd : cmds) {
         if(cmd.collection != null && cmd.collection.isPerReplicaState()) {
-          // we don;t try to optimize for this case. let's flush out all after this
+          // we don't try to optimize for this case. let's flush out all after this
           forceFlush = true;
+          break;
         }
       }
     }
