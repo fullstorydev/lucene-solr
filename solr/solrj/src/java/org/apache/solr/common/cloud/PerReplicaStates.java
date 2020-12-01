@@ -45,9 +45,9 @@ import static java.util.Collections.singletonList;
 import static org.apache.solr.common.params.CommonParams.NAME;
 import static org.apache.solr.common.params.CommonParams.VERSION;
 
-/**This represents the individual replica states in a collection
+/**
+ * This represents the individual replica states in a collection
  * This is an immutable object
- *
  */
 public class PerReplicaStates implements ReflectMapWriter {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -66,11 +66,11 @@ public class PerReplicaStates implements ReflectMapWriter {
   public PerReplicaStates(String path, int cversion, List<String> states) {
     this.path = path;
     this.cversion = cversion;
-    Map<String , State> tmp = new LinkedHashMap<>();
+    Map<String, State> tmp = new LinkedHashMap<>();
 
     for (String state : states) {
       State rs = State.parse(state);
-      if(rs == null) continue;
+      if (rs == null) continue;
       State existing = tmp.get(rs.replica);
       if (existing == null) {
         tmp.put(rs.replica, rs);
@@ -99,7 +99,8 @@ public class PerReplicaStates implements ReflectMapWriter {
     return result;
   }
 
-  /**This is a persist operation with retry if a write fails due to stale state
+  /**
+   * This is a persist operation with retry if a write fails due to stale state
    */
   public static void persist(WriteOps ops, String znode, SolrZkClient zkClient) throws KeeperException, InterruptedException {
     try {
@@ -112,7 +113,9 @@ public class PerReplicaStates implements ReflectMapWriter {
       log.info("retried for stale state {}, succeeded", znode);
     }
   }
-  /** Persist a set of operations to Zookeeper
+
+  /**
+   * Persist a set of operations to Zookeeper
    */
   public static void persist(List<Op> operations, String znode, SolrZkClient zkClient) throws KeeperException, InterruptedException {
     if (operations == null || operations.isEmpty()) return;
@@ -146,18 +149,19 @@ public class PerReplicaStates implements ReflectMapWriter {
   }
 
 
-  /**Fetch the latest {@link PerReplicaStates} . It fetches data after checking the {@link Stat#getCversion()} of state.json.
+  /**
+   * Fetch the latest {@link PerReplicaStates} . It fetches data after checking the {@link Stat#getCversion()} of state.json.
    * If this is not modified, the same object is returned
    */
-  public static PerReplicaStates fetch(String path,  SolrZkClient zkClient, PerReplicaStates current)  {
+  public static PerReplicaStates fetch(String path, SolrZkClient zkClient, PerReplicaStates current) {
     try {
-      if(current != null) {
+      if (current != null) {
         Stat stat = zkClient.exists(current.path, null, true);
-        if(stat == null) return null;
-        if(current.cversion == stat.getCversion()) return current;// not modifiedZkStateReaderTest
+        if (stat == null) return null;
+        if (current.cversion == stat.getCversion()) return current;// not modifiedZkStateReaderTest
       }
       Stat stat = new Stat();
-      List<String> children = zkClient.getChildren(path, null,stat ,true);
+      List<String> children = zkClient.getChildren(path, null, stat, true);
       return new PerReplicaStates(path, stat.getCversion(), Collections.unmodifiableList(children));
     } catch (KeeperException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error fetching per-replica states", e);
@@ -193,9 +197,6 @@ public class PerReplicaStates implements ReflectMapWriter {
     public final State state;
 
     public Op(Type typ, State replicaState) {
-      if (replicaState == null) {
-        new RuntimeException("replicaState==null").printStackTrace();
-      }
       this.typ = typ;
       this.state = replicaState;
     }
@@ -213,7 +214,6 @@ public class PerReplicaStates implements ReflectMapWriter {
       return typ.toString() + " : " + state;
     }
   }
-
 
 
   /**
@@ -252,7 +252,7 @@ public class PerReplicaStates implements ReflectMapWriter {
 
     public static State parse(String serialized) {
       List<String> pieces = StrUtils.splitSmart(serialized, ':');
-      if(pieces.size() < 3) return null;
+      if (pieces.size() < 3) return null;
       return new State(serialized, pieces);
 
     }
@@ -291,7 +291,8 @@ public class PerReplicaStates implements ReflectMapWriter {
       }
     }
 
-    /**fetch duplicates entries for this replica
+    /**
+     * fetch duplicates entries for this replica
      */
     List<State> getDuplicates() {
       if (duplicate == null) return Collections.emptyList();
@@ -341,7 +342,9 @@ public class PerReplicaStates implements ReflectMapWriter {
     List<Op> ops;
     private boolean preOp = true;
 
-    /**state of a replica is changed
+    /**
+     * state of a replica is changed
+     *
      * @param newState the new state
      */
     public static WriteOps flipState(String replica, Replica.State newState, PerReplicaStates rs) {
@@ -505,8 +508,10 @@ public class PerReplicaStates implements ReflectMapWriter {
       return preOp;
     }
 
-    /**if a multi operation fails because the state got modified from behind,
+    /**
+     * if a multi operation fails because the state got modified from behind,
      * refresh the operation and try again
+     *
      * @param prs The new state
      */
     abstract List<Op> refresh(PerReplicaStates prs);
@@ -519,7 +524,7 @@ public class PerReplicaStates implements ReflectMapWriter {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("{").append(path).append("/[") .append(cversion).append("]: [");
+    StringBuilder sb = new StringBuilder("{").append(path).append("/[").append(cversion).append("]: [");
     states.forEachEntry((s, state) -> {
       sb.append(state.asString).append(" , ");
       for (State d : state.getDuplicates()) {
