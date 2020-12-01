@@ -87,8 +87,9 @@ public class SliceMutator {
             ZkStateReader.REPLICA_TYPE, message.get(ZkStateReader.REPLICA_TYPE)), coll, slice);
 
     if(collection.isPerReplicaState()) {
+      PerReplicaStates prs = PerReplicaStates.fetch(collection.getZNode(), zkClient, collection.getPerReplicaStates());
       return new ZkWriteCommand(coll, updateReplica(collection, sl, replica.getName(), replica),
-          PerReplicaStates.WriteOps.addReplica(replica.getName(), replica.getState(), replica.isLeader(), collection.getPerReplicaStates(zkClient)), true);
+          PerReplicaStates.WriteOps.addReplica(replica.getName(), replica.getState(), replica.isLeader(), prs), true);
     } else {
       return new ZkWriteCommand(coll, updateReplica(collection, sl, replica.getName(), replica));
     }
@@ -169,11 +170,12 @@ public class SliceMutator {
     newSliceProps.put(Slice.REPLICAS, newReplicas);
     slice = new Slice(slice.getName(), newReplicas, slice.getProperties(), collectionName);
     if(coll.isPerReplicaState()) {
+      PerReplicaStates prs = PerReplicaStates.fetch(coll.getZNode(), zkClient, coll.getPerReplicaStates());
       return new ZkWriteCommand(collectionName, CollectionMutator.updateSlice(collectionName, coll, slice),
           PerReplicaStates.WriteOps.flipLeader(
               oldLeader == null ? null : oldLeader.getName(),
               newLeader == null ? null : newLeader.getName(),
-              coll.getPerReplicaStates(zkClient)), false);
+              prs), false);
     } else {
       return new ZkWriteCommand(collectionName, CollectionMutator.updateSlice(collectionName, coll, slice));
     }

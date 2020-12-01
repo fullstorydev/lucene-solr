@@ -494,25 +494,6 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
     return perReplicaStates;
   }
 
-  /**
-   * for internal use only
-   */
-  public PerReplicaStates getPerReplicaStates(SolrZkClient zkClient)  {
-    try {
-      if(perReplicaStates == null) {
-        return perReplicaStates = PerReplicaStates.fetch(znode, zkClient);
-      } else {
-        return perReplicaStates = PerReplicaStates.fetch(zkClient, perReplicaStates);
-      }
-    } catch (KeeperException e) {
-      throw new RuntimeException(e);
-    } catch (InterruptedException e) {
-      SolrZkClient.checkInterrupted(e);
-      throw new SolrException(ErrorCode.SERVER_ERROR, "Thread interrupted when loading replica states for collection " + name, e);
-    }
-
-  }
-
 
   public int getExpectedReplicaCount(Replica.Type type, int def) {
     Integer result = null;

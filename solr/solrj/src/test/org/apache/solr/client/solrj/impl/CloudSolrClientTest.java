@@ -1095,7 +1095,7 @@ public class CloudSolrClientTest extends SolrCloudTestCase {
     assertEquals("This should be OK", 0, response.getStatus());
     DocCollection c = cluster.getSolrClient().getZkStateReader().getCollection(testCollection);
     c.forEachReplica((s, replica) -> assertNotNull(replica.getReplicaState()));
-    PerReplicaStates prs = PerReplicaStates.fetch(ZkStateReader.getCollectionPath(testCollection), cluster.getZkClient());
+    PerReplicaStates prs = PerReplicaStates.fetch(ZkStateReader.getCollectionPath(testCollection), cluster.getZkClient(), null);
     assertEquals(4, prs.states.size());
   }
 

@@ -1016,10 +1016,11 @@ public class ZkStateReader implements SolrCloseable {
     }
 
     if(leader.get() == null) {
+      //nocommit
       log.debug("getLeaderRetry:@ {} , states {}",System.currentTimeMillis(), coll.get().getPerReplicaStates() );
       try {
         log.debug("Couldn't find leader for: {}/{} , ver : {}, actual ver : {}", coll, shard,
-            (coll.get() != null && coll.get().getPerReplicaStates() != null ? coll.get().getPerReplicaStates().cversion: -1), PerReplicaStates.fetch(getCollectionPath(collection), zkClient ).cversion );
+            (coll.get() != null && coll.get().getPerReplicaStates() != null ? coll.get().getPerReplicaStates().cversion: -1), PerReplicaStates.fetch(getCollectionPath(collection), zkClient, null ).cversion );
       } catch (Exception e) {
         log.error("Unknown Exception", e);
       }
@@ -2470,12 +2471,12 @@ public class ZkStateReader implements SolrCloseable {
     }
   }
   public PerReplicaStates getReplicaStates(String path) throws KeeperException, InterruptedException {
-    return PerReplicaStates.fetch(zkClient, new PerReplicaStates(path, 0, Collections.emptyList()));
+    return PerReplicaStates.fetch(path, zkClient,null );
 
   }
 
   public PerReplicaStates getReplicaStates(PerReplicaStates current) throws KeeperException, InterruptedException {
-    return PerReplicaStates.fetch(zkClient, current);
+    return PerReplicaStates.fetch(current.path, zkClient, current);
   }
 
   public DocCollection getCollection(String collection) {

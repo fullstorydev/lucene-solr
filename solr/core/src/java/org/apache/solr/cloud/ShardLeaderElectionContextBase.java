@@ -187,10 +187,10 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       if (coll == null || coll.getStateFormat() < 2 || ZkController.sendToOverseer(coll, id)) {
         zkController.getOverseer().offerStateUpdate(Utils.toJSON(m));
       } else {
-        PerReplicaStates prs = coll.getPerReplicaStates(zkStateReader.getZkClient());
+        PerReplicaStates prs = PerReplicaStates.fetch(coll.getZNode(), zkClient, coll.getPerReplicaStates());
         PerReplicaStates.WriteOps writeOps = PerReplicaStates.WriteOps.flipLeader(currentLeader, id, prs);
         log.debug("bypassed Zookeeper for leader election for {}/{}", this.collection, shardId);
-        PerReplicaStates.persist(writeOps, prs.path, zkStateReader.getZkClient());
+        PerReplicaStates.persist(writeOps, coll.getZNode(), zkStateReader.getZkClient());
       }
     }
   }

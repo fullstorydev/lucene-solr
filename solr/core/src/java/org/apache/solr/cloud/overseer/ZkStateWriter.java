@@ -241,7 +241,7 @@ public class ZkStateWriter {
                 prs);*/
 
             clusterState = clusterState.copyWith(name,
-                  cmd.collection.copyWith(PerReplicaStates.fetch(ZkStateReader.getCollectionPath(cmd.collection.getName()), reader.getZkClient())));
+                  cmd.collection.copyWith(PerReplicaStates.fetch(cmd.collection.getZNode(), reader.getZkClient(), null)));
           }
           if(!cmd.persistCollState) continue;
           if (c == null) {
@@ -271,7 +271,7 @@ public class ZkStateWriter {
             DocCollection currentCollState = clusterState.getCollection(cmd.name);
             if ( currentCollState != null) {
               clusterState = clusterState.copyWith(name,
-                  currentCollState.copyWith(PerReplicaStates.fetch(ZkStateReader.getCollectionPath(currentCollState.getName()), reader.getZkClient())));
+                  currentCollState.copyWith(PerReplicaStates.fetch(currentCollState.getZNode(), reader.getZkClient(), null)));
             }
           }
         }
