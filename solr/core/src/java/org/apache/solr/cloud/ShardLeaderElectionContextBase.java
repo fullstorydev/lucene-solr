@@ -189,7 +189,8 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       } else {
         PerReplicaStates prs = PerReplicaStates.fetch(coll.getZNode(), zkClient, coll.getPerReplicaStates());
         PerReplicaStates.WriteOps writeOps = PerReplicaStates.WriteOps.flipLeader(currentLeader, id, prs);
-        log.debug("bypassed Zookeeper for leader election for {}/{}", this.collection, shardId);
+        //nocommit make this debug
+        log.info("bypassed Zookeeper for leader election for {}/{}", this.collection, shardId);
         PerReplicaStates.persist(writeOps, coll.getZNode(), zkStateReader.getZkClient());
       }
     }
