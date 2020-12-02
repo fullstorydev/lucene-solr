@@ -1605,7 +1605,8 @@ public class ZkController implements Closeable {
     }
   }
 
-  /**Whether a message needs to be sent to oversereer or not
+  /**
+   * Whether a message needs to be sent to overseer or not
    */
   static boolean sendToOverseer(DocCollection coll, String replicaName) {
     if (coll == null) return true;

@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
+import org.apache.solr.client.solrj.impl.SolrClientCloudManager;
 import org.apache.solr.cloud.CloudUtil;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.Assign;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.cloud.overseer.CollectionMutator.checkCollectionKeyExistence;
 import static org.apache.solr.cloud.overseer.CollectionMutator.checkKeyExistence;
+import static org.apache.solr.cloud.overseer.SliceMutator.getZkClient;
 import static org.apache.solr.common.params.CommonParams.NAME;
 
 public class ReplicaMutator {
@@ -61,10 +63,10 @@ public class ReplicaMutator {
   protected final DistribStateManager stateManager;
   protected SolrZkClient zkClient;
 
-  public ReplicaMutator(SolrCloudManager cloudManager, SolrZkClient zkClient) {
+  public ReplicaMutator(SolrCloudManager cloudManager) {
     this.cloudManager = cloudManager;
     this.stateManager = cloudManager.getDistribStateManager();
-    this.zkClient = zkClient;
+    this.zkClient = getZkClient(cloudManager);
   }
 
   protected Replica setProperty(Replica replica, String key, String value) {
@@ -512,7 +514,7 @@ public class ReplicaMutator {
                   , (isLeaderSame ? "" : "un"), collection.getName(), parentSliceName);
             }
             ZkNodeProps m = new ZkNodeProps(propMap);
-            return new SliceMutator(cloudManager, zkClient).updateShardState(prevState, m).collection;
+            return new SliceMutator(cloudManager).updateShardState(prevState, m).collection;
           }
         }
       }

@@ -25,6 +25,7 @@ import java.util.Set;
 import com.google.common.collect.ImmutableSet;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
+import org.apache.solr.client.solrj.impl.SolrClientCloudManager;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.Assign;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
@@ -55,10 +56,19 @@ public class SliceMutator {
   protected final DistribStateManager stateManager;
   protected final SolrZkClient zkClient;
 
-  public SliceMutator(SolrCloudManager cloudManager, SolrZkClient zkClient) {
+  public SliceMutator(SolrCloudManager cloudManager) {
     this.cloudManager = cloudManager;
     this.stateManager = cloudManager.getDistribStateManager();
-    this.zkClient = zkClient;
+    this.zkClient = getZkClient(cloudManager);
+  }
+
+  static SolrZkClient getZkClient(SolrCloudManager cloudManager) {
+    if (cloudManager instanceof SolrClientCloudManager) {
+      SolrClientCloudManager manager = (SolrClientCloudManager) cloudManager;
+      return manager.getZkClient();
+    } else {
+      return null;
+    }
   }
 
   public ZkWriteCommand addReplica(ClusterState clusterState, ZkNodeProps message) {
@@ -158,9 +168,9 @@ public class SliceMutator {
       String coreURL = ZkCoreNodeProps.getCoreUrl(replica.getStr(ZkStateReader.BASE_URL_PROP), replica.getStr(ZkStateReader.CORE_NAME_PROP));
 
       if (replica == oldLeader && !coreURL.equals(leaderUrl)) {
-        replica = new ReplicaMutator(cloudManager, zkClient).unsetLeader(replica);
+        replica = new ReplicaMutator(cloudManager).unsetLeader(replica);
       } else if (coreURL.equals(leaderUrl)) {
-        newLeader= replica = new ReplicaMutator(cloudManager, zkClient).setLeader(replica);
+        newLeader= replica = new ReplicaMutator(cloudManager).setLeader(replica);
       }
 
       newReplicas.put(replica.getName(), replica);

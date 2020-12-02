@@ -56,6 +56,7 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 
 import static org.apache.solr.client.solrj.cloud.autoscaling.Policy.POLICY;
+import static org.apache.solr.common.cloud.DocCollection.PER_REPLICA_STATE;
 import static org.apache.solr.common.cloud.DocCollection.RULE;
 import static org.apache.solr.common.cloud.DocCollection.SNITCH;
 import static org.apache.solr.common.cloud.ZkStateReader.AUTO_ADD_REPLICAS;
@@ -94,6 +95,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
       COLL_CONF,
       WITH_COLLECTION,
       COLOCATED_WITH,
+      PER_REPLICA_STATE,
       READ_ONLY);
 
   protected final CollectionAction action;
@@ -592,7 +594,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
         params.set(ZkStateReader.TLOG_REPLICAS, tlogReplicas);
       }
       if(Boolean.TRUE.equals(perReplicaState)) {
-        params.set(DocCollection.PER_REPLICA_STATE, perReplicaState);
+        params.set(PER_REPLICA_STATE, perReplicaState);
       }
       if (rule != null) params.set(DocCollection.RULE, rule);
       if (snitch != null) params.set(DocCollection.SNITCH, snitch);

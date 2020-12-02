@@ -387,11 +387,11 @@ public class Overseer implements SolrCloseable {
           case DELETESHARD:
             return Collections.singletonList(new CollectionMutator(getSolrCloudManager()).deleteShard(clusterState, message));
           case ADDREPLICA:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager(), zkClient).addReplica(clusterState, message));
+            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).addReplica(clusterState, message));
           case ADDREPLICAPROP:
-            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager(), zkClient).addReplicaProperty(clusterState, message));
+            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).addReplicaProperty(clusterState, message));
           case DELETEREPLICAPROP:
-            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager(), zkClient).deleteReplicaProperty(clusterState, message));
+            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).deleteReplicaProperty(clusterState, message));
           case BALANCESHARDUNIQUE:
             ExclusiveSliceProperty dProp = new ExclusiveSliceProperty(clusterState, message);
             if (dProp.balanceProperty()) {
@@ -415,17 +415,17 @@ public class Overseer implements SolrCloseable {
         }
         switch (overseerAction) {
           case STATE:
-            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager(), zkClient).setState(clusterState, message));
+            return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).setState(clusterState, message));
           case LEADER:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager(), zkClient).setShardLeader(clusterState, message));
+            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).setShardLeader(clusterState, message));
           case DELETECORE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager(), zkClient).removeReplica(clusterState, message));
+            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).removeReplica(clusterState, message));
           case ADDROUTINGRULE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager(), zkClient).addRoutingRule(clusterState, message));
+            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).addRoutingRule(clusterState, message));
           case REMOVEROUTINGRULE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager(), zkClient).removeRoutingRule(clusterState, message));
+            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).removeRoutingRule(clusterState, message));
           case UPDATESHARDSTATE:
-            return Collections.singletonList(new SliceMutator(getSolrCloudManager(), zkClient).updateShardState(clusterState, message));
+            return Collections.singletonList(new SliceMutator(getSolrCloudManager()).updateShardState(clusterState, message));
           case QUIT:
             if (myId.equals(message.get(ID))) {
               if (log.isInfoEnabled()) {

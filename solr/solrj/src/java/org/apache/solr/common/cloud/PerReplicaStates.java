@@ -371,6 +371,31 @@ public class PerReplicaStates implements ReflectMapWriter {
       return rs;
     }
 
+
+    /**Switch a collection from/to perReplicaState=true
+     */
+    public static WriteOps modifyCollection(DocCollection coll, boolean enable, PerReplicaStates prs) {
+      return new WriteOps() {
+        @Override
+        List<Op> refresh(PerReplicaStates prs) {
+          return enable ? enable(coll) : disable(prs);
+        }
+
+        List<Op> enable(DocCollection coll) {
+          List<Op> result = new ArrayList<>();
+          coll.forEachReplica((s, r) -> result.add(new Op(Op.Type.ADD, new State(r.getName(), r.getState(), r.isLeader(), 0))));
+          return result;
+        }
+
+        List<Op> disable(PerReplicaStates prs) {
+          List<Op> result = new ArrayList<>();
+          prs.states.forEachEntry((s, state) -> result.add(new Op(Op.Type.DELETE, state)));
+          return result;
+        }
+      }.init(prs);
+
+    }
+
     /**
      * Flip the leader replica to a new one
      *
