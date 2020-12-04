@@ -183,7 +183,7 @@ public class SliceMutator {
       PerReplicaStates prs = PerReplicaStates.fetch(coll.getZNode(), zkClient, coll.getPerReplicaStates());
       return new ZkWriteCommand(collectionName, CollectionMutator.updateSlice(collectionName, coll, slice),
           PerReplicaStates.WriteOps.flipLeader(
-              oldLeader == null ? null : oldLeader.getName(),
+              slice.getReplicaNames(),
               newLeader == null ? null : newLeader.getName(),
               prs), false);
     } else {

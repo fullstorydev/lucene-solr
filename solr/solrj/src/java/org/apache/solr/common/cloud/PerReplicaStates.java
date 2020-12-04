@@ -26,6 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.BiConsumer;
 
 import org.apache.solr.cluster.api.SimpleMap;
 import org.apache.solr.common.MapWriter;
@@ -399,31 +401,44 @@ public class PerReplicaStates implements ReflectMapWriter {
     /**
      * Flip the leader replica to a new one
      *
-     * @param old  current leader
+     * @param allReplicas  allReplicas of the shard
      * @param next next leader
      */
-    public static WriteOps flipLeader(String old, String next, PerReplicaStates rs) {
+    public static WriteOps flipLeader(Set<String> allReplicas, String next, PerReplicaStates rs) {
       return new WriteOps() {
 
         @Override
         protected List<Op> refresh(PerReplicaStates rs) {
           List<Op> ops = new ArrayList<>(4);
-          if (old != null) {
-            State st = rs.get(old);
-            if (st != null) {
-              ops.add(new Op(Op.Type.ADD, new State(st.replica, st.state, Boolean.FALSE, st.version + 1)));
-              ops.add(new Op(Op.Type.DELETE, st));
-            }
-          }
-          if (next != null) {
+          if(next != null) {
             State st = rs.get(next);
             if (st != null) {
-              ops.add(new Op(Op.Type.ADD, new State(st.replica, Replica.State.ACTIVE, Boolean.TRUE, st.version + 1)));
-              ops.add(new Op(Op.Type.DELETE, st));
+              if (!st.isLeader) {
+                ops.add(new Op(Op.Type.ADD, new State(st.replica, Replica.State.ACTIVE, Boolean.TRUE, st.version + 1)));
+                ops.add(new Op(Op.Type.DELETE, st));
+              }
+              //else do not do anything , that node is the leader
+            } else {
+              //there is no entry for the new leader.
+              //create one
+              ops.add(new Op(Op.Type.ADD, new State(next, Replica.State.ACTIVE, Boolean.TRUE, 0)));
+            }
+          }
+
+          //now go through all other replicas and unset previous leader
+          for (String r : allReplicas) {
+            State st = rs.get(r);
+            if (st == null) continue;//unlikely
+            if (!Objects.equals(r, next)) {
+              if(st.isLeader) {
+                //some other replica is the leader now. unset
+                ops.add(new Op(Op.Type.ADD, new State(st.replica, st.state, Boolean.FALSE, st.version + 1)));
+                ops.add(new Op(Op.Type.DELETE, st));
+              }
             }
           }
           if (log.isDebugEnabled()) {
-            log.debug("flipLeader on:{}, {} -> {}, ops: {}", rs.path, old, next, ops);
+            log.debug("flipLeader on:{}, {} -> {}, ops: {}", rs.path, allReplicas, next, ops);
           }
           return ops;
         }
@@ -473,9 +488,11 @@ public class PerReplicaStates implements ReflectMapWriter {
           for (String replica : replicas) {
             State r = rs.get(replica);
             if (r != null) {
-              if (r.state == Replica.State.DOWN) continue;
-              ops.add(new Op(Op.Type.ADD, new State(replica, Replica.State.DOWN, r.isLeader, r.version + 1)));
+              if (r.state == Replica.State.DOWN && !r.isLeader) continue;
+              ops.add(new Op(Op.Type.ADD, new State(replica, Replica.State.DOWN, Boolean.FALSE, r.version + 1)));
               addDeleteStaleNodes(ops, r);
+            } else {
+              ops.add(new Op(Op.Type.ADD, new State(replica, Replica.State.DOWN, Boolean.FALSE, 0)));
             }
           }
           if (log.isDebugEnabled()) {
@@ -550,13 +567,21 @@ public class PerReplicaStates implements ReflectMapWriter {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("{").append(path).append("/[").append(cversion).append("]: [");
-    states.forEachEntry((s, state) -> {
-      sb.append(state.asString).append(" , ");
-      for (State d : state.getDuplicates()) {
-        sb.append(d).append(" , ");
+    appendStates(sb);
+    return sb.append("]}").toString();
+  }
+
+  private StringBuilder appendStates(StringBuilder sb) {
+    states.forEachEntry(new BiConsumer<String, State>() {
+      int count = 0;
+      @Override
+      public void accept(String s, State state) {
+        if(count++ > 0) sb.append(", ");
+        sb.append(state.asString);
+        for (State d : state.getDuplicates()) sb.append(d.asString);
       }
     });
-    return sb.append("]}").toString();
+    return sb;
   }
 
 }

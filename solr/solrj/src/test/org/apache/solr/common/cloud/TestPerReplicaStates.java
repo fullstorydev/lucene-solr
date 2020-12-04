@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.cloud.Replica.State;
 import org.apache.zookeeper.CreateMode;
@@ -102,14 +103,14 @@ public class TestPerReplicaStates extends SolrCloudTestCase {
     rs = zkStateReader.getReplicaStates(root);
     assertEquals(3, rs.states.size());
 
-    ops = PerReplicaStates.WriteOps.flipLeader(null, "R4",rs).get();
+    ops = PerReplicaStates.WriteOps.flipLeader(ImmutableSet.of("R4","R3","R1"), "R4",rs).get();
 
     assertEquals(2, ops.size());
     assertEquals(PerReplicaStates.Op.Type.ADD, ops.get(0).typ);
     assertEquals(PerReplicaStates.Op.Type.DELETE, ops.get(1).typ);
     PerReplicaStates.persist(ops, root,cluster.getZkClient());
     rs = zkStateReader.getReplicaStates(root);
-    ops =  PerReplicaStates.WriteOps.flipLeader("R4","R3",rs).get();
+    ops =  PerReplicaStates.WriteOps.flipLeader(ImmutableSet.of("R4","R3","R1"),"R3",rs).get();
     assertEquals(4, ops.size());
     PerReplicaStates.persist(ops, root,cluster.getZkClient());
     rs = zkStateReader.getReplicaStates(root);
