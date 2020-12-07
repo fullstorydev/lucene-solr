@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +49,7 @@ import static org.apache.solr.common.params.CommonParams.VERSION;
 
 /**
  * This represents the individual replica states in a collection
- * This is an immutable object
+ * This is an immutable object. When states are modified, a new instance is constructed
  */
 public class PerReplicaStates implements ReflectMapWriter {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -84,19 +84,19 @@ public class PerReplicaStates implements ReflectMapWriter {
 
   }
 
-  /**
-   * Get a map of replicas and their new states
-   *
-   * @param newPerReplicaStates This is the list of all nodes available in ZK
+  /**Get the changed replicas
    */
-  public static Map<String, State> findModifiedStates(PerReplicaStates newPerReplicaStates, DocCollection coll) {
-    Map<String, State> result = new HashMap<>();
-    newPerReplicaStates.states.forEachEntry((replicaName, state) -> {
-      Replica replica = coll.getReplica(replicaName);
-      if (replica != null && replica.getReplicaState() != null && !replica.getReplicaState().asString.equals(state.asString)) {
-        result.put(replicaName, state);
-        //this is modified
-      }
+  public static Set<String> findModifiedReplicas(PerReplicaStates old, PerReplicaStates fresh) {
+    Set<String> result = new HashSet<>();
+    if(fresh == null) {
+      old.states.forEachKey(result::add);
+      return result;
+    }
+    old.states.forEachEntry((s, state) -> {
+      //the state is modified or missing
+      if(!Objects.equals(fresh.get(s) , state)) result.add(s);
+    });
+    fresh.states.forEachEntry((s, state) -> { if(old.get(s) == null ) result.add(s);
     });
     return result;
   }
@@ -159,7 +159,7 @@ public class PerReplicaStates implements ReflectMapWriter {
     try {
       if (current != null) {
         Stat stat = zkClient.exists(current.path, null, true);
-        if (stat == null) return null;
+        if (stat == null) return new PerReplicaStates(path, -1, Collections.emptyList());
         if (current.cversion == stat.getCversion()) return current;// not modifiedZkStateReaderTest
       }
       Stat stat = new Stat();
@@ -496,7 +496,7 @@ public class PerReplicaStates implements ReflectMapWriter {
             }
           }
           if (log.isDebugEnabled()) {
-            log.debug("for coll: {} down replicas {}, ops {}", rs.path, replicas, ops);
+            log.debug("for coll: {} down replicas {}, ops {}", rs, replicas, ops);
           }
           return ops;
         }

@@ -233,9 +233,14 @@ public class Replica extends ZkNodeProps {
 
   public Replica copyWith(PerReplicaStates.State state) {
     log.debug("A replica is updated with new state : {}", state);
-    Map<String,Object> props =new LinkedHashMap<>(propMap);
-    props.put(ZkStateReader.STATE_PROP, state.state.toString());
-    if(state.isLeader) props.put(Slice.LEADER, "true");
+    Map<String, Object> props = new LinkedHashMap<>(propMap);
+    if (state == null) {
+      props.put(ZkStateReader.STATE_PROP, State.DOWN.toString());
+      props.remove(Slice.LEADER);
+    } else {
+      props.put(ZkStateReader.STATE_PROP, state.state.toString());
+      if (state.isLeader) props.put(Slice.LEADER, "true");
+    }
     Replica r = new Replica(name, props, collection, slice);
     r.replicaState = state;
     return r;

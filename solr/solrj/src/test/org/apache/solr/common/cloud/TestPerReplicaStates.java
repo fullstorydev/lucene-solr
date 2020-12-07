@@ -20,6 +20,7 @@ package org.apache.solr.common.cloud;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -53,11 +54,27 @@ public class TestPerReplicaStates extends SolrCloudTestCase {
   }
 
   public void testEntries() {
-    PerReplicaStates entries = new PerReplicaStates("/collections/testcoll/state.json", 0, ImmutableList.of("R1:2:A", "R1:1:A:L", "R1:0:D", "R2:0:D", "R3:0:A"));
+    PerReplicaStates entries = new PerReplicaStates("state.json", 0, ImmutableList.of("R1:2:A", "R1:1:A:L", "R1:0:D", "R2:0:D", "R3:0:A"));
     assertEquals(2, entries.get("R1").version);
-    entries = new PerReplicaStates("/collections/testcoll/state.json", 0, ImmutableList.of("R1:1:A:L", "R1:2:A", "R2:0:D", "R3:0:A", "R1:0:D"));
+    entries = new PerReplicaStates("state.json", 0, ImmutableList.of("R1:1:A:L", "R1:2:A", "R2:0:D", "R3:0:A", "R1:0:D"));
     assertEquals(2, entries.get("R1").version);
     assertEquals(2, entries.get("R1").getDuplicates().size());
+    Set<String> modified = PerReplicaStates.findModifiedReplicas(entries,  new PerReplicaStates("state.json", 0, ImmutableList.of("R1:1:A:L", "R1:2:A", "R2:0:D", "R3:1:A", "R1:0:D")));
+    assertEquals(1, modified.size());
+    assertTrue(modified.contains("R3"));
+    modified = PerReplicaStates.findModifiedReplicas( entries,
+        new PerReplicaStates("state.json", 0, ImmutableList.of("R1:1:A:L", "R1:2:A", "R2:0:D", "R3:1:A", "R1:0:D", "R4:0:A")));
+    assertEquals(2, modified.size());
+    assertTrue(modified.contains("R3"));
+    assertTrue(modified.contains("R4"));
+    modified = PerReplicaStates.findModifiedReplicas( entries,
+        new PerReplicaStates("state.json", 0, ImmutableList.of("R1:1:A:L", "R1:2:A", "R3:1:A", "R1:0:D", "R4:0:A")));
+    assertEquals(3, modified.size());
+    assertTrue(modified.contains("R3"));
+    assertTrue(modified.contains("R4"));
+    assertTrue(modified.contains("R2"));
+
+
   }
 
   public void testReplicaStateOperations() throws Exception {

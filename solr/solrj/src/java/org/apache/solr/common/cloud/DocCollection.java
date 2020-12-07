@@ -33,7 +33,6 @@ import java.util.function.BiPredicate;
 import org.apache.solr.client.solrj.cloud.autoscaling.Policy;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.zookeeper.KeeperException;
 import org.noggit.JSONWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,26 +149,22 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
    * Used to create a new Collection State when only a replica is updated
    */
   public DocCollection copyWith( PerReplicaStates newPerReplicaStates) {
-    log.debug("collection :{} going to be updated :  per-replica state :{} -> {}",name, this.perReplicaStates==null? -1: this.perReplicaStates.cversion, newPerReplicaStates.cversion );
-    if(this.perReplicaStates != null && this.perReplicaStates.cversion == newPerReplicaStates.cversion) return this;
-    Map<String, PerReplicaStates.State> replicaNameVsNodeName = PerReplicaStates.findModifiedStates(newPerReplicaStates, this);
-    if(replicaNameVsNodeName.isEmpty()) {
-      this.perReplicaStates = newPerReplicaStates;
-      return this;//nothing is modified
+    log.debug("collection :{} going to be updated :  per-replica state :{} -> {}",
+        name,
+        getChildNodesVersion(), newPerReplicaStates.cversion);
+    if(getChildNodesVersion() == newPerReplicaStates.cversion) return this;
+    Set<String> modifiedReplicas = PerReplicaStates.findModifiedReplicas(newPerReplicaStates, this.perReplicaStates);
+    if(modifiedReplicas.isEmpty()) return this; //nothing is modified
+    Map<String, Slice> modifiedShards = new HashMap<>(getSlicesMap());
+    for (String s : modifiedReplicas) {
+      Replica replica = getReplica(s);
+      if(replica != null) {
+        Replica newReplica = replica.copyWith(newPerReplicaStates.get(s));
+        Slice shard = modifiedShards.get(replica.slice);
+        modifiedShards.put(replica.slice, shard.copyWith(newReplica));
+      }
     }
-
-    Map<String, List<PerReplicaStates.State>> slicesVsReplicaVsReplicaStates = new HashMap<>();
-    replicaNameVsNodeName.forEach((r, rs) -> {
-      Replica replica =  getReplica(r);
-      slicesVsReplicaVsReplicaStates
-          .computeIfAbsent(replica.slice, s -> new ArrayList<>())
-      .add(rs);
-    });
-    Map<String, Slice> newSlices =  new LinkedHashMap<>(getSlicesMap());
-    slicesVsReplicaVsReplicaStates.forEach((slice, rs) -> {
-      newSlices.put(slice, getSlice(slice).copyWith(rs));
-    });
-    DocCollection result = new DocCollection(getName(), newSlices, propMap, router, znodeVersion, znode);
+    DocCollection result = new DocCollection(getName(), modifiedShards, propMap, router, znodeVersion, znode);
     result.perReplicaStates = newPerReplicaStates;
     return result;
 
@@ -301,6 +296,16 @@ public class DocCollection extends ZkNodeProps implements Iterable<Slice> {
 
   public int getZNodeVersion(){
     return znodeVersion;
+  }
+  public int getChildNodesVersion() {
+    return perReplicaStates == null ? -1 : perReplicaStates.cversion;
+  }
+
+  public boolean isModified(int dataVersion, int childVersion) {
+    if(dataVersion > znodeVersion) return true;
+    if(childVersion > getChildNodesVersion()) return true;
+    return false;
+
   }
 
   public int getStateFormat() {
