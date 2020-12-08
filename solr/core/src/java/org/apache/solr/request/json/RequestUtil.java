@@ -194,7 +194,7 @@ public class RequestUtil {
     }
 
     List<SearchComponent> components = ((SearchHandler) handler).getComponents();
-    Set<String> pluginNames = components.stream().map(c -> c.getJsonKey()).filter(c -> c != null).collect(Collectors.toSet());
+    Set<String> pluginJsonKeys = components.stream().map(c -> c.getJsonKey()).filter(c -> c != null).collect(Collectors.toSet());
 
     // implement compat for existing components...
     JsonQueryConverter jsonQueryConverter = new JsonQueryConverter();
@@ -220,7 +220,7 @@ public class RequestUtil {
           out = "rows";
         } else if (SORT.equals(key)) {
           out = SORT;
-        } else if ("params".equals(key) || "facet".equals(key) || pluginNames.contains(key) ) {
+        } else if ("params".equals(key) || "facet".equals(key) || pluginJsonKeys.contains(key) ) {
           // handled elsewhere
           continue;
         } else {

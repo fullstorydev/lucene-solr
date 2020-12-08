@@ -41,7 +41,6 @@ public abstract class SearchComponent implements SolrInfoBean, NamedListInitiali
    * The name given to this component in solrconfig.xml file
    */
   private String name = this.getClass().getName();
-  private String jsonKey;
 
   protected Set<String> metricNames = ConcurrentHashMap.newKeySet();
   protected MetricRegistry registry;
@@ -93,9 +92,10 @@ public abstract class SearchComponent implements SolrInfoBean, NamedListInitiali
     this.name = name;
   }
 
-  public String getJsonKey() { return this.jsonKey; }
-
-  public void setJsonKey(String key) { this.jsonKey = key; }
+  /**
+   * Override getJsonKey for custom SearchComponents
+   */
+  public String getJsonKey() { return null; }
 
   //////////////////////// NamedListInitializedPlugin methods //////////////////////
   @Override
