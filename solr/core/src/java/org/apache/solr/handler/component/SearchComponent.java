@@ -93,7 +93,8 @@ public abstract class SearchComponent implements SolrInfoBean, NamedListInitiali
   }
 
   /**
-   * Override getJsonKey for custom SearchComponents
+   * Built-in component json keys are explicitly handled in RequestUtil
+   * Override getJsonKey for custom SearchComponents so the custom json key can be parsed by RequestUtil
    */
   public String getJsonKey() { return null; }
 
