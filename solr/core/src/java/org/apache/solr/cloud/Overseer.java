@@ -101,7 +101,8 @@ public class Overseer implements SolrCloseable, SolrMetricProducer, SolrInfoBean
 
   enum LeaderStatus {DONT_KNOW, NO, YES}
 
-  private Counter totalMessages, stateMessages, leaderMessages;
+  //for
+  public Counter totalMessages, stateMessages, leaderMessages;
   private SolrMetricsContext ctx;
   
   @Override
@@ -396,7 +397,8 @@ public class Overseer implements SolrCloseable, SolrMetricProducer, SolrInfoBean
     private List<ZkWriteCommand> processMessage(ClusterState clusterState,
         final ZkNodeProps message, final String operation) {
       CollectionParams.CollectionAction collectionAction = CollectionParams.CollectionAction.get(operation);
-      totalMessages.inc();
+      log.debug("An overseer state message");
+      if(totalMessages!= null) totalMessages.inc();
       if (collectionAction != null) {
         switch (collectionAction) {
           case CREATE:
@@ -436,11 +438,13 @@ public class Overseer implements SolrCloseable, SolrMetricProducer, SolrInfoBean
         }
         switch (overseerAction) {
           case STATE: {
-            stateMessages.inc();
+            log.debug("A state message");
+            if(stateMessages != null) stateMessages.inc();
             return Collections.singletonList(new ReplicaMutator(getSolrCloudManager()).setState(clusterState, message));
           }
           case LEADER: {
-            leaderMessages.inc();
+            log.debug("A leader message");
+            if(leaderMessages != null) leaderMessages.inc();
             return Collections.singletonList(new SliceMutator(getSolrCloudManager()).setShardLeader(clusterState, message));
           }
           case DELETECORE:
