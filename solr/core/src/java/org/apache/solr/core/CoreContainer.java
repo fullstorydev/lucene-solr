@@ -71,6 +71,7 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Replica.State;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrjNamedThreadFactory;
@@ -143,6 +144,9 @@ import static org.apache.solr.security.AuthenticationPlugin.AUTHENTICATION_PLUGI
  */
 public class CoreContainer {
 
+  private static final String SOLR_QUERY_AGGREGATOR = "SolrQueryAggregator";
+  private static final String PROXY_CORE_SUFFIX = "_Proxycore";
+
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   final SolrCores solrCores = new SolrCores(this);
@@ -182,6 +186,8 @@ public class CoreContainer {
       new DefaultSolrThreadFactory("coreContainerWorkExecutor"));
 
   private final OrderedExecutor replayUpdatesExecutor;
+
+  private final boolean isQueryAggregator = Boolean.getBoolean(SOLR_QUERY_AGGREGATOR);
 
   protected volatile LogWatcher logging = null;
 
@@ -346,6 +352,7 @@ public class CoreContainer {
         ExecutorUtil.newMDCAwareCachedThreadPool(
             cfg.getReplayUpdatesThreads(),
             new DefaultSolrThreadFactory("replayUpdatesExecutor")));
+    log.info("Initialized core container as {}", isQueryAggregator ? "query aggregator" : "data node");
   }
 
   private synchronized void initializeAuthorizationPlugin(Map<String, Object> authorizationConf) {
@@ -1281,15 +1288,19 @@ public class CoreContainer {
     try {
       MDCLoggingContext.setCoreDescriptor(this, dcore);
       SolrIdentifierValidator.validateCoreName(dcore.getName());
-      if (zkSys.getZkController() != null) {
+      // We are not registering proxy core
+      if (!isQueryAggregator && zkSys.getZkController() != null) {
         zkSys.getZkController().preRegister(dcore, publishState);
       }
-
       ConfigSet coreConfig = getConfigSet(dcore);
       dcore.setConfigSetTrusted(coreConfig.isTrusted());
       log.info("Creating SolrCore '{}' using configuration from {}, trusted={}", dcore.getName(), coreConfig.getName(), dcore.isConfigSetTrusted());
       try {
-        core = new SolrCore(this, dcore, coreConfig);
+        if (isQueryAggregator) {
+          core = new SolrCoreProxy(this, dcore, coreConfig);
+        } else {
+          core = new SolrCore(this, dcore, coreConfig);
+        }
       } catch (SolrException e) {
         core = processCoreCreateException(e, dcore, coreConfig);
       }
@@ -1298,7 +1309,6 @@ public class CoreContainer {
       if (!isZooKeeperAware() && core.getUpdateHandler().getUpdateLog() != null) {
         core.getUpdateHandler().getUpdateLog().recoverFromLog();
       }
-
       registerCore(dcore, core, publishState, newCollection);
 
       return core;
@@ -1324,6 +1334,27 @@ public class CoreContainer {
     } finally {
       MDCLoggingContext.clear();
     }
+  }
+
+  private SolrCore getOrCreateProxyCore(String collectionName) {
+    DocCollection collection = getCollection(collectionName);
+
+    if (collection == null)
+      return null;
+
+    Map<String, String> coreProps = new HashMap<>();
+    coreProps.put(CoreAdminParams.CORE_NODE_NAME, this.getHostName());
+    coreProps.put(CoreAdminParams.NAME, collection.getName() + PROXY_CORE_SUFFIX);
+    coreProps.put(CoreAdminParams.COLLECTION, collection.getName());
+
+    CoreDescriptor ret = new CoreDescriptor(
+        collection.getName(),
+        Paths.get(this.getSolrHome() + "/" + collection.getName()),
+        coreProps, this.getContainerProperties(), this.isZooKeeperAware());
+
+    SolrCore solrCore = createFromDescriptor(ret, false, false);
+    solrCore.open();
+    return solrCore;
   }
 
   public boolean isSharedFs(CoreDescriptor cd) {
@@ -1771,6 +1802,10 @@ public class CoreContainer {
       return core;
     }
 
+    if(isQueryAggregator) {
+      return getOrCreateProxyCore(name);
+    }
+
     // If it's not yet loaded, we can check if it's had a core init failure and "do the right thing"
     CoreDescriptor desc = solrCores.getCoreDescriptor(name);
 
@@ -1943,6 +1978,10 @@ public class CoreContainer {
     return solrCores.isCoreLoading(name);
   }
 
+  public boolean isQueryAggregator() {
+    return isQueryAggregator;
+  }
+
   public AuthorizationPlugin getAuthorizationPlugin() {
     return authorizationPlugin == null ? null : authorizationPlugin.plugin;
   }
@@ -1990,7 +2029,7 @@ public class CoreContainer {
     // Try to read the coreNodeName from the cluster state.
 
     String coreName = cd.getName();
-    DocCollection coll = getZkController().getZkStateReader().getClusterState().getCollection(cd.getCollectionName());
+    DocCollection coll = getCollection(cd.getConfigName());
     for (Replica rep : coll.getReplicas()) {
       if (coreName.equals(rep.getCoreName())) {
         log.warn("Core properties file for node {} found with no coreNodeName, attempting to repair with value {}. See SOLR-11503. " +
@@ -2003,6 +2042,11 @@ public class CoreContainer {
     }
     log.error("Could not repair coreNodeName in core.properties file for core {}", coreName);
     return false;
+  }
+
+  private DocCollection getCollection(String collectionName) {
+    DocCollection coll = getZkController().getZkStateReader().getClusterState().getCollection(collectionName);
+    return coll;
   }
 
   /**

@@ -1119,7 +1119,8 @@ public class ZkController implements Closeable {
     String nodeAddedPath = ZkStateReader.SOLR_AUTOSCALING_NODE_ADDED_PATH + "/" + nodeName;
     log.info("Register node as live in ZooKeeper:" + nodePath);
     List<Op> ops = new ArrayList<>(2);
-    ops.add(Op.create(nodePath, null, zkClient.getZkACLProvider().getACLsToAdd(nodePath), CreateMode.EPHEMERAL));
+    byte[] queryNode = Utils.toJSON(new ZkNodeProps(ZkStateReader.SOLR_QUERY_AGGREGATOR, String.valueOf(cc.isQueryAggregator())));
+    ops.add(Op.create(nodePath, queryNode, zkClient.getZkACLProvider().getACLsToAdd(nodePath), CreateMode.EPHEMERAL));
     // if there are nodeAdded triggers don't create nodeAdded markers
     boolean createMarkerNode = zkStateReader.getAutoScalingConfig().hasTriggerForEvents(TriggerEventType.NODEADDED);
     if (createMarkerNode && !zkClient.exists(nodeAddedPath, true)) {

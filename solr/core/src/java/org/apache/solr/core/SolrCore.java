@@ -182,7 +182,7 @@ import static org.apache.solr.common.params.CommonParams.PATH;
  * When multi-core support was added to Solr way back in version 1.3, this class was required so that the core
  * functionality could be re-used multiple times.
  */
-public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
+public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
 
   public static final String version = "1.0";
 
@@ -1097,7 +1097,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   /**
    * Set UpdateLog to buffer updates if the slice is in construction.
    */
-  private void bufferUpdatesIfConstructing(CoreDescriptor coreDescriptor) {
+  protected void bufferUpdatesIfConstructing(CoreDescriptor coreDescriptor) {
 
     if (coreContainer != null && coreContainer.isZooKeeperAware()) {
       if (reqHandlers.get("/get") == null) {
