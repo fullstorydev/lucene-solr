@@ -1336,7 +1336,7 @@ public class CoreContainer {
     }
   }
 
-  private SolrCore getOrCreateProxyCore(String collectionName) {
+  private SolrCore createProxyCore(String collectionName) {
     DocCollection collection = getCollection(collectionName);
 
     if (collection == null)
@@ -1351,10 +1351,16 @@ public class CoreContainer {
         collection.getName(),
         Paths.get(this.getSolrHome() + "/" + collection.getName()),
         coreProps, this.getContainerProperties(), this.isZooKeeperAware());
-
-    SolrCore solrCore = createFromDescriptor(ret, false, false);
-    solrCore.open();
-    return solrCore;
+    try {
+      SolrCore solrCore = solrCores.waitAddPendingCoreOps(ret.getName());
+      if (solrCore == null) {
+        solrCore = createFromDescriptor(ret, false, false);
+      }
+      solrCore.open();
+      return solrCore;
+    } finally {
+      solrCores.removeFromPendingOps(ret.getName());
+    }
   }
 
   public boolean isSharedFs(CoreDescriptor cd) {
@@ -1803,7 +1809,7 @@ public class CoreContainer {
     }
 
     if(isQueryAggregator) {
-      return getOrCreateProxyCore(name);
+      return createProxyCore(name);
     }
 
     // If it's not yet loaded, we can check if it's had a core init failure and "do the right thing"
