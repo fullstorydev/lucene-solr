@@ -109,6 +109,7 @@ public class ZkStateReader implements SolrCloseable {
   public static final String STATE_TIMESTAMP_PROP = "stateTimestamp";
   public static final String COLLECTIONS_ZKNODE = "/collections";
   public static final String LIVE_NODES_ZKNODE = "/live_nodes";
+  public static final String LIVE_QUERY_NODES_ZKNODE = "/live_query_nodes";
   public static final String SOLR_QUERY_AGGREGATOR = "QueryAggregator";
   public static final String ALIASES = "/aliases.json";
   public static final String CLUSTER_STATE = "/clusterstate.json";
@@ -198,6 +199,10 @@ public class ZkStateReader implements SolrCloseable {
   private final ConcurrentHashMap<String, PropsWatcher> collectionPropsWatchers = new ConcurrentHashMap<>();
 
   private volatile SortedSet<String> liveNodes = emptySortedSet();
+
+  private volatile SortedSet<String> liveQueryNodes = emptySortedSet();
+
+  private final Object refreshLiveQueryNodesLock = new Object();
 
   private volatile Map<String, Object> clusterProperties = Collections.emptyMap();
 
@@ -512,6 +517,10 @@ public class ZkStateReader implements SolrCloseable {
     // on reconnect of SolrZkClient force refresh and re-add watches.
     loadClusterProperties();
     refreshLiveNodes(new LiveNodeWatcher());
+    log.info("zk reader for query nodes " + Boolean.getBoolean("SolrQueryAggregator"));
+    if(Boolean.getBoolean("SolrQueryAggregator")) {
+      refreshLiveQueryNodes(new LiveQueryNodeWatcher());
+    }
     refreshLegacyClusterState(new LegacyClusterStateWatcher());
     refreshStateFormat2Collections();
     refreshCollectionList(new CollectionsChildWatcher());
@@ -599,6 +608,7 @@ public class ZkStateReader implements SolrCloseable {
     }
 
     this.clusterState = new ClusterState(liveNodes, result, legacyClusterStateVersion);
+    this.clusterState.setLiveQueryNodes(liveQueryNodes);
 
     log.debug("clusterStateSet: legacy [{}] interesting [{}] watched [{}] lazy [{}] total [{}]",
         legacyCollectionStates.keySet().size(),
@@ -861,6 +871,27 @@ public class ZkStateReader implements SolrCloseable {
           removeLiveNodesListener(listener);
         }
       });
+    }
+  }
+
+  /**
+   * Refresh live_query_nodes.
+   */
+  private void refreshLiveQueryNodes(Watcher watcher) throws KeeperException, InterruptedException {
+    synchronized (refreshLiveQueryNodesLock) {
+      SortedSet<String> newLiveQueryNodes;
+      try {
+        List<String> nodeList = zkClient.getChildren(LIVE_QUERY_NODES_ZKNODE, watcher, true);
+        newLiveQueryNodes = new TreeSet<>(nodeList);
+      } catch (KeeperException.NoNodeException e) {
+        newLiveQueryNodes = emptySortedSet();
+      }
+      log.info("updating query nodes {}", newLiveQueryNodes);
+      if (clusterState != null) {
+        log.info("setting query nodes in cluster states");
+        liveQueryNodes = newLiveQueryNodes;
+        clusterState.setLiveQueryNodes(newLiveQueryNodes);
+      }
     }
   }
 
@@ -1534,6 +1565,37 @@ public class ZkStateReader implements SolrCloseable {
     public void refreshAndWatch() {
       try {
         refreshLiveNodes(this);
+      } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
+        log.warn("ZooKeeper watch triggered, but Solr cannot talk to ZK: [{}]", e.getMessage());
+      } catch (KeeperException e) {
+        log.error("A ZK error has occurred", e);
+        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "A ZK error has occurred", e);
+      } catch (InterruptedException e) {
+        // Restore the interrupted status
+        Thread.currentThread().interrupt();
+        log.warn("Interrupted", e);
+      }
+    }
+  }
+
+  /**
+   * Watches the live_nodes and syncs changes.
+   */
+  class LiveQueryNodeWatcher implements Watcher {
+
+    @Override
+    public void process(WatchedEvent event) {
+      // session events are not change events, and do not remove the watcher
+      if (EventType.None.equals(event.getType())) {
+        return;
+      }
+      log.debug("A live query node change: [{}], has occurred - updating... (live nodes size: [{}])", event, liveQueryNodes.size());
+      refreshAndWatch();
+    }
+
+    public void refreshAndWatch() {
+      try {
+        refreshLiveQueryNodes(this);
       } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
         log.warn("ZooKeeper watch triggered, but Solr cannot talk to ZK: [{}]", e.getMessage());
       } catch (KeeperException e) {

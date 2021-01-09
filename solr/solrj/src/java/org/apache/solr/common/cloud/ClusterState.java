@@ -44,6 +44,7 @@ public class ClusterState implements JSONWriter.Writable {
 
   private final Map<String, CollectionRef> collectionStates, immutableCollectionStates;
   private Set<String> liveNodes;
+  private Set<String> liveQueryNodes;
 
   /**
    * Use this constr when ClusterState is meant for consumption.
@@ -113,7 +114,7 @@ public class ClusterState implements JSONWriter.Writable {
    */
   public DocCollection getCollection(String collection) {
     DocCollection coll = getCollectionOrNull(collection);
-    if (coll == null) throw new SolrException(ErrorCode.BAD_REQUEST, "Could not find collection : " + collection);
+    if (coll == null) throw new SolrException(ErrorCode.NOT_FOUND, "Could not find collection : " + collection);
     return coll;
   }
 
@@ -170,6 +171,13 @@ public class ClusterState implements JSONWriter.Writable {
    */
   public Set<String> getLiveNodes() {
     return Collections.unmodifiableSet(liveNodes);
+  }
+
+  /**
+   * Get names of the currently live nodes.
+   */
+  public Set<String> getLiveQueryNodes() {
+    return Collections.unmodifiableSet(liveQueryNodes);
   }
 
   public String getShardId(String nodeName, String coreName) {
@@ -340,6 +348,10 @@ public class ClusterState implements JSONWriter.Writable {
    */
   void setLiveNodes(Set<String> liveNodes){
     this.liveNodes = liveNodes;
+  }
+
+  void setLiveQueryNodes(Set<String> liveQueryNodes){
+    this.liveQueryNodes = liveQueryNodes;
   }
 
   /** Be aware that this may return collections which may not exist now.

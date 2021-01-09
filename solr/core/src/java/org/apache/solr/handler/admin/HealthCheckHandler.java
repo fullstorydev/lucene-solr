@@ -89,7 +89,8 @@ public class HealthCheckHandler extends RequestHandlerBase {
     }
 
     // Set status to true if this node is in live_nodes
-    if (clusterState.getLiveNodes().contains(cores.getZkController().getNodeName())) {
+    if (clusterState.getLiveNodes().contains(cores.getZkController().getNodeName())
+        || clusterState.getLiveQueryNodes().contains(cores.getZkController().getNodeName())) {
       rsp.add(STATUS, OK);
     } else {
       rsp.add(STATUS, FAILURE);

@@ -404,6 +404,7 @@ public class HttpShardHandler extends ShardHandler {
         shortCircuit = shortCircuit && targetHandler == null;             // if a different handler is specified, don't short-circuit
 
         if (shortCircuit) {
+          log.info("query sc");
           rb.isDistrib = false;
           rb.shortCircuitedURL = ZkCoreNodeProps.getCoreUrl(zkController.getBaseUrl(), coreDescriptor.getName());
           if (hostChecker.isWhitelistHostCheckingEnabled() && hostChecker.hasExplicitWhitelist()) {
