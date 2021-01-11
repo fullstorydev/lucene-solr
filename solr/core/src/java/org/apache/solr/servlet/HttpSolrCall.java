@@ -552,9 +552,6 @@ public class HttpSolrCall {
         if (authorizationAction != null) return authorizationAction;
       }
 
-      if(action == REMOTEQUERY) {
-        throw new RuntimeException("Remote query is not expected.");
-      }
       HttpServletResponse resp = response;
       switch (action) {
         case ADMIN:
