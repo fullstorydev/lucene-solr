@@ -175,9 +175,6 @@ public class ClusterState implements JSONWriter.Writable {
     return Collections.unmodifiableSet(liveNodes);
   }
 
-  /**
-   * Get names of the currently live nodes.
-   */
   public Set<String> getLiveQueryNodes() {
     return Collections.unmodifiableSet(liveQueryNodes);
   }

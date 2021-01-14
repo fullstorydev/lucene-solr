@@ -519,7 +519,7 @@ public class ZkStateReader implements SolrCloseable {
     // on reconnect of SolrZkClient force refresh and re-add watches.
     loadClusterProperties();
     refreshLiveNodes(new LiveNodeWatcher());
-    if(Boolean.getBoolean("SolrQueryAggregator")) {
+    if (Boolean.getBoolean("SolrQueryAggregator")) {
       refreshLiveQueryNodes(new LiveQueryNodeWatcher());
     }
     refreshLegacyClusterState(new LegacyClusterStateWatcher());
@@ -1588,7 +1588,7 @@ public class ZkStateReader implements SolrCloseable {
   }
 
   /**
-   * Watches the live_nodes and syncs changes.
+   * Watches the live_query_nodes and syncs changes.
    */
   class LiveQueryNodeWatcher implements Watcher {
 
@@ -1598,7 +1598,7 @@ public class ZkStateReader implements SolrCloseable {
       if (EventType.None.equals(event.getType())) {
         return;
       }
-      log.debug("A live query node change: [{}], has occurred - updating... (live nodes size: [{}])", event, liveQueryNodes.size());
+      log.debug("A live query node change: [{}], has occurred - updating... (live query nodes size: [{}])", event, liveQueryNodes.size());
       refreshAndWatch();
     }
 

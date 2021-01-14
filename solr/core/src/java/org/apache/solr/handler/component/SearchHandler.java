@@ -312,20 +312,9 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
       subt.stop();
     }
 
-    if (req.getParams().get("qan") != null ) {
-      log.info("found qan");
-    }else if (req.getParams().get("singlecore") != null ) {
-      log.info("singlecore request");
-    }
-
-    if (req.getParams().get("bjr") != null ) {
-      log.info("bjr request " + req.getParams().get("bjr"));
-    }
-
-    
     if (!rb.isDistrib) {
       // a normal non-distributed request
-      log.info("local query request " + req.toString());
+
       long timeAllowed = req.getParams().getLong(CommonParams.TIME_ALLOWED, -1L);
       if (timeAllowed >= 0L) {
         SolrQueryTimeoutImpl.set(timeAllowed);
@@ -370,8 +359,8 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
         SolrQueryTimeoutImpl.reset();
       }
     } else {
-      log.info("distrib query request " + req.toString());
       // a distributed request
+
       if (rb.outgoing == null) {
         rb.outgoing = new LinkedList<>();
       }
@@ -412,9 +401,6 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
               params.set(ShardParams.SHARDS_PURPOSE, sreq.purpose);
               params.set(ShardParams.SHARD_URL, shard); // so the shard knows what was asked
               params.set(CommonParams.OMIT_HEADER, false);
-              if (core.getCoreContainer().isQueryAggregator()) {
-                params.set("qan", true);
-              }
               if (rb.requestInfo != null) {
                 // we could try and detect when this is needed, but it could be tricky
                 params.set("NOW", Long.toString(rb.requestInfo.getNOW().getTime()));
@@ -431,13 +417,8 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
                   params.set(CommonParams.QT, reqPath);
                 } // else if path is /select, then the qt gets passed thru if set
               }
-              if (core.getCoreContainer().isQueryAggregator()) {
-                log.info("qa shard request " + shard);
-                log.info("qa shard request " + sreq);
-              }
               shardHandler1.submit(sreq, shard, params);
             }
-            log.info("qa shard requests done " );
           }
 
 

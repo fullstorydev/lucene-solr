@@ -1308,6 +1308,7 @@ public class CoreContainer {
       if (!isZooKeeperAware() && core.getUpdateHandler().getUpdateLog() != null) {
         core.getUpdateHandler().getUpdateLog().recoverFromLog();
       }
+
       registerCore(dcore, core, publishState, newCollection);
 
       return core;
@@ -1338,8 +1339,9 @@ public class CoreContainer {
   SolrCore createProxyCore(String collectionName) {
     DocCollection collection = getCollection(collectionName);
 
-    if (collection == null)
+    if (collection == null) {
       return null;
+    }
 
     Map<String, String> coreProps = new HashMap<>();
     coreProps.put(CoreAdminParams.CORE_NODE_NAME, this.getHostName());
@@ -1349,6 +1351,7 @@ public class CoreContainer {
         collection.getName(),
         Paths.get(this.getSolrHome() + "/" + collection.getName()),
         coreProps, this.getContainerProperties(), this.isZooKeeperAware());
+
     try {
       SolrCore solrCore = solrCores.waitAddPendingCoreOps(ret.getName());
       if (solrCore == null) {
@@ -1806,7 +1809,7 @@ public class CoreContainer {
       return core;
     }
 
-    if(isQueryAggregator) {
+    if (isQueryAggregator) {
       return createProxyCore(name);
     }
 

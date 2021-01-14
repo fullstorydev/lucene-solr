@@ -383,11 +383,11 @@ public class ZkController implements Closeable {
               } 
 
               // we have to register as live first to pick up docs in the buffer
-              if (cc.isQueryAggregator())
+              if (cc.isQueryAggregator()) {
                 createEphemeralLiveQueryNode();
-              else
+              } else {
                 createEphemeralLiveNode();
-
+              }
 
               List<CoreDescriptor> descriptors = registerOnReconnect.getCurrentDescriptors();
               // re register all descriptors
@@ -594,10 +594,11 @@ public class ZkController implements Closeable {
     this.isClosed = true;
 
     try {
-      if (cc.isQueryAggregator())
-        this.removeEphemeralLiveQueryNode();
-      else
-        this.removeEphemeralLiveNode();
+      if (cc.isQueryAggregator()) {
+        removeEphemeralLiveQueryNode();
+      } else {
+        removeEphemeralLiveNode();
+      }
     } catch (AlreadyClosedException | SessionExpiredException | KeeperException.ConnectionLossException e) {
 
     } catch (Exception e) {
@@ -943,10 +944,11 @@ public class ZkController implements Closeable {
       }
 
       // Do this last to signal we're up.
-      if(cc.isQueryAggregator())
+      if (cc.isQueryAggregator()) {
         createEphemeralLiveQueryNode();
-      else
+      } else {
         createEphemeralLiveNode();
+      }
 
     } catch (IOException e) {
       log.error("", e);
@@ -1130,8 +1132,7 @@ public class ZkController implements Closeable {
     String nodeAddedPath = ZkStateReader.SOLR_AUTOSCALING_NODE_ADDED_PATH + "/" + nodeName;
     log.info("Register node as live in ZooKeeper:" + nodePath);
     List<Op> ops = new ArrayList<>(2);
-    byte[] queryNode = Utils.toJSON(new ZkNodeProps(ZkStateReader.SOLR_QUERY_AGGREGATOR, String.valueOf(cc.isQueryAggregator())));
-    ops.add(Op.create(nodePath, queryNode, zkClient.getZkACLProvider().getACLsToAdd(nodePath), CreateMode.EPHEMERAL));
+    ops.add(Op.create(nodePath, null, zkClient.getZkACLProvider().getACLsToAdd(nodePath), CreateMode.EPHEMERAL));
     // if there are nodeAdded triggers don't create nodeAdded markers
     boolean createMarkerNode = zkStateReader.getAutoScalingConfig().hasTriggerForEvents(TriggerEventType.NODEADDED);
     if (createMarkerNode && !zkClient.exists(nodeAddedPath, true)) {
