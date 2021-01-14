@@ -204,6 +204,8 @@ public class ZkStateReader implements SolrCloseable {
 
   private final Object refreshLiveQueryNodesLock = new Object();
 
+  private final AtomicReference<SortedSet<String>> lastFetchedLiveQueryNodes = new AtomicReference<>();
+
   private volatile Map<String, Object> clusterProperties = Collections.emptyMap();
 
   private final ZkConfigManager configManager;
@@ -517,7 +519,6 @@ public class ZkStateReader implements SolrCloseable {
     // on reconnect of SolrZkClient force refresh and re-add watches.
     loadClusterProperties();
     refreshLiveNodes(new LiveNodeWatcher());
-    log.info("zk reader for query nodes " + Boolean.getBoolean("SolrQueryAggregator"));
     if(Boolean.getBoolean("SolrQueryAggregator")) {
       refreshLiveQueryNodes(new LiveQueryNodeWatcher());
     }
@@ -607,8 +608,7 @@ public class ZkStateReader implements SolrCloseable {
       result.putIfAbsent(entry.getKey(), entry.getValue());
     }
 
-    this.clusterState = new ClusterState(liveNodes, result, legacyClusterStateVersion);
-    this.clusterState.setLiveQueryNodes(liveQueryNodes);
+    this.clusterState = new ClusterState(liveNodes, liveQueryNodes, result, legacyClusterStateVersion);
 
     log.debug("clusterStateSet: legacy [{}] interesting [{}] watched [{}] lazy [{}] total [{}]",
         legacyCollectionStates.keySet().size(),
@@ -886,10 +886,19 @@ public class ZkStateReader implements SolrCloseable {
       } catch (KeeperException.NoNodeException e) {
         newLiveQueryNodes = emptySortedSet();
       }
-      log.info("updating query nodes {}", newLiveQueryNodes);
+
+      lastFetchedLiveQueryNodes.set(newLiveQueryNodes);
+    }
+
+    synchronized (getUpdateLock()) {
+      SortedSet<String> newLiveQueryNodes;
+      newLiveQueryNodes = lastFetchedLiveQueryNodes.getAndSet(null);
+      if (newLiveQueryNodes == null) {
+        return;
+      }
+
+      this.liveQueryNodes = newLiveQueryNodes;
       if (clusterState != null) {
-        log.info("setting query nodes in cluster states");
-        liveQueryNodes = newLiveQueryNodes;
         clusterState.setLiveQueryNodes(newLiveQueryNodes);
       }
     }

@@ -51,7 +51,7 @@ public class ClusterState implements JSONWriter.Writable {
    */
   public ClusterState(Integer znodeVersion, Set<String> liveNodes,
       Map<String, DocCollection> collectionStates) {
-    this(liveNodes, getRefMap(collectionStates),znodeVersion);
+    this(liveNodes, Collections.emptySet(), getRefMap(collectionStates),znodeVersion);
   }
 
   private static Map<String, CollectionRef> getRefMap(Map<String, DocCollection> collectionStates) {
@@ -65,10 +65,12 @@ public class ClusterState implements JSONWriter.Writable {
 
   /**Use this if all the collection states are not readily available and some needs to be lazily loaded
    */
-  public ClusterState(Set<String> liveNodes, Map<String, CollectionRef> collectionStates, Integer znodeVersion){
+  public ClusterState(Set<String> liveNodes, Set<String> liveQueryNodes, Map<String, CollectionRef> collectionStates, Integer znodeVersion){
     this.znodeVersion = znodeVersion;
     this.liveNodes = new HashSet<>(liveNodes.size());
     this.liveNodes.addAll(liveNodes);
+    this.liveQueryNodes = new HashSet<>(liveQueryNodes.size());
+    this.liveQueryNodes.addAll(liveQueryNodes);
     this.collectionStates = new LinkedHashMap<>(collectionStates);
     this.immutableCollectionStates = Collections.unmodifiableMap(collectionStates);
   }
@@ -82,7 +84,7 @@ public class ClusterState implements JSONWriter.Writable {
    * @return the updated cluster state which preserves the current live nodes and zk node version
    */
   public ClusterState copyWith(String collectionName, DocCollection collection) {
-    ClusterState result = new ClusterState(liveNodes, new LinkedHashMap<>(collectionStates), znodeVersion);
+    ClusterState result = new ClusterState(liveNodes, liveQueryNodes, new LinkedHashMap<>(collectionStates), znodeVersion);
     if (collection == null) {
       result.collectionStates.remove(collectionName);
     } else {
@@ -254,7 +256,7 @@ public class ClusterState implements JSONWriter.Writable {
       collections.put(collectionName, new CollectionRef(coll));
     }
 
-    return new ClusterState( liveNodes, collections,version);
+    return new ClusterState( liveNodes, Collections.emptySet(), collections, version);
   }
 
   // TODO move to static DocCollection.loadFromMap

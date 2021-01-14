@@ -144,8 +144,7 @@ import static org.apache.solr.security.AuthenticationPlugin.AUTHENTICATION_PLUGI
  */
 public class CoreContainer {
 
-  private static final String SOLR_QUERY_AGGREGATOR = "SolrQueryAggregator";
-  private static final String PROXY_CORE_SUFFIX = "_Proxycore";
+  public static final String SOLR_QUERY_AGGREGATOR = "SolrQueryAggregator";
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -1336,7 +1335,7 @@ public class CoreContainer {
     }
   }
 
-  private SolrCore createProxyCore(String collectionName) {
+  SolrCore createProxyCore(String collectionName) {
     DocCollection collection = getCollection(collectionName);
 
     if (collection == null)
@@ -1344,7 +1343,6 @@ public class CoreContainer {
 
     Map<String, String> coreProps = new HashMap<>();
     coreProps.put(CoreAdminParams.CORE_NODE_NAME, this.getHostName());
-    coreProps.put(CoreAdminParams.NAME, collection.getName() + PROXY_CORE_SUFFIX);
     coreProps.put(CoreAdminParams.COLLECTION, collection.getName());
 
     CoreDescriptor ret = new CoreDescriptor(

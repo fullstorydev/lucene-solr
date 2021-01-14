@@ -922,7 +922,8 @@ public class ZkController implements Closeable {
       zkStateReader.createClusterStateWatchersAndUpdate();
       this.baseURL = zkStateReader.getBaseUrlForNodeName(this.nodeName);
 
-      checkForExistingEphemeralNode();
+      String nodePath = (cc.isQueryAggregator() ? zkStateReader.LIVE_QUERY_NODES_ZKNODE : ZkStateReader.LIVE_NODES_ZKNODE) + "/" + getNodeName();
+      checkForExistingEphemeralNode(nodePath);
       registerLiveNodesListener();
 
       // start the overseer first as following code may need it's processing
@@ -965,12 +966,10 @@ public class ZkController implements Closeable {
 
   }
 
-  private void checkForExistingEphemeralNode() throws KeeperException, InterruptedException {
+  private void checkForExistingEphemeralNode(String nodePath) throws KeeperException, InterruptedException {
     if (zkRunOnly) {
       return;
     }
-    String nodeName = getNodeName();
-    String nodePath = ZkStateReader.LIVE_NODES_ZKNODE + "/" + nodeName;
 
     if (!zkClient.exists(nodePath, true)) {
       return;
