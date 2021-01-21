@@ -21,6 +21,12 @@ public class SolrCoreProxy extends SolrCore {
 
   public SolrCoreProxy(CoreContainer coreContainer, CoreDescriptor cd, ConfigSet coreConfig) {
     super(coreContainer, cd, coreConfig);
+    registerCollectionWatcher();
+  }
+
+  private void registerCollectionWatcher() {
+    //This will update the collection state, if there is shard split or move
+    getCoreContainer().getZkController().getZkStateReader().registerDocCollectionWatcher(getName(), collection -> false);
   }
 
   protected void bufferUpdatesIfConstructing(CoreDescriptor coreDescriptor) {

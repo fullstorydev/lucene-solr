@@ -28,6 +28,8 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.NamedList;
 import org.junit.After;
 import org.junit.Before;
@@ -106,6 +108,63 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     addDocs(ingestNodeUrl, collectionName, 10);
     //query through query node
     queryDocs(queryNodeUrl, collectionName, 10);
+
+    verifyCollectionShards(collectionName);
+    verifyCollectionListenerInstalled(collectionName);
+    verifyDeleteCollection(collectionName);
+  }
+
+  private void verifyCollectionShards(final String collection) throws Exception {
+    CoreContainer queryAggregatorContainer = null;
+    for (JettySolrRunner jetty : jettys) {
+      if (jetty.getCoreContainer().isQueryAggregator()) {
+        queryAggregatorContainer = jetty.getCoreContainer();
+      }
+    }
+    assertNotNull(queryAggregatorContainer);
+    ClusterState clusterState = queryAggregatorContainer.getZkController().getZkStateReader().getClusterState();
+    DocCollection docCollection = clusterState.getCollection(collection);
+
+    assertTrue("Collection should have one slice", docCollection.getActiveSlices().size() == 1);
+
+    CollectionAdminRequest.SplitShard splitShard = CollectionAdminRequest.splitShard(collection);
+    splitShard.setShardName("shard1");
+    NamedList<Object> response = splitShard.process(cloudClient).getResponse();
+    assertNotNull(response.get("success"));
+    Thread.sleep(5000);
+    clusterState = queryAggregatorContainer.getZkController().getZkStateReader().getClusterState();
+    docCollection = clusterState.getCollection(collection);
+    ClusterState.CollectionRef collectionRef = clusterState.getCollectionStates().get(collection);
+    assertNotNull(collectionRef);
+    assertFalse(collectionRef instanceof ZkStateReader.LazyCollectionRef);
+    assertTrue("Collection now should have two slices", docCollection.getActiveSlices().size() == 2);
+  }
+
+  private void verifyCollectionListenerInstalled(final String collection) throws Exception {
+    CoreContainer queryAggregatorContainer = null;
+    for (JettySolrRunner jetty : jettys) {
+      if (jetty.getCoreContainer().isQueryAggregator()) {
+        queryAggregatorContainer = jetty.getCoreContainer();
+      }
+    }
+    assertNotNull(queryAggregatorContainer);
+    assertTrue("There should be one collection watcher.",
+        queryAggregatorContainer.getZkController().getZkStateReader().getStateWatchers(collection).size() == 1);
+  }
+
+  private void verifyDeleteCollection(final String collection) throws Exception {
+    CollectionAdminRequest.Delete delete = CollectionAdminRequest.deleteCollection(collection);
+    NamedList<Object> response = delete.process(cloudClient).getResponse();
+    assertNotNull(response.get("success"));
+
+    CoreContainer queryAggregatorContainer = null;
+    for (JettySolrRunner jetty : jettys) {
+      if (jetty.getCoreContainer().isQueryAggregator()) {
+        queryAggregatorContainer = jetty.getCoreContainer();
+      }
+    }
+    assertNotNull(queryAggregatorContainer);
+    assertTrue("There should be any core.", queryAggregatorContainer.getCores().isEmpty());
   }
 
   private void addDocs(final String baseUrl, final String collection, int docs) throws Exception {

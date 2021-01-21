@@ -33,6 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -67,6 +68,7 @@ import org.apache.solr.cloud.autoscaling.AutoScalingHandler;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.CloudCollectionsListener;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Replica.State;
@@ -352,6 +354,21 @@ public class CoreContainer {
             cfg.getReplayUpdatesThreads(),
             new DefaultSolrThreadFactory("replayUpdatesExecutor")));
     log.info("Initialized core container as {}", isQueryAggregator ? "query aggregator" : "data node");
+  }
+
+  private void registerCollectionListener() {
+    getZkController().getZkStateReader().registerCloudCollectionsListener(new CloudCollectionsListener() {
+      @Override
+      public void onChange(Set<String> oldCollections, Set<String> newCollections) {
+        // if core is not in newCollections and it exists locally, we delete the core
+        for (SolrCore core : getCores()) {
+          if(!newCollections.contains(core.getName())) {
+            log.info("unloading/deleting core " + core.getName());
+            unload(core.getName(), true, true, true);
+          }
+        }
+      }
+    });
   }
 
   private synchronized void initializeAuthorizationPlugin(Map<String, Object> authorizationConf) {
@@ -842,6 +859,9 @@ public class CoreContainer {
       autoScalingHandler = new AutoScalingHandler(getZkController().getSolrCloudManager(), loader);
       containerHandlers.put(AutoScalingHandler.HANDLER_PATH, autoScalingHandler);
       autoScalingHandler.initializeMetrics(solrMetricsContext, AutoScalingHandler.HANDLER_PATH);
+      if (isQueryAggregator) {
+        registerCollectionListener();
+      }
     }
     // This is a bit redundant but these are two distinct concepts for all they're accomplished at the same time.
     status |= LOAD_COMPLETE | INITIAL_CORE_LOAD_COMPLETE;
@@ -1725,7 +1745,7 @@ public class CoreContainer {
     // delete metrics specific to this core
     metricManager.removeRegistry(core.getCoreMetricManager().getRegistryName());
 
-    if (zkSys.getZkController() != null) {
+    if (!isQueryAggregator && zkSys.getZkController() != null) {
       // cancel recovery in cloud mode
       core.getSolrCoreState().cancelRecovery();
       if (cd.getCloudDescriptor().getReplicaType() == Replica.Type.PULL
@@ -1739,7 +1759,7 @@ public class CoreContainer {
     if (close)
       core.closeAndWait();
 
-    if (zkSys.getZkController() != null) {
+    if (!isQueryAggregator && zkSys.getZkController() != null) {
       try {
         zkSys.getZkController().unregister(name, cd);
       } catch (InterruptedException e) {

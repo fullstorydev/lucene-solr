@@ -779,7 +779,8 @@ public class ZkStateReader implements SolrCloseable {
     return collections;
   }
 
-  private class LazyCollectionRef extends ClusterState.CollectionRef {
+  /* for testing */
+  public class LazyCollectionRef extends ClusterState.CollectionRef {
     private final String collName;
     private long lastUpdateTime;
     private DocCollection cachedDocCollection;
@@ -1978,8 +1979,8 @@ public class ZkStateReader implements SolrCloseable {
     }
   }
 
-  /* package-private for testing */
-  Set<DocCollectionWatcher> getStateWatchers(String collection) {
+  /* for testing */
+  public Set<DocCollectionWatcher> getStateWatchers(String collection) {
     final Set<DocCollectionWatcher> watchers = new HashSet<>();
     collectionWatches.compute(collection, (k, v) -> {
       if (v != null) {
