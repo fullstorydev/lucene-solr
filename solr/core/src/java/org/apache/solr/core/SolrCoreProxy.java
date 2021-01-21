@@ -17,6 +17,10 @@
 
 package org.apache.solr.core;
 
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.update.UpdateHandler;
+
 public class SolrCoreProxy extends SolrCore {
 
   public SolrCoreProxy(CoreContainer coreContainer, CoreDescriptor cd, ConfigSet coreConfig) {
@@ -24,11 +28,27 @@ public class SolrCoreProxy extends SolrCore {
     registerCollectionWatcher();
   }
 
+  public SolrCoreProxy(CoreContainer coreContainer, String name, String dataDir, SolrConfig config,
+                       IndexSchema schema, NamedList configSetProperties,
+                       CoreDescriptor coreDescriptor, UpdateHandler updateHandler,
+                       IndexDeletionPolicyWrapper delPolicy, SolrCore prev, boolean reload) {
+    super(coreContainer, name, dataDir, config, schema, configSetProperties, coreDescriptor, updateHandler, delPolicy, prev, reload);
+    registerCollectionWatcher();
+  }
+
   private void registerCollectionWatcher() {
     //This will update the collection state, if there is shard split or move
-    getCoreContainer().getZkController().getZkStateReader().registerDocCollectionWatcher(getName(), collection -> false);
+    if (getCoreContainer().isZooKeeperAware())
+      getCoreContainer().getZkController().getZkStateReader().registerDocCollectionWatcher(getName(), collection -> false);
   }
 
   protected void bufferUpdatesIfConstructing(CoreDescriptor coreDescriptor) {
+  }
+
+  /*
+  We register for config dir "configs/conf"; thus if user updates "configs/conf" then just reload proxycore.
+   */
+  protected boolean forceReloadCore() {
+    return true;
   }
 }

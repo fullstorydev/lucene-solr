@@ -57,22 +57,9 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
   @Test
   @ShardsFixed(num = 1)
   public void testCreateProxyCore() throws Exception {
-    String collectionName = "SolrCoreProxyTest";
-    CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collectionName, 1, 1);
+    String collectionName = "collection1";
 
-    NamedList<Object> request = create.process(cloudClient).getResponse();
-
-    assertNotNull(request.get("success"));
-
-    CoreContainer queryNodeContainer = null;
-    for (JettySolrRunner jetty : jettys) {
-      if (jetty.getCoreContainer().isQueryAggregator()) {
-        queryNodeContainer = jetty.getCoreContainer();
-        break;
-      }
-    }
-
-    assertNotNull("There should be one query node container", queryNodeContainer);
+    CoreContainer queryNodeContainer = getQueryNodeContainer();
     ClusterState clusterState = queryNodeContainer.getZkController().getClusterState();
     Set<String> queryNodes = clusterState.getLiveQueryNodes();
     Set<String> liveNodes = clusterState.getLiveNodes();
@@ -109,19 +96,40 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     //query through query node
     queryDocs(queryNodeUrl, collectionName, 10);
 
-    verifyCollectionShards(collectionName);
-    verifyCollectionListenerInstalled(collectionName);
-    verifyDeleteCollection(collectionName);
+    try {
+      System.setProperty("solr.test.sys.prop1", "propone");
+      System.setProperty("solr.test.sys.prop2", "proptwo");
+
+      verifyCoreReloadAfterSchemaConfigUpdate(collectionName);
+      verifyCollectionShards(collectionName);
+      verifyCollectionListenerInstalled(collectionName);
+      verifyDeleteCollection(collectionName);
+    } finally {
+      System.clearProperty("solr.test.sys.prop1");
+      System.clearProperty("solr.test.sys.prop2");
+    }
+  }
+
+  private void verifyCoreReloadAfterSchemaConfigUpdate(final String collection) throws Exception {
+    CoreContainer queryAggregatorContainer = getQueryNodeContainer();
+    SolrCore currentCore = queryAggregatorContainer.getCore(collection);
+    currentCore.close();
+
+    String update = "true";
+    //update conf1 directory
+    String zkConfigPath = "/configs/conf1";
+    zkServer.getZkClient().setData(zkConfigPath, update.getBytes(), true);
+
+    //now observe if unload happens.
+    Thread.sleep(10000);
+    SolrCore newCore = queryAggregatorContainer.getCore(collection);
+    newCore.close();
+    //core reference should be different
+    assertFalse(currentCore == newCore);
   }
 
   private void verifyCollectionShards(final String collection) throws Exception {
-    CoreContainer queryAggregatorContainer = null;
-    for (JettySolrRunner jetty : jettys) {
-      if (jetty.getCoreContainer().isQueryAggregator()) {
-        queryAggregatorContainer = jetty.getCoreContainer();
-      }
-    }
-    assertNotNull(queryAggregatorContainer);
+    CoreContainer queryAggregatorContainer = getQueryNodeContainer();
     ClusterState clusterState = queryAggregatorContainer.getZkController().getZkStateReader().getClusterState();
     DocCollection docCollection = clusterState.getCollection(collection);
 
@@ -141,13 +149,8 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
   }
 
   private void verifyCollectionListenerInstalled(final String collection) throws Exception {
-    CoreContainer queryAggregatorContainer = null;
-    for (JettySolrRunner jetty : jettys) {
-      if (jetty.getCoreContainer().isQueryAggregator()) {
-        queryAggregatorContainer = jetty.getCoreContainer();
-      }
-    }
-    assertNotNull(queryAggregatorContainer);
+    CoreContainer queryAggregatorContainer = getQueryNodeContainer();
+
     assertTrue("There should be one collection watcher.",
         queryAggregatorContainer.getZkController().getZkStateReader().getStateWatchers(collection).size() == 1);
   }
@@ -156,15 +159,25 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     CollectionAdminRequest.Delete delete = CollectionAdminRequest.deleteCollection(collection);
     NamedList<Object> response = delete.process(cloudClient).getResponse();
     assertNotNull(response.get("success"));
+    Thread.sleep(10000);
+    CoreContainer queryAggregatorContainer = getQueryNodeContainer();
+    String corenames = "";
 
+    for (SolrCore core : queryAggregatorContainer.getCores()) {
+      corenames += core.getName() + " , ";
+    }
+    assertTrue("There should not be any core. " + corenames, queryAggregatorContainer.getCores().isEmpty());
+  }
+
+  private CoreContainer getQueryNodeContainer() {
     CoreContainer queryAggregatorContainer = null;
     for (JettySolrRunner jetty : jettys) {
       if (jetty.getCoreContainer().isQueryAggregator()) {
         queryAggregatorContainer = jetty.getCoreContainer();
       }
     }
-    assertNotNull(queryAggregatorContainer);
-    assertTrue("There should be any core.", queryAggregatorContainer.getCores().isEmpty());
+    assertNotNull("There should be one query node container", queryAggregatorContainer);
+    return queryAggregatorContainer;
   }
 
   private void addDocs(final String baseUrl, final String collection, int docs) throws Exception {

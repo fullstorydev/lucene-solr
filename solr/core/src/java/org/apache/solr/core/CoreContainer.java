@@ -362,9 +362,13 @@ public class CoreContainer {
       public void onChange(Set<String> oldCollections, Set<String> newCollections) {
         // if core is not in newCollections and it exists locally, we delete the core
         for (SolrCore core : getCores()) {
-          if(!newCollections.contains(core.getName())) {
-            log.info("unloading/deleting core " + core.getName());
-            unload(core.getName(), true, true, true);
+          if (!newCollections.contains(core.getName())) {
+            try {
+              log.info("unloading/deleting core {} ", core.getName());
+              unload(core.getName(), true, true, true);
+            } catch (Exception ex) {
+              log.warn("Unable to unlaod core " + core.getName(), ex);
+            }
           }
         }
       }
@@ -1634,7 +1638,7 @@ public class CoreContainer {
         }
 
 
-        if (docCollection != null) {
+        if (!isQueryAggregator && docCollection != null) {
           Replica replica = docCollection.getReplica(cd.getCloudDescriptor().getCoreNodeName());
           assert replica != null;
           if (replica.getType() == Replica.Type.TLOG) { // TODO: needed here?

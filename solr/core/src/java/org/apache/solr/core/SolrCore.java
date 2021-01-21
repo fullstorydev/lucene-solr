@@ -688,9 +688,15 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       try {
         CoreDescriptor cd = new CoreDescriptor(name, getCoreDescriptor());
         cd.loadExtraProperties(); //Reload the extra properties
-        core = new SolrCore(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
-            coreConfig.getIndexSchema(), coreConfig.getProperties(),
-            cd, updateHandler, solrDelPolicy, currentCore, true);
+        if (coreContainer.isQueryAggregator()) {
+          core = new SolrCoreProxy(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
+              coreConfig.getIndexSchema(), coreConfig.getProperties(),
+              cd, updateHandler, solrDelPolicy, currentCore, true);
+        } else {
+          core = new SolrCore(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
+              coreConfig.getIndexSchema(), coreConfig.getProperties(),
+              cd, updateHandler, solrDelPolicy, currentCore, true);
+        }
 
         // we open a new IndexWriter to pick up the latest config
         core.getUpdateHandler().getSolrCoreState().newIndexWriter(core, false);
@@ -3088,7 +3094,8 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       if (cfg != null) {
         cfg.refreshRequestParams();
       }
-      if (checkStale(zkClient, overlayPath, solrConfigversion) ||
+      if (core.forceReloadCore() ||
+          checkStale(zkClient, overlayPath, solrConfigversion) ||
           checkStale(zkClient, solrConfigPath, overlayVersion) ||
           checkStale(zkClient, managedSchmaResourcePath, managedSchemaVersion)) {
         log.info("core reload {}", coreName);
@@ -3130,6 +3137,10 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       SolrMetricProducer producer = (SolrMetricProducer) solrInfoBean;
       coreMetricManager.registerMetricProducer(name, producer);
     }
+  }
+
+  protected boolean forceReloadCore() {
+    return false;
   }
 
   private static boolean checkStale(SolrZkClient zkClient, String zkPath, int currentVersion) {
