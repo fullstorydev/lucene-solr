@@ -566,7 +566,8 @@ public class HttpSolrCall {
           HttpCacheHeaderUtil.setCacheControlHeader(config, resp, reqMethod);
           // unless we have been explicitly told not to, do cache validation
           // if we fail cache validation, execute the query
-          if (config.getHttpCachingConfig().isNever304() ||
+          if (cores.isQueryAggregator() ||
+              config.getHttpCachingConfig().isNever304() ||
               !HttpCacheHeaderUtil.doCacheHeaderValidation(solrReq, req, reqMethod, resp)) {
             SolrQueryResponse solrRsp = new SolrQueryResponse();
               /* even for HEAD requests, we need to execute the handler to

@@ -182,7 +182,7 @@ import static org.apache.solr.common.params.CommonParams.PATH;
  * When multi-core support was added to Solr way back in version 1.3, this class was required so that the core
  * functionality could be re-used multiple times.
  */
-public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
+public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
 
   public static final String version = "1.0";
 
@@ -688,9 +688,15 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       try {
         CoreDescriptor cd = new CoreDescriptor(name, getCoreDescriptor());
         cd.loadExtraProperties(); //Reload the extra properties
-        core = new SolrCore(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
-            coreConfig.getIndexSchema(), coreConfig.getProperties(),
-            cd, updateHandler, solrDelPolicy, currentCore, true);
+        if (coreContainer.isQueryAggregator()) {
+          core = new SolrCoreProxy(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
+              coreConfig.getIndexSchema(), coreConfig.getProperties(),
+              cd, updateHandler, solrDelPolicy, currentCore, true);
+        } else {
+          core = new SolrCore(coreContainer, getName(), getDataDir(), coreConfig.getSolrConfig(),
+              coreConfig.getIndexSchema(), coreConfig.getProperties(),
+              cd, updateHandler, solrDelPolicy, currentCore, true);
+        }
 
         // we open a new IndexWriter to pick up the latest config
         core.getUpdateHandler().getSolrCoreState().newIndexWriter(core, false);
@@ -1097,7 +1103,7 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
   /**
    * Set UpdateLog to buffer updates if the slice is in construction.
    */
-  private void bufferUpdatesIfConstructing(CoreDescriptor coreDescriptor) {
+  protected void bufferUpdatesIfConstructing(CoreDescriptor coreDescriptor) {
 
     if (coreContainer != null && coreContainer.isZooKeeperAware()) {
       if (reqHandlers.get("/get") == null) {
@@ -3088,7 +3094,8 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       if (cfg != null) {
         cfg.refreshRequestParams();
       }
-      if (checkStale(zkClient, overlayPath, solrConfigversion) ||
+      if (core.forceReloadCore() ||
+          checkStale(zkClient, overlayPath, solrConfigversion) ||
           checkStale(zkClient, solrConfigPath, overlayVersion) ||
           checkStale(zkClient, managedSchmaResourcePath, managedSchemaVersion)) {
         log.info("core reload {}", coreName);
@@ -3130,6 +3137,10 @@ public final class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeab
       SolrMetricProducer producer = (SolrMetricProducer) solrInfoBean;
       coreMetricManager.registerMetricProducer(name, producer);
     }
+  }
+
+  protected boolean forceReloadCore() {
+    return false;
   }
 
   private static boolean checkStale(SolrZkClient zkClient, String zkPath, int currentVersion) {
