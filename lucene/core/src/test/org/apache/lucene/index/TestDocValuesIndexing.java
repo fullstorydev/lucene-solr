@@ -353,12 +353,10 @@ public class TestDocValuesIndexing extends LuceneTestCase {
     BytesRef b = new BytesRef(bytes);
     random().nextBytes(bytes);
     hugeDoc.add(new SortedDocValuesField("dv", b));
-    expectThrows(IllegalArgumentException.class, () -> {
-      iwriter.addDocument(hugeDoc);
-    });
+    iwriter.addDocument(hugeDoc);
 
     IndexReader ir = iwriter.getReader();
-    assertEquals(1, ir.numDocs());
+    assertEquals(2, ir.numDocs());
     ir.close();
     iwriter.close();
     directory.close();
@@ -381,12 +379,10 @@ public class TestDocValuesIndexing extends LuceneTestCase {
     BytesRef b = new BytesRef(bytes);
     random().nextBytes(bytes);
     hugeDoc.add(new SortedSetDocValuesField("dv", b));
-    expectThrows(IllegalArgumentException.class, () -> {
-      iwriter.addDocument(hugeDoc);
-    });
+    iwriter.addDocument(hugeDoc);
 
     IndexReader ir = iwriter.getReader();
-    assertEquals(1, ir.numDocs());
+    assertEquals(2, ir.numDocs());
     ir.close();
     iwriter.close();
     directory.close();

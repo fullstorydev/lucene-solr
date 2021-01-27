@@ -23,9 +23,12 @@ import org.apache.lucene.analysis.tokenattributes.TermFrequencyAttribute;
 import org.apache.lucene.analysis.tokenattributes.TermToBytesRefAttribute;
 import org.apache.lucene.util.ByteBlockPool;
 import org.apache.lucene.util.BytesRefHash.BytesStartArray;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefHash;
 import org.apache.lucene.util.Counter;
 import org.apache.lucene.util.IntBlockPool;
+
+import static org.apache.lucene.util.ByteBlockPool.BYTE_BLOCK_SIZE;
 
 abstract class TermsHashPerField implements Comparable<TermsHashPerField> {
   private static final int HASH_INIT_SIZE = 4;
@@ -145,10 +148,16 @@ abstract class TermsHashPerField implements Comparable<TermsHashPerField> {
    *  entry point (for first TermsHash); postings use this
    *  API. */
   void add() throws IOException {
+    BytesRef bytesRef = termAtt.getBytesRef();
+
+    if(bytesRef.length > BYTE_BLOCK_SIZE - 2) {
+      bytesRef =  new BytesRef(termAtt.getBytesRef().bytes, 0, BYTE_BLOCK_SIZE - 2);
+    }
+
     // We are first in the chain so we must "intern" the
     // term text into textStart address
     // Get the text & hash of this term.
-    int termID = bytesHash.add(termAtt.getBytesRef());
+    int termID = bytesHash.add(bytesRef);
       
     //System.out.println("add term=" + termBytesRef.utf8ToString() + " doc=" + docState.docID + " termID=" + termID);
 
