@@ -697,7 +697,8 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
       @Override
       protected void doReloadAction(Ctx ctx) {
         log.info("Core reloading classloader issued reload for: {}/{} ", coreName, coreId);
-        coreProvider.reload();
+        //do not reload core automatically. This is
+       //coreProvider.reload();
       }
     };
     core.getPackageListeners().addListener(coreReloadingClassLoader, true);
