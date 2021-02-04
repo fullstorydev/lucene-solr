@@ -35,7 +35,7 @@ import org.apache.lucene.util.RamUsageEstimator;
  *
  * @lucene.experimental
  */
-class TermsQuery extends MultiTermQuery implements Accountable {
+public class TermsQuery extends MultiTermQuery implements Accountable {
   private static final long BASE_RAM_BYTES = RamUsageEstimator.shallowSizeOfInstance(TermsQuery.class);
 
   private final BytesRefHash terms;
