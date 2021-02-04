@@ -243,23 +243,33 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             Map<String, Object> m = getConfigDetails(parts.get(1), req);
             Map<String, Object> val = makeMap(parts.get(1), m.get(parts.get(1)));
             String componentName = req.getParams().get("componentName");
+            log.info("Got componentName {}", componentName);
             if (componentName != null) {
               Map map = (Map) val.get(parts.get(1));
+              log.info("Got map of components {}", map);
               if (map != null) {
                 Object o = map.get(componentName);
                 val.put(parts.get(1), makeMap(componentName, o));
+                log.info("val = {}", val);
                 if (req.getParams().getBool("meta", false)) {
+                  log.info("request did ask for the metainfo");
                   // meta=true is asking for the package info of the plugin
                   // We go through all the listeners and see if there is one registered for this plugin
                   List<PackageListeners.Listener> listeners = req.getCore().getPackageListeners().getListeners();
                   for (PackageListeners.Listener listener :
                       listeners) {
                     PluginInfo info = listener.pluginInfo();
-                    if(info == null) continue;
+                    if(info == null) {
+                      log.info("Info was null for {}; continuing", componentName);
+                      continue;
+                    }
+                    log.info("info found is {}", info);
                     if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
                       if (o instanceof Map) {
                         Map m1 = (Map) o;
                         m1.put("_packageinfo_", listener.getPackageVersion());
+                      } else {
+                        log.info("{} was not instance of map", o);
                       }
                     }
                   }
