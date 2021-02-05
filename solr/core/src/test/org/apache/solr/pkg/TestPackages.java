@@ -156,6 +156,8 @@ public class TestPackages extends SolrCloudTestCase {
               ":result:packages:mypkg[1]:version", "2.0",
               ":result:packages:mypkg[1]:files[0]", FILE1
           ));
+      //fullstory doesn't want automatic reload. So, we do an explicit reload command
+      CollectionAdminRequest.reloadCollection(COLLECTION_NAME).process(cluster.getSolrClient());
       new UpdateRequest().commit(cluster.getSolrClient(), COLLECTION_NAME);
 
       verifyComponent(cluster.getSolrClient(),
