@@ -267,7 +267,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
                     if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
                       log.info("component name {} info.name {} o {} type {}", componentName, info.name, o, o.getClass().getName());
                       if (o instanceof PluginInfo) {
-                        Map m1 = (Map) o;
+                        Map m1 = (Map) ((PluginInfo) o);
                         m1.put("_packageinfo_", listener.getPackageVersion());
                       } else {
                         log.info("{} was not instance of PluginInfo", o);
