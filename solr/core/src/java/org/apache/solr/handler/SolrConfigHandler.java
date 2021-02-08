@@ -246,13 +246,10 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             log.info("Got componentName {}", componentName);
             if (componentName != null) {
               Map map = (Map) val.get(parts.get(1));
-              log.info("Got map of components {}", map);
               if (map != null) {
                 Object o = map.get(componentName);
                 val.put(parts.get(1), makeMap(componentName, o));
-                log.info("val = {}", val);
                 if (req.getParams().getBool("meta", false)) {
-                  log.info("request did ask for the metainfo");
                   // meta=true is asking for the package info of the plugin
                   // We go through all the listeners and see if there is one registered for this plugin
                   List<PackageListeners.Listener> listeners = req.getCore().getPackageListeners().getListeners();
@@ -260,12 +257,11 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
                       listeners) {
                     PluginInfo info = listener.pluginInfo();
                     if(info == null) {
-                      log.info("Info was null for {}; continuing", componentName);
+                      log.info("listener.pluginInfo was null for {}; continuing", componentName);
                       continue;
                     }
-                    log.info("info found is {}", info);
                     if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
-                      log.info("component name {} info.name {} o {} type {}", componentName, info.name, o, o.getClass().getName());
+                      log.info("component name {} info {} o {} type {}", componentName, info, o, o.getClass().getName());
                       if (o instanceof PluginInfo) {
                         // Map m1 = ((PluginInfo) o).attributes;
                         log.info("_packageinfo_ {}", listener.getPackageVersion());
