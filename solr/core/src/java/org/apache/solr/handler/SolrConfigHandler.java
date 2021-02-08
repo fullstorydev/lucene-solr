@@ -243,6 +243,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             Map<String, Object> m = getConfigDetails(parts.get(1), req);
             Map<String, Object> val = makeMap(parts.get(1), m.get(parts.get(1)));
             String componentName = req.getParams().get("componentName");
+            log.info("Got componentName {}", componentName);
             if (componentName != null) {
               Map map = (Map) val.get(parts.get(1));
               if (map != null) {
@@ -255,11 +256,17 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
                   for (PackageListeners.Listener listener :
                       listeners) {
                     PluginInfo info = listener.pluginInfo();
-                    if(info == null) continue;
+                    if(info == null) {
+                      log.info("listener.pluginInfo was null for {}; continuing", componentName);
+                      continue;
+                    }
                     if (info.type.equals(parts.get(1)) && info.name.equals(componentName)) {
-                      if (o instanceof Map) {
-                        Map m1 = (Map) o;
-                        m1.put("_packageinfo_", listener.getPackageVersion());
+                      log.info("component name {} info {} o {} type {}", componentName, info, o, o.getClass().getName());
+                      if (o instanceof PluginInfo) {
+                        // Map m1 = ((PluginInfo) o).attributes;
+                        log.info("_packageinfo_ {}", listener.getPackageVersion());
+                      } else {
+                        log.info("{} was not instance of PluginInfo", o);
                       }
                     }
                   }
