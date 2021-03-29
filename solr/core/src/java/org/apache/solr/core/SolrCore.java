@@ -186,7 +186,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
 
   public static final String version = "1.0";
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  protected static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final Logger requestLog = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass().getName() + ".Request");
   private static final Logger slowLog = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass().getName() + ".SlowRequest");
 
@@ -927,14 +927,13 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
                   CoreDescriptor coreDescriptor, UpdateHandler updateHandler,
                   IndexDeletionPolicyWrapper delPolicy, SolrCore prev, boolean reload) {
 
-    assert ObjectReleaseTracker.track(searcherExecutor); // ensure that in unclean shutdown tests we still close this
-
     this.coreContainer = coreContainer;
 
     final CountDownLatch latch = new CountDownLatch(1);
 
     try {
 
+      searcherExecutor = getExecutorService(coreContainer, name);
       CoreDescriptor cd = Objects.requireNonNull(coreDescriptor, "coreDescriptor cannot be null");
       coreContainer.solrCores.addCoreDescriptor(cd);
 
@@ -1082,6 +1081,14 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
 
     assert ObjectReleaseTracker.track(this);
+  }
+
+  protected ExecutorService getExecutorService(CoreContainer coreContainer, String name) {
+    //kept executor per core
+    final ExecutorService es = ExecutorUtil.newMDCAwareSingleThreadExecutor(
+        new DefaultSolrThreadFactory("searcherExecutor"));
+    assert ObjectReleaseTracker.track(es); // ensure that in unclean shutdown tests we still close this
+    return es;
   }
 
   public void seedVersionBuckets() {
@@ -1631,15 +1638,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       }
     }
 
-    try {
-      ExecutorUtil.shutdownAndAwaitTermination(searcherExecutor);
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-    assert ObjectReleaseTracker.release(searcherExecutor);
+    closeSearchExecutor();
 
     try {
       // Since we waited for the searcherExecutor to shut down,
@@ -1711,6 +1710,19 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
 
     assert ObjectReleaseTracker.release(this);
+  }
+
+  protected void closeSearchExecutor() {
+    try {
+      ExecutorUtil.shutdownAndAwaitTermination(searcherExecutor);
+    } catch (Throwable e) {
+      SolrException.log(log, e);
+      if (e instanceof Error) {
+        throw (Error) e;
+      }
+    } finally {
+    }
+    assert ObjectReleaseTracker.release(searcherExecutor);
   }
 
   /**
@@ -1873,12 +1885,11 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
   private final LinkedList<RefCounted<SolrIndexSearcher>> _searchers = new LinkedList<>();
   private final LinkedList<RefCounted<SolrIndexSearcher>> _realtimeSearchers = new LinkedList<>();
 
-  final ExecutorService searcherExecutor = ExecutorUtil.newMDCAwareSingleThreadExecutor(
-      new DefaultSolrThreadFactory("searcherExecutor"));
+  final ExecutorService searcherExecutor;
   private int onDeckSearchers;  // number of searchers preparing
   // Lock ordering: one can acquire the openSearcherLock and then the searcherLock, but not vice-versa.
   private Object searcherLock = new Object();  // the sync object for the searcher
-  private ReentrantLock openSearcherLock = new ReentrantLock(true);     // used to serialize opens/reopens for absolute ordering
+  protected ReentrantLock openSearcherLock = new ReentrantLock(true);     // used to serialize opens/reopens for absolute ordering
   private final int maxWarmingSearchers;  // max number of on-deck searchers allowed
   private final int slowQueryThresholdMillis;  // threshold above which a query is considered slow
 
@@ -2305,6 +2316,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     openSearcherLock.lock();
     Timer.Context timerContext = newSearcherTimer.time();
     try {
+      searchExecutorClosed();
       searchHolder = openNewSearcher(updateHandlerReopens, false);
       // the searchHolder will be incremented once already (and it will eventually be assigned to _searcher when registered)
       // increment it again if we are going to return it to the caller.
@@ -2424,6 +2436,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       if (waitSearcher != null) {
         waitSearcher[0] = future;
       }
+      searchExecutorWaiter(future);
 
       success = true;
 
@@ -2471,6 +2484,12 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
 
     }
 
+  }
+
+  protected void searchExecutorClosed() {
+  }
+
+  protected void searchExecutorWaiter(Future future) {
   }
 
 
