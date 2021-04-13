@@ -17,6 +17,7 @@
 
 package org.apache.solr.core;
 
+import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -25,9 +26,12 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.update.UpdateHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SolrCoreProxy extends SolrCore {
 
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   //to wait during core close
   private Future searcherExecutorFuture = null;
   private boolean isSearchExecutorClosed = false;
