@@ -31,6 +31,8 @@ import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.NamedList;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -60,6 +62,7 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     String collectionName = "collection1";
 
     CoreContainer queryNodeContainer = getQueryNodeContainer();
+
     ClusterState clusterState = queryNodeContainer.getZkController().getClusterState();
     Set<String> queryNodes = clusterState.getLiveQueryNodes();
     Set<String> liveNodes = clusterState.getLiveNodes();
@@ -103,6 +106,13 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
       verifyCoreReloadAfterSchemaConfigUpdate(collectionName);
       verifyCollectionShards(collectionName);
       verifyCollectionListenerInstalled(collectionName);
+      log.info("restarting zookeeper ");
+      WatchedEvent watchedEvent = new WatchedEvent(Watcher.Event.EventType.ChildWatchRemoved, Watcher.Event.KeeperState.Expired, "/solr/live_query_node");
+      queryNodeContainer.getZkController().getZkClient().getConnectionManager().process(watchedEvent);
+      log.info("restarted zookeeper ");
+      queryDocs(queryNodeUrl, collectionName, 10);
+      verifyCollectionListenerInstalled(collectionName);
+      log.info("verifyCollectionListenerInstalled ");
       verifyDeleteCollection(collectionName);
     } finally {
       System.clearProperty("solr.test.sys.prop1");
@@ -125,7 +135,7 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     SolrCore newCore = queryAggregatorContainer.getCore(collection);
     newCore.close();
     //core reference should be different
-    assertFalse(currentCore == newCore);
+    assertTrue(currentCore == newCore);
   }
 
   private void verifyCollectionShards(final String collection) throws Exception {
@@ -193,6 +203,7 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
   }
 
   private void queryDocs(final String baseUrl, final String collection, int docs) throws Exception {
+    log.info("queryDocs ...");
     SolrQuery query = new SolrQuery("*:*");
     try (HttpSolrClient qclient = getHttpSolrClient(baseUrl)) {
       QueryResponse results = qclient.query(collection, query);
