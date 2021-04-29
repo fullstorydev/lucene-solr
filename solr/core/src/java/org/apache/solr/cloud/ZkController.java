@@ -344,6 +344,17 @@ public class ZkController implements Closeable {
           @Override
           public void command() throws SessionExpiredException {
             log.info("ZooKeeper session re-connected ... refreshing core states after session expiration.");
+            if (cc.isQueryAggregator()) {
+              try {
+                zkStateReader.createClusterStateWatchersAndUpdate();
+                createEphemeralLiveQueryNode();
+              } catch (Exception e) {
+                SolrException.log(log, "", e);
+                throw new ZooKeeperException(
+                    SolrException.ErrorCode.SERVER_ERROR, "", e);
+              }
+              return;
+            }
             clearZkCollectionTerms();
             try {
               // recreate our watchers first so that they exist even on any problems below
@@ -456,6 +467,8 @@ public class ZkController implements Closeable {
 
       @Override
       public void command() {
+        if(cc.isQueryAggregator())
+          return;
         try {
           ZkController.this.overseer.close();
         } catch (Exception e) {
@@ -471,7 +484,6 @@ public class ZkController implements Closeable {
         return cc.isShutDown();
       }});
 
-
     this.overseerRunningMap = Overseer.getRunningMap(zkClient);
     this.overseerCompletedMap = Overseer.getCompletedMap(zkClient);
     this.overseerFailureMap = Overseer.getFailureMap(zkClient);
@@ -482,10 +494,17 @@ public class ZkController implements Closeable {
     });
 
     init(registerOnReconnect);
+    if (!cc.isQueryAggregator()) {
 
-    this.overseerJobQueue = overseer.getStateUpdateQueue();
-    this.overseerCollectionQueue = overseer.getCollectionQueue(zkClient);
-    this.overseerConfigSetQueue = overseer.getConfigSetQueue(zkClient);
+      this.overseerJobQueue = overseer.getStateUpdateQueue();
+      this.overseerCollectionQueue = overseer.getCollectionQueue(zkClient);
+      this.overseerConfigSetQueue = overseer.getConfigSetQueue(zkClient);
+    } else {
+        this.overseerJobQueue = null;
+        this.overseerCollectionQueue = null;
+        this.overseerConfigSetQueue = null;
+    }
+
     this.sysPropsCacher = new NodesSysPropsCacher(getSolrCloudManager().getNodeStateProvider(),
         getNodeName(), zkStateReader);
 
@@ -612,7 +631,7 @@ public class ZkController implements Closeable {
     }
 
     try {
-      if (getZkClient().getConnectionManager().isConnected()) {
+      if (!cc.isQueryAggregator() && getZkClient().getConnectionManager().isConnected()) {
         log.info("Publish this node as DOWN...");
         publishNodeAsDown(getNodeName());
       }
@@ -926,7 +945,7 @@ public class ZkController implements Closeable {
       registerLiveNodesListener();
 
       // start the overseer first as following code may need it's processing
-      if (!zkRunOnly) {
+      if (!(zkRunOnly || cc.isQueryAggregator())) {
         overseerElector = new LeaderElector(zkClient);
         this.overseer = new Overseer((HttpShardHandler) cc.getShardHandlerFactory().getShardHandler(), cc.getUpdateShardHandler(),
             CommonParams.CORES_HANDLER_PATH, zkStateReader, this, cloudConfig);
@@ -937,7 +956,7 @@ public class ZkController implements Closeable {
       }
 
       Stat stat = zkClient.exists(ZkStateReader.LIVE_NODES_ZKNODE, null, true);
-      if (stat != null && stat.getNumChildren() > 0) {
+      if (!cc.isQueryAggregator() && stat != null && stat.getNumChildren() > 0) {
         publishAndWaitForDownStates();
       }
 

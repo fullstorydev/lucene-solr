@@ -112,7 +112,7 @@ public class ZkStateReader implements SolrCloseable {
   public static final String COLLECTIONS_ZKNODE = "/collections";
   public static final String LIVE_NODES_ZKNODE = "/live_nodes";
   public static final String LIVE_QUERY_NODES_ZKNODE = "/live_query_nodes";
-  public static final String SOLR_QUERY_AGGREGATOR = "QueryAggregator";
+  public static final String SOLR_QUERY_AGGREGATOR = "SolrQueryAggregator";
   public static final String ALIASES = "/aliases.json";
   public static final String CLUSTER_STATE = "/clusterstate.json";
   public static final String CLUSTER_PROPS = "/clusterprops.json";
@@ -338,6 +338,8 @@ public class ZkStateReader implements SolrCloseable {
   private volatile boolean closed = false;
 
   private Set<CountDownLatch> waitLatches = ConcurrentHashMap.newKeySet();
+
+  private final boolean isQueryAggregatorNode = Boolean.getBoolean(SOLR_QUERY_AGGREGATOR);
 
   public ZkStateReader(SolrZkClient zkClient) {
     this(zkClient, null);
@@ -595,18 +597,23 @@ public class ZkStateReader implements SolrCloseable {
   private void constructState(Set<String> changedCollections) {
 
     Set<String> liveNodes = this.liveNodes; // volatile read
-
+    log.info("collectionWatches size " + collectionWatches.size());
+    log.info("legacyCollectionStates size " + legacyCollectionStates.size());
+    log.info("watchedCollectionStates size " + watchedCollectionStates.size());
+    log.info("lazyCollectionStates size " + lazyCollectionStates.size());
     // Legacy clusterstate is authoritative, for backwards compatibility.
     // To move a collection's state to format2, first create the new state2 format node, then remove legacy entry.
     Map<String, ClusterState.CollectionRef> result = new LinkedHashMap<>(legacyCollectionStates);
 
     // Add state format2 collections, but don't override legacy collection states.
     for (Map.Entry<String, DocCollection> entry : watchedCollectionStates.entrySet()) {
+      log.info("construct state: watch collection " + entry.getKey());
       result.putIfAbsent(entry.getKey(), new ClusterState.CollectionRef(entry.getValue()));
     }
 
     // Finally, add any lazy collections that aren't already accounted for.
     for (Map.Entry<String, LazyCollectionRef> entry : lazyCollectionStates.entrySet()) {
+      log.info("construct state: lazy collection " + entry.getKey());
       result.putIfAbsent(entry.getKey(), entry.getValue());
     }
 
@@ -757,6 +764,12 @@ public class ZkStateReader implements SolrCloseable {
     cloudCollectionsListeners.remove(cloudCollectionsListener);
   }
 
+  public boolean hasCollection(String collection) {
+    if (lazyCollectionStates.containsKey(collection))
+      return true;
+    throw new SolrException(ErrorCode.NOT_FOUND, "Could not find collection : " + collection);
+  }
+
   private void notifyNewCloudCollectionsListener(CloudCollectionsListener listener) {
     listener.onChange(Collections.emptySet(), lastFetchedCollectionSet.get());
   }
@@ -798,8 +811,21 @@ public class ZkStateReader implements SolrCloseable {
     @Override
     public synchronized DocCollection get(boolean allowCached) {
       gets.incrementAndGet();
+
+      //we install collection watcher for query aggregator nodes thus fetching from state directly
+      //TODO: below code is for solr nodes; need to look if we can optimize that as well(as we have 30k collections)
+      //that makes zk call every 2 seconds(configurable) to ensure collection state has changed or not.
+      // so frequent zk call vs watches
+      if (ZkStateReader.this.isQueryAggregatorNode) {
+        DocCollection collection = getCollectionLiveForQANode(ZkStateReader.this, collName);
+        if (collection != null) {
+          return collection;
+        }
+      }
+
       if (!allowCached || lastUpdateTime < 0 || System.nanoTime() - lastUpdateTime > LAZY_CACHE_TIME) {
         boolean shouldFetch = true;
+
         if (cachedDocCollection != null) {
           Stat freshStats = null;
           try {
@@ -811,6 +837,7 @@ public class ZkStateReader implements SolrCloseable {
           }
         }
         if (shouldFetch) {
+          //log.info("fetching collection ", new RuntimeException("fetching collection " + collName));
           cachedDocCollection = getCollectionLive(ZkStateReader.this, collName);
           lastUpdateTime = System.nanoTime();
         }
@@ -1676,6 +1703,17 @@ public class ZkStateReader implements SolrCloseable {
     }
   }
 
+  public static DocCollection getCollectionLiveForQANode(ZkStateReader zkStateReader, String coll) {
+    if (!zkStateReader.isQueryAggregatorNode)
+      return null;
+
+    ClusterState.CollectionRef collectionRef = zkStateReader.clusterState.getCollectionStates().get(coll);
+    if ( collectionRef != null && !(collectionRef instanceof LazyCollectionRef) && collectionRef.get() != null)
+      return collectionRef.get();
+
+    return null;
+  }
+
   public static DocCollection getCollectionLive(ZkStateReader zkStateReader, String coll) {
     try {
       return zkStateReader.fetchCollectionState(coll, null, null);
@@ -2102,6 +2140,7 @@ public class ZkStateReader implements SolrCloseable {
           if (log.isDebugEnabled()) {
             log.debug("Add data for [{}] ver [{}]", coll, newState.getZNodeVersion());
           }
+          log.info("Add data for [{}] ver [{}]", coll, newState.getZNodeVersion());
           updated = true;
           break;
         }
@@ -2118,6 +2157,7 @@ public class ZkStateReader implements SolrCloseable {
           if (log.isDebugEnabled()) {
             log.debug("Updating data for [{}] from [{}] to [{}]", coll, oldState.getZNodeVersion(), newState.getZNodeVersion());
           }
+          log.info("Updating data for [{}] from [{}] to [{}]", coll, oldState.getZNodeVersion(), newState.getZNodeVersion());
           updated = true;
           break;
         }

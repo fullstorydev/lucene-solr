@@ -1052,7 +1052,7 @@ public class CoreContainer {
   public void shutdown() {
 
     ZkController zkController = getZkController();
-    if (zkController != null) {
+    if (!isQueryAggregator() && zkController != null) {
       OverseerTaskQueue overseerCollectionQueue = zkController.getOverseerCollectionQueue();
       overseerCollectionQueue.allowOverseerPendingTasksToComplete();
     }
@@ -1530,19 +1530,18 @@ public class CoreContainer {
   }
 
   SolrCore createProxyCore(String collectionName) {
-    DocCollection collection = getCollection(collectionName);
 
-    if (collection == null) {
+    if (!hasCollection(collectionName)) {
       return null;
     }
 
     Map<String, String> coreProps = new HashMap<>();
     coreProps.put(CoreAdminParams.CORE_NODE_NAME, this.getHostName());
-    coreProps.put(CoreAdminParams.COLLECTION, collection.getName());
+    coreProps.put(CoreAdminParams.COLLECTION, collectionName);
 
     CoreDescriptor ret = new CoreDescriptor(
-        collection.getName(),
-        Paths.get(this.getSolrHome() + "/" + collection.getName()),
+        collectionName,
+        Paths.get(this.getSolrHome() + "/" + collectionName),
         coreProps, this.getContainerProperties(), this.getZkController());
 
     try {
@@ -2288,6 +2287,10 @@ public class CoreContainer {
   private DocCollection getCollection(String collectionName) {
     DocCollection coll = getZkController().getZkStateReader().getClusterState().getCollection(collectionName);
     return coll;
+  }
+
+  private boolean hasCollection(String collectionName) {
+    return getZkController().getZkStateReader().hasCollection(collectionName);
   }
 
   /**
