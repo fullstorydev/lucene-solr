@@ -985,7 +985,7 @@ public class CoreContainer {
   public void shutdown() {
 
     ZkController zkController = getZkController();
-    if (zkController != null) {
+    if (!isQueryAggregator() && zkController != null) {
       OverseerTaskQueue overseerCollectionQueue = zkController.getOverseerCollectionQueue();
       overseerCollectionQueue.allowOverseerPendingTasksToComplete();
     }

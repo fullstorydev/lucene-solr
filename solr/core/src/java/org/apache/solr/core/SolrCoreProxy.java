@@ -86,7 +86,7 @@ public class SolrCoreProxy extends SolrCore {
   protected void closeSearchExecutor() {
     try {
       openSearcherLock.lock();
-      if (searcherExecutor != null) {
+      if (searcherExecutor != null && searcherExecutorFuture != null) {
         searcherExecutorFuture.get(60, TimeUnit.SECONDS);
       }
     } catch (Throwable e) {
@@ -98,5 +98,9 @@ public class SolrCoreProxy extends SolrCore {
       isSearchExecutorClosed = true;
       openSearcherLock.unlock();
     }
+  }
+
+  protected void registerConfListener() {
+    //we don't want register conf listener for proxy core
   }
 }

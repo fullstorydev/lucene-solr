@@ -3072,7 +3072,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
    * there is no event fired when children are modified. So , we expect everyone
    * to 'touch' the /conf directory by setting some data  so that events are triggered.
    */
-  private void registerConfListener() {
+  protected void registerConfListener() {
     if (!(resourceLoader instanceof ZkSolrResourceLoader)) return;
     final ZkSolrResourceLoader zkSolrResourceLoader = (ZkSolrResourceLoader) resourceLoader;
     if (zkSolrResourceLoader != null)
