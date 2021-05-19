@@ -137,12 +137,12 @@ public class Replica extends ZkNodeProps {
     this.nodeName = (String) propMap.get(ZkStateReader.NODE_NAME_PROP);
     this.core = (String) propMap.get(ZkStateReader.CORE_NAME_PROP);
     type = Type.get((String) propMap.get(ZkStateReader.REPLICA_TYPE));
-    Objects.requireNonNull(this.collection, "'collection' must not be null");
-    Objects.requireNonNull(this.slice, "'slice' must not be null");
-    Objects.requireNonNull(this.name, "'name' must not be null");
-    Objects.requireNonNull(this.nodeName, "'node_name' must not be null");
-    Objects.requireNonNull(this.core, "'core' must not be null");
-    Objects.requireNonNull(this.type, "'type' must not be null");
+//    Objects.requireNonNull(this.collection, "'collection' must not be null");
+//    Objects.requireNonNull(this.slice, "'slice' must not be null");
+//    Objects.requireNonNull(this.name, "'name' must not be null");
+//    Objects.requireNonNull(this.nodeName, "'node_name' must not be null");
+//    Objects.requireNonNull(this.core, "'core' must not be null");
+//    Objects.requireNonNull(this.type, "'type' must not be null");
     ClusterState.getReplicaStatesProvider().get().ifPresent(it -> {
       if(log.isDebugEnabled()) {
         log.debug("replica: {}, state fetched from per-replica state", name);
