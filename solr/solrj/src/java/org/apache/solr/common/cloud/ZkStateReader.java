@@ -597,23 +597,17 @@ public class ZkStateReader implements SolrCloseable {
   private void constructState(Set<String> changedCollections) {
 
     Set<String> liveNodes = this.liveNodes; // volatile read
-    log.info("collectionWatches size " + collectionWatches.size());
-    log.info("legacyCollectionStates size " + legacyCollectionStates.size());
-    log.info("watchedCollectionStates size " + watchedCollectionStates.size());
-    log.info("lazyCollectionStates size " + lazyCollectionStates.size());
     // Legacy clusterstate is authoritative, for backwards compatibility.
     // To move a collection's state to format2, first create the new state2 format node, then remove legacy entry.
     Map<String, ClusterState.CollectionRef> result = new LinkedHashMap<>(legacyCollectionStates);
 
     // Add state format2 collections, but don't override legacy collection states.
     for (Map.Entry<String, DocCollection> entry : watchedCollectionStates.entrySet()) {
-      log.info("construct state: watch collection " + entry.getKey());
       result.putIfAbsent(entry.getKey(), new ClusterState.CollectionRef(entry.getValue()));
     }
 
     // Finally, add any lazy collections that aren't already accounted for.
     for (Map.Entry<String, LazyCollectionRef> entry : lazyCollectionStates.entrySet()) {
-      log.info("construct state: lazy collection " + entry.getKey());
       result.putIfAbsent(entry.getKey(), entry.getValue());
     }
 
@@ -2140,7 +2134,6 @@ public class ZkStateReader implements SolrCloseable {
           if (log.isDebugEnabled()) {
             log.debug("Add data for [{}] ver [{}]", coll, newState.getZNodeVersion());
           }
-          log.info("Add data for [{}] ver [{}]", coll, newState.getZNodeVersion());
           updated = true;
           break;
         }
@@ -2157,7 +2150,6 @@ public class ZkStateReader implements SolrCloseable {
           if (log.isDebugEnabled()) {
             log.debug("Updating data for [{}] from [{}] to [{}]", coll, oldState.getZNodeVersion(), newState.getZNodeVersion());
           }
-          log.info("Updating data for [{}] from [{}] to [{}]", coll, oldState.getZNodeVersion(), newState.getZNodeVersion());
           updated = true;
           break;
         }
