@@ -109,7 +109,7 @@ public abstract class ConfigSetService {
    */
   public ConfigSetService(SolrResourceLoader loader, boolean shareSchema) {
     this.parentLoader = loader;
-    this.schemaCache = (shareSchema || Boolean.getBoolean("shareSchema")) ? Caffeine.newBuilder().weakValues().build() : null;
+    this.schemaCache = shareSchema ? Caffeine.newBuilder().weakValues().build() : null;
   }
 
   /**

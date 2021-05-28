@@ -831,7 +831,6 @@ public class ZkStateReader implements SolrCloseable {
           }
         }
         if (shouldFetch) {
-          //log.info("fetching collection ", new RuntimeException("fetching collection " + collName));
           cachedDocCollection = getCollectionLive(ZkStateReader.this, collName);
           lastUpdateTime = System.nanoTime();
         }
