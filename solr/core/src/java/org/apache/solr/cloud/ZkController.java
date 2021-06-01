@@ -505,7 +505,7 @@ public class ZkController implements Closeable {
         this.overseerConfigSetQueue = null;
     }
 
-    this.sysPropsCacher = new NodesSysPropsCacher(getSolrCloudManager().getNodeStateProvider(),
+    this.sysPropsCacher = new NodesSysPropsCacher( cc.isQueryAggregator() ? null : getSolrCloudManager().getNodeStateProvider(),
         getNodeName(), zkStateReader);
 
     assert ObjectReleaseTracker.track(this);
