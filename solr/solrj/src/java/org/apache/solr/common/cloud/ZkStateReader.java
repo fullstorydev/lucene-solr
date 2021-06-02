@@ -731,6 +731,7 @@ public class ZkStateReader implements SolrCloseable {
           // Double check contains just to avoid allocating an object.
           LazyCollectionRef existing = lazyCollectionStates.get(coll);
           if (existing == null) {
+            log.info("adding coll " + coll, new RuntimeException("adding coll " + coll));
             lazyCollectionStates.putIfAbsent(coll, new LazyCollectionRef(coll));
           }
         }
@@ -831,6 +832,7 @@ public class ZkStateReader implements SolrCloseable {
           }
         }
         if (shouldFetch) {
+          log.info("fetching collection ", new RuntimeException("fetching collection " + collName));
           cachedDocCollection = getCollectionLive(ZkStateReader.this, collName);
           lastUpdateTime = System.nanoTime();
         }
