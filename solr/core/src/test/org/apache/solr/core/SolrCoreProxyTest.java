@@ -71,7 +71,7 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     assertTrue("Query nodes should contain query node.", queryNodes.contains(queryNodeContainer.getZkController().getNodeName()));
     assertTrue("There must be some live nodes.", liveNodes.size() > 0);
     assertFalse("Query node should not register in live nodes.", liveNodes.contains(queryNodeContainer.getZkController().getNodeName()));
-
+    assertTrue("Collection should have one slice.", clusterState.getCollection(collectionName).getSlices().size() == 1);
 
     SolrCore core = queryNodeContainer.getCore(collectionName);
 
@@ -102,17 +102,43 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     try {
       System.setProperty("solr.test.sys.prop1", "propone");
       System.setProperty("solr.test.sys.prop2", "proptwo");
-
+      ClusterState preSplitClusterState = queryNodeContainer.getZkController().getClusterState();
       verifyCoreReloadAfterSchemaConfigUpdate(collectionName);
-      verifyCollectionShards(collectionName);
+      verifyCollectionShardSplit(collectionName);
       verifyCollectionListenerInstalled(collectionName);
-      log.info("restarting zookeeper ");
+      ClusterState postSplitClusterState = queryNodeContainer.getZkController().getClusterState();
+
+      log.info("restarting zookeeper================================ ");
       WatchedEvent watchedEvent = new WatchedEvent(Watcher.Event.EventType.ChildWatchRemoved, Watcher.Event.KeeperState.Expired, "/solr/live_query_node");
       queryNodeContainer.getZkController().getZkClient().getConnectionManager().process(watchedEvent);
-      log.info("restarted zookeeper ");
-      queryDocs(queryNodeUrl, collectionName, 10);
+      log.info("restarted zookeeper ======================================================== ");
+
+      ClusterState postZkReconnectClusterState = queryNodeContainer.getZkController().getClusterState();
+
+      //collection state should be same
+      assertTrue(postSplitClusterState.getCollection(collectionName).equals(postZkReconnectClusterState.getCollection(collectionName)));
+      //collection object should be same
+      DocCollection preC = postSplitClusterState.getCollection(collectionName);
+      DocCollection postC = postZkReconnectClusterState.getCollection(collectionName);
+      assertTrue( preC == postC);
+
+      //add more docs after zk disconnect
+      addDocs(ingestNodeUrl, collectionName, 10);
+      //total results should be 20
+      queryDocs(queryNodeUrl, collectionName, 20);
+
       verifyCollectionListenerInstalled(collectionName);
-      log.info("verifyCollectionListenerInstalled ");
+
+      //do again split and verify the data
+      verifyCollectionShardSplitAfterZkDisconnect(collectionName);
+      DocCollection postSplitC = queryNodeContainer.getZkController().getClusterState().getCollection(collectionName);
+      assertTrue(!postC.equals(postSplitC));
+      assertTrue(postC != postSplitC);
+      //add more docs after split
+      addDocs(ingestNodeUrl, collectionName, 10);
+      //total results should be 30
+      queryDocs(queryNodeUrl, collectionName, 30);
+
       verifyDeleteCollection(collectionName);
     } finally {
       System.clearProperty("solr.test.sys.prop1");
@@ -138,7 +164,7 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     assertTrue(currentCore == newCore);
   }
 
-  private void verifyCollectionShards(final String collection) throws Exception {
+  private void verifyCollectionShardSplit(final String collection) throws Exception {
     CoreContainer queryAggregatorContainer = getQueryNodeContainer();
     ClusterState clusterState = queryAggregatorContainer.getZkController().getZkStateReader().getClusterState();
     DocCollection docCollection = clusterState.getCollection(collection);
@@ -156,6 +182,26 @@ public class SolrCoreProxyTest extends AbstractFullDistribZkTestBase {
     assertNotNull(collectionRef);
     assertFalse(collectionRef instanceof ZkStateReader.LazyCollectionRef);
     assertTrue("Collection now should have two slices", docCollection.getActiveSlices().size() == 2);
+  }
+
+  private void verifyCollectionShardSplitAfterZkDisconnect(final String collection) throws Exception {
+    CoreContainer queryAggregatorContainer = getQueryNodeContainer();
+    ClusterState clusterState = queryAggregatorContainer.getZkController().getZkStateReader().getClusterState();
+    DocCollection docCollection = clusterState.getCollection(collection);
+
+    assertTrue("Collection should have one slice", docCollection.getActiveSlices().size() == 2);
+
+    CollectionAdminRequest.SplitShard splitShard = CollectionAdminRequest.splitShard(collection);
+    splitShard.setShardName("shard1_0");
+    NamedList<Object> response = splitShard.process(cloudClient).getResponse();
+    assertNotNull(response.get("success"));
+    Thread.sleep(5000);
+    clusterState = queryAggregatorContainer.getZkController().getZkStateReader().getClusterState();
+    docCollection = clusterState.getCollection(collection);
+    ClusterState.CollectionRef collectionRef = clusterState.getCollectionStates().get(collection);
+    assertNotNull(collectionRef);
+    assertFalse(collectionRef instanceof ZkStateReader.LazyCollectionRef);
+    assertTrue("Collection now should have two slices", docCollection.getActiveSlices().size() == 3);
   }
 
   private void verifyCollectionListenerInstalled(final String collection) throws Exception {

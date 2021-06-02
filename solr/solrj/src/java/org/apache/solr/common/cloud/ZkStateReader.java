@@ -731,7 +731,6 @@ public class ZkStateReader implements SolrCloseable {
           // Double check contains just to avoid allocating an object.
           LazyCollectionRef existing = lazyCollectionStates.get(coll);
           if (existing == null) {
-            log.info("adding coll " + coll, new RuntimeException("adding coll " + coll));
             lazyCollectionStates.putIfAbsent(coll, new LazyCollectionRef(coll));
           }
         }
@@ -807,17 +806,6 @@ public class ZkStateReader implements SolrCloseable {
     public synchronized DocCollection get(boolean allowCached) {
       gets.incrementAndGet();
 
-      //we install collection watcher for query aggregator nodes thus fetching from state directly
-      //TODO: below code is for solr nodes; need to look if we can optimize that as well(as we have 30k collections)
-      //that makes zk call every 2 seconds(configurable) to ensure collection state has changed or not.
-      // so frequent zk call vs watches
-      if (ZkStateReader.this.isQueryAggregatorNode) {
-        DocCollection collection = getCollectionLiveForQANode(ZkStateReader.this, collName);
-        if (collection != null) {
-          return collection;
-        }
-      }
-
       if (!allowCached || lastUpdateTime < 0 || System.nanoTime() - lastUpdateTime > LAZY_CACHE_TIME) {
         boolean shouldFetch = true;
 
@@ -832,7 +820,6 @@ public class ZkStateReader implements SolrCloseable {
           }
         }
         if (shouldFetch) {
-          log.info("fetching collection ", new RuntimeException("fetching collection " + collName));
           cachedDocCollection = getCollectionLive(ZkStateReader.this, collName);
           lastUpdateTime = System.nanoTime();
         }
@@ -1696,17 +1683,6 @@ public class ZkStateReader implements SolrCloseable {
         log.warn("Interrupted", e);
       }
     }
-  }
-
-  public static DocCollection getCollectionLiveForQANode(ZkStateReader zkStateReader, String coll) {
-    if (!zkStateReader.isQueryAggregatorNode)
-      return null;
-
-    ClusterState.CollectionRef collectionRef = zkStateReader.clusterState.getCollectionStates().get(coll);
-    if ( collectionRef != null && !(collectionRef instanceof LazyCollectionRef) && collectionRef.get() != null)
-      return collectionRef.get();
-
-    return null;
   }
 
   public static DocCollection getCollectionLive(ZkStateReader zkStateReader, String coll) {
