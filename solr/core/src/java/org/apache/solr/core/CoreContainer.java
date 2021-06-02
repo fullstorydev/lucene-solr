@@ -872,42 +872,44 @@ public class CoreContainer {
         SolrMetricManager.mkName("coreLoadExecutor", SolrInfoBean.Category.CONTAINER.toString(), "threadPool"));
     final List<Future<SolrCore>> futures = new ArrayList<>();
     try {
-      List<CoreDescriptor> cds = coresLocator.discover(this);
-      cds = CoreSorter.sortCores(this, cds);
-      checkForDuplicateCoreNames(cds);
-      status |= CORE_DISCOVERY_COMPLETE;
+      if (!isQueryAggregator) {
+        List<CoreDescriptor> cds = coresLocator.discover(this);
+        cds = CoreSorter.sortCores(this, cds);
+        checkForDuplicateCoreNames(cds);
+        status |= CORE_DISCOVERY_COMPLETE;
 
-      for (final CoreDescriptor cd : cds) {
-        if (cd.isTransient() || !cd.isLoadOnStartup()) {
-          solrCores.addCoreDescriptor(cd);
-        } else if (asyncSolrCoreLoad) {
-          solrCores.markCoreAsLoading(cd);
-        }
-        if (cd.isLoadOnStartup()) {
-          futures.add(coreLoadExecutor.submit(() -> {
-            SolrCore core;
-            try {
-              if (zkSys.getZkController() != null) {
-                zkSys.getZkController().throwErrorIfReplicaReplaced(cd);
+        for (final CoreDescriptor cd : cds) {
+          if (cd.isTransient() || !cd.isLoadOnStartup()) {
+            solrCores.addCoreDescriptor(cd);
+          } else if (asyncSolrCoreLoad) {
+            solrCores.markCoreAsLoading(cd);
+          }
+          if (cd.isLoadOnStartup()) {
+            futures.add(coreLoadExecutor.submit(() -> {
+              SolrCore core;
+              try {
+                if (zkSys.getZkController() != null) {
+                  zkSys.getZkController().throwErrorIfReplicaReplaced(cd);
+                }
+                solrCores.waitAddPendingCoreOps(cd.getName());
+                core = createFromDescriptor(cd, false, false);
+              } finally {
+                solrCores.removeFromPendingOps(cd.getName());
+                if (asyncSolrCoreLoad) {
+                  solrCores.markCoreAsNotLoading(cd);
+                }
               }
-              solrCores.waitAddPendingCoreOps(cd.getName());
-              core = createFromDescriptor(cd, false, false);
-            } finally {
-              solrCores.removeFromPendingOps(cd.getName());
-              if (asyncSolrCoreLoad) {
-                solrCores.markCoreAsNotLoading(cd);
+              try {
+                zkSys.registerInZk(core, true, false);
+              } catch (RuntimeException e) {
+                SolrException.log(log, "Error registering SolrCore", e);
               }
-            }
-            try {
-              zkSys.registerInZk(core, true, false);
-            } catch (RuntimeException e) {
-              SolrException.log(log, "Error registering SolrCore", e);
-            }
-            return core;
-          }));
+              return core;
+            }));
+          }
         }
+
       }
-
 
       // Start the background thread
       backgroundCloser = new CloserThread(this, solrCores, cfg);
