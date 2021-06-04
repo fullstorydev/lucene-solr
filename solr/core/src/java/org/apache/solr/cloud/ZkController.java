@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.solr.client.solrj.cloud.NodeStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -211,7 +212,7 @@ public class ZkController implements Closeable {
   private SolrCloudManager cloudManager;
   private CloudSolrClient cloudSolrClient;
 
-  private final String zkServerAddress;          // example: 127.0.0.1:54062/solr
+  protected final String zkServerAddress;          // example: 127.0.0.1:54062/solr
 
   private final int localHostPort;      // example: 54065
   private final String hostName;           // example: 127.0.0.1
@@ -228,7 +229,7 @@ public class ZkController implements Closeable {
 
   // for now, this can be null in tests, in which case recovery will be inactive, and other features
   // may accept defaults or use mocks rather than pulling things from a CoreContainer
-  private CoreContainer cc;
+  protected CoreContainer cc;
 
   protected volatile Overseer overseer;
 
@@ -237,7 +238,7 @@ public class ZkController implements Closeable {
 
   private boolean genericCoreNodeNames;
 
-  private int clientTimeout;
+  protected int clientTimeout;
 
   private volatile boolean isClosed;
 
@@ -337,24 +338,55 @@ public class ZkController implements Closeable {
     }
     addOnReconnectListener(getConfigDirListener());
 
-    zkClient = new SolrZkClient(zkServerAddress, clientTimeout, zkClientConnectTimeout, strat,
+    zkClient = getSolrZkClient(zkClientConnectTimeout, registerOnReconnect, strat, zkACLProvider);
+
+    this.overseerRunningMap = Overseer.getRunningMap(zkClient);
+    this.overseerCompletedMap = Overseer.getCompletedMap(zkClient);
+    this.overseerFailureMap = Overseer.getFailureMap(zkClient);
+    this.asyncIdsMap = Overseer.getAsyncIdsMap(zkClient);
+
+    zkStateReader = new ZkStateReader(zkClient, () -> {
+      if (cc != null) cc.securityNodeChanged();
+    });
+
+    init(registerOnReconnect);
+    this.overseerJobQueue = initOverseerJobQueue();
+    this.overseerCollectionQueue = initOverseerTaskQueue();
+    this.overseerConfigSetQueue = initOverseerConfigSetQueue();
+
+    this.sysPropsCacher = new NodesSysPropsCacher( getNodeStateProvider(),
+        getNodeName(), zkStateReader);
+
+    assert ObjectReleaseTracker.track(this);
+  }
+
+  protected ZkDistributedQueue initOverseerJobQueue() {
+    return overseer.getStateUpdateQueue();
+  }
+
+  protected OverseerTaskQueue initOverseerTaskQueue() {
+    return overseer.getCollectionQueue(zkClient);
+  }
+
+  protected OverseerTaskQueue initOverseerConfigSetQueue() {
+    return overseer.getConfigSetQueue(zkClient);
+  }
+
+  protected NodeStateProvider getNodeStateProvider() {
+    return getSolrCloudManager().getNodeStateProvider();
+  }
+
+  protected SolrZkClient getSolrZkClient(int zkClientConnectTimeout,
+                                         CurrentCoreDescriptorProvider registerOnReconnect,
+                                         DefaultConnectionStrategy strat,
+                                         ZkACLProvider zkACLProvider) {
+    return  new SolrZkClient(zkServerAddress, clientTimeout, zkClientConnectTimeout, strat,
         // on reconnect, reload cloud info
         new OnReconnect() {
 
           @Override
           public void command() throws SessionExpiredException {
             log.info("ZooKeeper session re-connected ... refreshing core states after session expiration.");
-            if (cc.isQueryAggregator()) {
-              try {
-                zkStateReader.createClusterStateWatchersAndUpdate();
-                createEphemeralLiveQueryNode();
-              } catch (Exception e) {
-                SolrException.log(log, "", e);
-                throw new ZooKeeperException(
-                    SolrException.ErrorCode.SERVER_ERROR, "", e);
-              }
-              return;
-            }
             clearZkCollectionTerms();
             try {
               // recreate our watchers first so that they exist even on any problems below
@@ -467,8 +499,6 @@ public class ZkController implements Closeable {
 
       @Override
       public void command() {
-        if(cc.isQueryAggregator())
-          return;
         try {
           ZkController.this.overseer.close();
         } catch (Exception e) {
@@ -483,32 +513,6 @@ public class ZkController implements Closeable {
       public boolean isClosed() {
         return cc.isShutDown();
       }});
-
-    this.overseerRunningMap = Overseer.getRunningMap(zkClient);
-    this.overseerCompletedMap = Overseer.getCompletedMap(zkClient);
-    this.overseerFailureMap = Overseer.getFailureMap(zkClient);
-    this.asyncIdsMap = Overseer.getAsyncIdsMap(zkClient);
-
-    zkStateReader = new ZkStateReader(zkClient, () -> {
-      if (cc != null) cc.securityNodeChanged();
-    });
-
-    init(registerOnReconnect);
-    if (!cc.isQueryAggregator()) {
-
-      this.overseerJobQueue = overseer.getStateUpdateQueue();
-      this.overseerCollectionQueue = overseer.getCollectionQueue(zkClient);
-      this.overseerConfigSetQueue = overseer.getConfigSetQueue(zkClient);
-    } else {
-        this.overseerJobQueue = null;
-        this.overseerCollectionQueue = null;
-        this.overseerConfigSetQueue = null;
-    }
-
-    this.sysPropsCacher = new NodesSysPropsCacher( cc.isQueryAggregator() ? null : getSolrCloudManager().getNodeStateProvider(),
-        getNodeName(), zkStateReader);
-
-    assert ObjectReleaseTracker.track(this);
   }
 
   public int getLeaderVoteWait() {
@@ -1162,7 +1166,7 @@ public class ZkController implements Closeable {
     zkClient.multi(ops, true);
   }
 
-  private void createEphemeralLiveQueryNode() throws KeeperException,
+  protected void createEphemeralLiveQueryNode() throws KeeperException,
       InterruptedException {
     if (zkRunOnly) {
       return;
