@@ -697,9 +697,11 @@ public class QueryComponent extends SearchComponent
   protected void createDistributedStats(ResponseBuilder rb) {
     StatsCache cache = rb.req.getSearcher().getStatsCache();
     if ( (rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES)!=0 || rb.getSortSpec().includesScore()) {
-      ShardRequest sreq = cache.retrieveStatsRequest(rb);
-      if (sreq != null) {
-        rb.addRequest(this, sreq);
+      if (cache != null) {
+        ShardRequest sreq = cache.retrieveStatsRequest(rb);
+        if (sreq != null) {
+          rb.addRequest(this, sreq);
+        }
       }
     }
   }
@@ -788,7 +790,8 @@ public class QueryComponent extends SearchComponent
     if (shardQueryIncludeScore || rb.isDebug()) {
       StatsCache statsCache = rb.req.getSearcher().getStatsCache();
       sreq.purpose |= ShardRequest.PURPOSE_SET_TERM_STATS;
-      statsCache.sendGlobalStats(rb, sreq);
+      if (statsCache != null)
+        statsCache.sendGlobalStats(rb, sreq);
     }
 
     if (additionalAdded) sreq.params.add(CommonParams.FL, additionalFL.toString());

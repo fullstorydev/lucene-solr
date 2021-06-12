@@ -17,15 +17,22 @@
 
 package org.apache.solr.core;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.solr.cloud.RecoveryStrategy;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.core.snapshots.SolrSnapshotMetaDataManager;
+import org.apache.solr.metrics.SolrMetricsContext;
+import org.apache.solr.search.SolrIndexSearcher;
+import org.apache.solr.update.DefaultSolrCoreState;
 import org.apache.solr.update.UpdateHandler;
+import org.apache.solr.util.RefCounted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,5 +108,60 @@ public class SolrCoreProxy extends SolrCore {
 
   protected void registerConfListener() {
     //we don't want register conf listener for proxy core
+  }
+
+  protected DirectoryFactory initDirectoryFactory() {
+    return null;
+  }
+
+  protected RecoveryStrategy.Builder initRecoveryStrategyBuilder() {
+    return null;
+  }
+
+  protected DefaultSolrCoreState createSolrCoreState() {
+    return null;
+  }
+
+  protected String initDataDir(String dataDir, SolrConfig config, CoreDescriptor coreDescriptor) {
+    return null;
+  }
+
+  protected String initUpdateLogDir(CoreDescriptor coreDescriptor) {
+    return null;
+  }
+
+  @Override
+  public void initializeMetrics(SolrMetricsContext parentContext, String scope) {
+
+  }
+
+  protected void initSolrFieldCache() {
+
+  }
+
+  protected SolrSnapshotMetaDataManager initSnapshotMetaDataManager() {
+    return null;
+  }
+
+  protected IndexDeletionPolicyWrapper initDeletionPolicy(IndexDeletionPolicyWrapper delPolicyWrapper) {
+    return null;
+  }
+
+  void initIndex(boolean passOnPreviousState, boolean reload) throws IOException {
+
+  }
+
+  protected UpdateHandler initUpdateHandler(UpdateHandler updateHandler) {
+    return null;
+  }
+
+  protected void incSearcherCount() {
+
+  }
+
+  protected void initSearcher(SolrCore prev) throws IOException {
+    SolrIndexSearcher newone = new SolrIndexSearcher(this,  getLatestSchema());
+    List<RefCounted<SolrIndexSearcher>> searcherList = new LinkedList<>();
+    _searcher = newHolder(newone, searcherList);
   }
 }

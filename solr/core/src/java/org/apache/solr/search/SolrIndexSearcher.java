@@ -228,6 +228,41 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     return collector;
   }
 
+  public SolrIndexSearcher(SolrCore core, IndexSchema schema) {
+    super();
+    this.core = core;
+    this.schema = schema;
+    reader = null;
+    closeReader = false;
+
+    queryResultWindowSize = 0;
+    queryResultMaxDocsCached = 0;
+    useFilterForSortedQuery = false;
+
+    cachingEnabled = false;
+    filterCache = null;
+    queryResultCache = null;
+    fieldValueCache = null;
+
+    cacheMap = null ;
+
+    cacheList = null;
+
+    directoryFactory = null;
+
+    leafReader = null;
+    rawReader = null;
+
+    path = null;
+    releaseDirectory = false;
+
+    statsCache = null;
+
+    docFetcher = null;
+
+    name = null;
+  }
+
   public SolrIndexSearcher(SolrCore core, String path, IndexSchema schema, SolrIndexConfig config, String name,
       boolean enableCache, DirectoryFactory directoryFactory) throws IOException {
     // We don't need to reserve the directory because we get it from the factory
@@ -472,28 +507,33 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       }
     }
 
-    core.getInfoRegistry().remove(name);
+    if (name != null)
+      core.getInfoRegistry().remove(name);
 
     // super.close();
     // can't use super.close() since it just calls reader.close() and that may only be called once
     // per reader (even if incRef() was previously called).
 
-    long cpg = reader.getIndexCommit().getGeneration();
-    try {
-      if (closeReader) rawReader.decRef();
-    } catch (Exception e) {
-      SolrException.log(log, "Problem dec ref'ing reader", e);
-    }
-
-    if (directoryFactory.searchersReserveCommitPoints()) {
-      core.getDeletionPolicy().releaseCommitPoint(cpg);
-    }
-
-    for (@SuppressWarnings({"rawtypes"})SolrCache cache : cacheList) {
+    if (reader != null) {
+      long cpg = reader.getIndexCommit().getGeneration();
       try {
-        cache.close();
+        if (closeReader) rawReader.decRef();
       } catch (Exception e) {
-        SolrException.log(log, "Exception closing cache " + cache.name(), e);
+        SolrException.log(log, "Problem dec ref'ing reader", e);
+      }
+
+      if (directoryFactory.searchersReserveCommitPoints()) {
+        core.getDeletionPolicy().releaseCommitPoint(cpg);
+      }
+    }
+
+    if (cacheList != null) {
+      for (@SuppressWarnings({"rawtypes"}) SolrCache cache : cacheList) {
+        try {
+          cache.close();
+        } catch (Exception e) {
+          SolrException.log(log, "Exception closing cache " + cache.name(), e);
+        }
       }
     }
 

@@ -530,7 +530,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     return infoRegistry;
   }
 
-  private IndexDeletionPolicyWrapper initDeletionPolicy(IndexDeletionPolicyWrapper delPolicyWrapper) {
+  protected IndexDeletionPolicyWrapper initDeletionPolicy(IndexDeletionPolicyWrapper delPolicyWrapper) {
     if (delPolicyWrapper != null) {
       return delPolicyWrapper;
     }
@@ -549,7 +549,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     return new IndexDeletionPolicyWrapper(delPolicy, snapshotMgr);
   }
 
-  private SolrSnapshotMetaDataManager initSnapshotMetaDataManager() {
+  protected SolrSnapshotMetaDataManager initSnapshotMetaDataManager() {
     try {
       String dirName = getDataDir() + SolrSnapshotMetaDataManager.SNAPSHOT_METADATA_DIR + "/";
       Directory snapshotDir = directoryFactory.get(dirName, DirContext.DEFAULT,
@@ -730,11 +730,11 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
   }
 
-  private DirectoryFactory initDirectoryFactory() {
+  protected DirectoryFactory initDirectoryFactory() {
     return DirectoryFactory.loadDirectoryFactory(solrConfig, coreContainer, coreMetricManager.getRegistryName());
   }
 
-  private RecoveryStrategy.Builder initRecoveryStrategyBuilder() {
+  protected RecoveryStrategy.Builder initRecoveryStrategyBuilder() {
     final PluginInfo info = solrConfig.getPluginInfo(RecoveryStrategy.Builder.class.getName());
     final RecoveryStrategy.Builder rsBuilder;
     if (info != null && info.className != null) {
@@ -967,7 +967,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       if (updateHandler == null) {
         directoryFactory = initDirectoryFactory();
         recoveryStrategyBuilder = initRecoveryStrategyBuilder();
-        solrCoreState = new DefaultSolrCoreState(directoryFactory, recoveryStrategyBuilder);
+        solrCoreState = createSolrCoreState();
       } else {
         solrCoreState = updateHandler.getSolrCoreState();
         directoryFactory = solrCoreState.getDirectoryFactory();
@@ -988,11 +988,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       // initialize searcher-related metrics
       initializeMetrics(solrMetricsContext, null);
 
-      SolrFieldCacheBean solrFieldCacheBean = new SolrFieldCacheBean();
-      // this is registered at the CONTAINER level because it's not core-specific - for now we
-      // also register it here for back-compat
-      solrFieldCacheBean.initializeMetrics(solrMetricsContext, "core");
-      infoRegistry.put("fieldCache", solrFieldCacheBean);
+      initSolrFieldCache();
 
       this.maxWarmingSearchers = solrConfig.maxWarmingSearchers;
       this.slowQueryThresholdMillis = solrConfig.slowQueryThresholdMillis;
@@ -1042,7 +1038,8 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       // Finally tell anyone who wants to know
       resourceLoader.inform(resourceLoader);
       resourceLoader.inform(this); // last call before the latch is released.
-      this.updateHandler.informEventListeners(this);
+      if (this.updateHandler != null)
+        this.updateHandler.informEventListeners(this);
 
       infoRegistry.put("core", this);
 
@@ -1055,7 +1052,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       resourceLoader.inform(infoRegistry);
 
       // Allow the directory factory to report metrics
-      if (directoryFactory instanceof SolrMetricProducer) {
+      if (!coreContainer.isQueryAggregator() && directoryFactory instanceof SolrMetricProducer) {
         // XXX use deprecated method for back-compat, remove in 9.0
         ((SolrMetricProducer) directoryFactory).initializeMetrics(
             solrMetricsContext.metricManager, solrMetricsContext.registry, solrMetricsContext.tag, "directoryFactory");
@@ -1097,6 +1094,18 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
 
     assert ObjectReleaseTracker.track(this);
+  }
+
+  protected void initSolrFieldCache() {
+    SolrFieldCacheBean solrFieldCacheBean = new SolrFieldCacheBean();
+    // this is registered at the CONTAINER level because it's not core-specific - for now we
+    // also register it here for back-compat
+    solrFieldCacheBean.initializeMetrics(solrMetricsContext, "core");
+    infoRegistry.put("fieldCache", solrFieldCacheBean);
+  }
+
+  protected DefaultSolrCoreState createSolrCoreState() {
+    return new DefaultSolrCoreState(directoryFactory, recoveryStrategyBuilder);
   }
 
   protected ExecutorService getExecutorService(CoreContainer coreContainer, String name) {
@@ -1144,7 +1153,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
   }
 
-  private void initSearcher(SolrCore prev) throws IOException {
+  protected void initSearcher(SolrCore prev) throws IOException {
     // use the (old) writer to open the first searcher
     RefCounted<IndexWriter> iwRef = null;
     if (prev != null) {
@@ -1166,7 +1175,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
   }
 
-  private UpdateHandler initUpdateHandler(UpdateHandler updateHandler) {
+  protected UpdateHandler initUpdateHandler(UpdateHandler updateHandler) {
     String updateHandlerClass = solrConfig.getUpdateHandlerInfo().className;
     if (updateHandlerClass == null) {
       updateHandlerClass = DirectUpdateHandler2.class.getName();
@@ -1285,7 +1294,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
   }
 
-  private String initDataDir(String dataDir, SolrConfig config, CoreDescriptor coreDescriptor) {
+  protected String initDataDir(String dataDir, SolrConfig config, CoreDescriptor coreDescriptor) {
     return findDataDir(getDirectoryFactory(), dataDir, config, coreDescriptor);
   }
 
@@ -1394,7 +1403,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
     }
   }
 
-  private String initUpdateLogDir(CoreDescriptor coreDescriptor) {
+  protected String initUpdateLogDir(CoreDescriptor coreDescriptor) {
     String updateLogDir = coreDescriptor.getUlogDir();
     if (updateLogDir == null) {
       updateLogDir = coreDescriptor.getInstanceDir().resolve(dataDir).toString();
@@ -1692,14 +1701,16 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
       }
     }
 
-    // Close the snapshots meta-data directory.
-    Directory snapshotsDir = snapshotMgr.getSnapshotsDir();
-    try {
-      this.directoryFactory.release(snapshotsDir);
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
+    if (snapshotMgr != null ) {
+      // Close the snapshots meta-data directory.
+      Directory snapshotsDir = snapshotMgr.getSnapshotsDir();
+      try {
+        this.directoryFactory.release(snapshotsDir);
+      } catch (Throwable e) {
+        SolrException.log(log, e);
+        if (e instanceof Error) {
+          throw (Error) e;
+        }
       }
     }
 
@@ -1911,7 +1922,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
   // Don't access this directly!!!! use getSearcher() to
   // get it (and it will increment the ref count at the same time).
   // This reference is protected by searcherLock.
-  private RefCounted<SolrIndexSearcher> _searcher;
+  protected RefCounted<SolrIndexSearcher> _searcher;
 
   // All of the normal open searchers.  Don't access this directly.
   // protected by synchronizing on searcherLock.
@@ -2330,7 +2341,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
         // first: increment count to signal other threads that we are
         //        opening a new searcher.
         onDeckSearchers++;
-        newSearcherCounter.inc();
+        incSearcherCount();
         if (onDeckSearchers < 1) {
           // should never happen... just a sanity check
           log.error("{}ERROR!!! onDeckSearchers is {}", logid, onDeckSearchers);
@@ -2534,6 +2545,10 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
 
   }
 
+  protected void incSearcherCount() {
+    newSearcherCounter.inc();
+  }
+
   protected void searchExecutorClosed() {
   }
 
@@ -2541,7 +2556,7 @@ public class SolrCore implements SolrInfoBean, SolrMetricProducer, Closeable {
   }
 
 
-  private RefCounted<SolrIndexSearcher> newHolder(SolrIndexSearcher newSearcher, final List<RefCounted<SolrIndexSearcher>> searcherList) {
+  protected RefCounted<SolrIndexSearcher> newHolder(SolrIndexSearcher newSearcher, final List<RefCounted<SolrIndexSearcher>> searcherList) {
     RefCounted<SolrIndexSearcher> holder = new RefCounted<SolrIndexSearcher>(newSearcher) {
       @Override
       public void close() {

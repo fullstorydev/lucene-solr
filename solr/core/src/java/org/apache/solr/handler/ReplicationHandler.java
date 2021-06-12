@@ -88,6 +88,7 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.DirectoryFactory.DirContext;
 import org.apache.solr.core.IndexDeletionPolicyWrapper;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.core.SolrCoreProxy;
 import org.apache.solr.core.SolrDeletionPolicy;
 import org.apache.solr.core.SolrEventListener;
 import org.apache.solr.core.backup.repository.BackupRepository;
@@ -1270,6 +1271,8 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
   @Override
   @SuppressWarnings({"resource"})
   public void inform(SolrCore core) {
+    if (core instanceof SolrCoreProxy)
+      return;
     this.core = core;
     registerCloseHook();
     Long deprecatedReserveCommitDuration = null;

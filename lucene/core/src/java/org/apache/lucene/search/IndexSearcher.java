@@ -217,6 +217,14 @@ public class IndexSearcher {
     this(context, null);
   }
 
+  public IndexSearcher() {
+    this.reader = null;
+    this.executor = null;
+    this.readerContext = null;
+    this.leafContexts = null;
+    this.leafSlices = null;
+  }
+
   /**
    * Set the {@link QueryCache} to use when scores are not needed.
    * A value of {@code null} indicates that query matches should never be
