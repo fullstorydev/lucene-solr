@@ -116,7 +116,10 @@ public class SolrMetricManager {
   private final MetricRegistry.MetricSupplier<Timer> timerSupplier;
   private final MetricRegistry.MetricSupplier<Histogram> histogramSupplier;
 
+  private final Set<Class> whiteList;
+
   public SolrMetricManager() {
+    whiteList = null;
     metricsConfig = new MetricsConfig.MetricsConfigBuilder().build();
     counterSupplier = MetricSuppliers.counterSupplier(null, null);
     meterSupplier = MetricSuppliers.meterSupplier(null, null);
@@ -124,8 +127,9 @@ public class SolrMetricManager {
     histogramSupplier = MetricSuppliers.histogramSupplier(null, null);
   }
 
-  public SolrMetricManager(SolrResourceLoader loader, MetricsConfig metricsConfig) {
+  public SolrMetricManager(SolrResourceLoader loader, MetricsConfig metricsConfig, Set<Class> whiteList) {
     this.metricsConfig = metricsConfig;
+    this.whiteList = whiteList;
     counterSupplier = MetricSuppliers.counterSupplier(loader, metricsConfig.getCounterSupplier());
     meterSupplier = MetricSuppliers.meterSupplier(loader, metricsConfig.getMeterSupplier());
     timerSupplier = MetricSuppliers.timerSupplier(loader, metricsConfig.getTimerSupplier());
@@ -662,7 +666,12 @@ public class SolrMetricManager {
     if (info != null) {
       info.registerMetricName(name);
     }
-    return registry(registry).meter(name, meterSupplier);
+    MetricRegistry.MetricSupplier<Meter> meterMetricSupplier = meterSupplier;
+    if (whiteList != null) {
+      if ( info == null || !whiteList.contains(info.getClass()))
+        meterMetricSupplier = MetricSuppliers.NoOpMeterSupplier.INSTANCE;
+    }
+    return registry(registry).meter(name, meterMetricSupplier);
   }
 
   /**
@@ -679,7 +688,12 @@ public class SolrMetricManager {
     if (info != null) {
       info.registerMetricName(name);
     }
-    return registry(registry).timer(name, timerSupplier);
+    MetricRegistry.MetricSupplier<Timer> timerMetricSupplier = timerSupplier;
+    if (whiteList != null) {
+      if ( info == null || !whiteList.contains(info.getClass()))
+        timerMetricSupplier = MetricSuppliers.NoOpTimerSupplier.INSTANCE;
+    }
+    return registry(registry).timer(name, timerMetricSupplier);
   }
 
   /**
@@ -696,7 +710,12 @@ public class SolrMetricManager {
     if (info != null) {
       info.registerMetricName(name);
     }
-    return registry(registry).counter(name, counterSupplier);
+    MetricRegistry.MetricSupplier<Counter> counterMetricSupplier = counterSupplier;
+    if (whiteList != null) {
+      if ( info == null || !whiteList.contains(info.getClass()))
+        counterMetricSupplier = MetricSuppliers.NoOpCounterSupplier.INSTANCE;
+    }
+    return registry(registry).counter(name, counterMetricSupplier);
   }
 
   /**
@@ -713,7 +732,12 @@ public class SolrMetricManager {
     if (info != null) {
       info.registerMetricName(name);
     }
-    return registry(registry).histogram(name, histogramSupplier);
+    MetricRegistry.MetricSupplier<Histogram> histogramMetricSupplier = histogramSupplier;
+    if (whiteList != null) {
+      if ( info == null || !whiteList.contains(info.getClass()))
+        histogramMetricSupplier = MetricSuppliers.NoOpHistogramSupplier.INSTANCE;
+    }
+    return registry(registry).histogram(name, histogramMetricSupplier);
   }
 
   /**
