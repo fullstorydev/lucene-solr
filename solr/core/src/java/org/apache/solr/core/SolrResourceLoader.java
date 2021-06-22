@@ -181,6 +181,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
     this.classLoader = URLClassLoader.newInstance(new URL[0], parent);
   }
 
+  private static HashMap<List<URL>, URLClassLoader> classLoaderCache = new HashMap<>();
   /**
    * Adds URLs to the ResourceLoader's internal classloader.  This method <b>MUST</b>
    * only be called prior to using this ResourceLoader to get any resources, otherwise
@@ -190,7 +191,17 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
    * @param urls    the URLs of files to add
    */
   synchronized void addToClassLoader(List<URL> urls) {
-    URLClassLoader newLoader = addURLsToClassLoader(classLoader, urls);
+    URLClassLoader newLoader = null;
+    synchronized (classLoaderCache) {
+      if (!classLoaderCache.containsKey(urls)) {
+        newLoader = addURLsToClassLoader(classLoader, urls);
+        reloadLuceneSPI();
+        classLoaderCache.put(urls, newLoader);
+      } else {
+        newLoader = classLoaderCache.get(urls);
+      }
+    }
+
     if (newLoader == classLoader) {
       return; // short-circuit
     }

@@ -705,9 +705,6 @@ public class CoreContainer {
         }
       }
     }
-    if (modified) {
-      loader.reloadLuceneSPI();
-    }
 
     packageStoreAPI = new PackageStoreAPI(this);
     containerHandlers.getApiBag().registerObject(packageStoreAPI.readAPI);
