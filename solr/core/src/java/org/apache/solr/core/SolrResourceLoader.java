@@ -930,6 +930,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
   @Override
   public void close() throws IOException {
     IOUtils.close(classLoader);
+    classLoaderCache.clear();
   }
   public List<SolrInfoBean> getInfoMBeans(){
     return Collections.unmodifiableList(infoMBeans);
