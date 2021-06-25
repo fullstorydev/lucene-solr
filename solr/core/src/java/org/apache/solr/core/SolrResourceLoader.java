@@ -181,7 +181,30 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
     this.classLoader = URLClassLoader.newInstance(new URL[0], parent);
   }
 
-  private static HashMap<List<URL>, URLClassLoader> classLoaderCache = new HashMap<>();
+  private static HashMap<URLListWrapper, URLClassLoader> classLoaderCache = new HashMap<>();
+
+  private static class URLListWrapper {
+    private final int hashcode;
+    private final List<URL> urls;
+
+    public URLListWrapper(List<URL> urls) {
+      this.urls = urls;
+      this.hashcode = urls.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      URLListWrapper that = (URLListWrapper) o;
+      return hashCode() == that.hashCode() && urls.equals(that.urls);
+    }
+
+    @Override
+    public int hashCode() {
+      return hashcode;
+    }
+  }
   /**
    * Adds URLs to the ResourceLoader's internal classloader.  This method <b>MUST</b>
    * only be called prior to using this ResourceLoader to get any resources, otherwise
@@ -191,14 +214,15 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
    * @param urls    the URLs of files to add
    */
   synchronized void addToClassLoader(List<URL> urls) {
+    URLListWrapper urlsKey = new URLListWrapper(urls);
     URLClassLoader newLoader = null;
     synchronized (classLoaderCache) {
-      if (!classLoaderCache.containsKey(urls)) {
+      if (!classLoaderCache.containsKey(urlsKey)) {
         newLoader = addURLsToClassLoader(classLoader, urls);
         reloadLuceneSPI();
-        classLoaderCache.put(urls, newLoader);
+        classLoaderCache.put(urlsKey, newLoader);
       } else {
-        newLoader = classLoaderCache.get(urls);
+        newLoader = classLoaderCache.get(urlsKey);
       }
     }
 
