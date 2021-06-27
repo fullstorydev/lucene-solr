@@ -188,6 +188,16 @@ public class SolrResourceLoader implements ResourceLoader, Closeable, SolrClassL
     private final List<URL> urls;
 
     public URLListWrapper(List<URL> urls) {
+      if (urls == null) {
+        urls = Collections.<URL>emptyList();
+      }
+
+      Collections.sort(urls, new Comparator<URL>() {
+        @Override
+        public int compare(URL o1, URL o2) {
+          return o1.toString().compareTo(o2.toString());
+        }
+      });
       this.urls = urls;
       this.hashcode = urls.hashCode();
     }
