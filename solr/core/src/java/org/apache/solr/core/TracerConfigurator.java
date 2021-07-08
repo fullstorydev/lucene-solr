@@ -34,6 +34,11 @@ public abstract class TracerConfigurator implements NamedListInitializedPlugin {
 
   public static void loadTracer(SolrResourceLoader loader, PluginInfo info, ZkStateReader stateReader) {
     if (info == null) {
+    /*  TracerConfigurator configurator = new FSJaegerConfigurator();
+      configurator.init(null);
+      GlobalTracer.setup(configurator.getTracer());
+      GlobalTracer.get().setSamplePercentage(100.0);
+      if(true) return;*/
       // in case of a Tracer is registered to OpenTracing through javaagent
       if (io.opentracing.util.GlobalTracer.isRegistered()) {
         GlobalTracer.setup(io.opentracing.util.GlobalTracer.get());
