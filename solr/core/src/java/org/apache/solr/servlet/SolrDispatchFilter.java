@@ -68,7 +68,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.core.CoreContainer;
-import org.apache.solr.core.FSJaegerConfigurator;
+import org.apache.solr.core.FSTracerConfigurator;
 import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrInfoBean;
@@ -363,8 +363,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     if (!(_request instanceof HttpServletRequest)) return;
     HttpServletRequest request = closeShield((HttpServletRequest)_request, retry);
     HttpServletResponse response = closeShield((HttpServletResponse)_response, retry);
-    String _req_id = ((HttpServletRequest) _request).getHeader(FSJaegerConfigurator._REQ_ID);
-    if(_req_id != null) MDC.put(FSJaegerConfigurator._REQ_ID, _req_id);
+    String reqId = ((HttpServletRequest) _request).getHeader(FSTracerConfigurator._REQ_ID);
+    if(reqId != null) MDC.put(FSTracerConfigurator._REQ_ID, reqId);
     Scope scope = null;
     Span span = null;
     try {

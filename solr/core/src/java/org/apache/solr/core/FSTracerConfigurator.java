@@ -1,28 +1,13 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.solr.core;
 
 import javax.servlet.http.HttpServletRequest;
 import java.lang.invoke.MethodHandles;
 
+import io.jaegertracing.internal.JaegerSpan;
 import io.jaegertracing.internal.JaegerSpanContext;
 import io.jaegertracing.internal.JaegerTracer;
 import io.jaegertracing.internal.reporters.LoggingReporter;
+import io.jaegertracing.internal.reporters.NoopReporter;
 import io.opentracing.Scope;
 import io.opentracing.ScopeManager;
 import io.opentracing.Span;
@@ -37,7 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-public class FSJaegerConfigurator extends TracerConfigurator implements GlobalTracer.SolrTracer {
+public class FSTracerConfigurator extends TracerConfigurator  {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final ThreadLocal<Boolean> IS_FORWARDED = ThreadLocal.withInitial(() -> Boolean.FALSE);
@@ -47,12 +32,6 @@ public class FSJaegerConfigurator extends TracerConfigurator implements GlobalTr
   public Tracer getTracer() {
     return tracer;
   }
-
-  @Override
-  public boolean enabled() {
-    return MDC.get(_REQ_ID) != null;
-  }
-
 
   public void requestStart(HttpServletRequest request) {
     String reqId = MDC.get(_REQ_ID);
@@ -67,15 +46,18 @@ public class FSJaegerConfigurator extends TracerConfigurator implements GlobalTr
   public void init(NamedList args) {
     JaegerTracer.Builder builder = new JaegerTracer.Builder("solr")
         .withSampler(new ConstSampler(true))
-        .withReporter(new LoggingReporter(log))
-
+        .withReporter(new NoopReporter())
        ;
     tracer= new TracerWrapper(builder.build());
   }
 
-  public class TracerWrapper implements Tracer {
+  public class TracerWrapper implements Tracer , GlobalTracer.SolrTracer {
     private final  Tracer delegate;
 
+    @Override
+    public boolean enabled() {
+      return MDC.get(_REQ_ID) != null;
+    }
     public TracerWrapper(Tracer delegate) {
       this.delegate = delegate;
     }
@@ -102,11 +84,9 @@ public class FSJaegerConfigurator extends TracerConfigurator implements GlobalTr
 
     @Override
     public <C> void inject(SpanContext spanContext, Format<C> format, C c) {
-      if(MDC.get(_REQ_ID) == null) return;
       String reqId = MDC.get(_REQ_ID);
-      if(reqId != null) {
-        spanContext =  ((JaegerSpanContext) spanContext).withBaggageItem(_REQ_ID, reqId);
-      }
+      if(reqId == null) return;
+      spanContext =  ((JaegerSpanContext) spanContext).withBaggageItem(_REQ_ID, reqId);
       delegate.inject(spanContext, format, c);
     }
 
@@ -117,9 +97,9 @@ public class FSJaegerConfigurator extends TracerConfigurator implements GlobalTr
       try {
         result = (JaegerSpanContext) delegate.extract(format, c);
         if(result == null) return result;
-        String fsId = result.getBaggageItem(_REQ_ID);
-        if(fsId != null) {
-          MDC.put(_REQ_ID, fsId);
+        String reqId = result.getBaggageItem(_REQ_ID);
+        if(reqId != null) {
+          MDC.put(_REQ_ID, reqId);
           IS_FORWARDED.set(Boolean.TRUE);
         }
       } finally {
@@ -139,6 +119,6 @@ public class FSJaegerConfigurator extends TracerConfigurator implements GlobalTr
     }
 
   }
-  public static final String _REQ_ID = "_REQ_ID";
+  public static final String _REQ_ID = "_req_id";
 
 }
