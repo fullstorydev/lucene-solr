@@ -29,9 +29,11 @@ import io.opentracing.propagation.TextMap;
  * A Carrier for extract Span context out of request headers
  */
 public class HttpServletCarrier implements TextMap {
+  private final HttpServletRequest req;
   private Iterator<Map.Entry<String, String>> it;
 
   public HttpServletCarrier(HttpServletRequest request) {
+    this.req = request;
     this.it = new Iterator<Map.Entry<String, String>>() {
 
       Enumeration<String> headerNameIt = request.getHeaderNames();
@@ -89,5 +91,9 @@ public class HttpServletCarrier implements TextMap {
   @Override
   public void put(String key, String value) {
     throw new UnsupportedOperationException("HttpServletCarrier should only be used with Tracer.extract()");
+  }
+
+  public HttpServletRequest getRequest() {
+    return req;
   }
 }

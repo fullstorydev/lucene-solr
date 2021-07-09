@@ -20,7 +20,6 @@ package org.apache.solr.core;
 import java.lang.invoke.MethodHandles;
 
 import io.opentracing.Tracer;
-import io.opentracing.noop.NoopTracerFactory;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.util.plugin.NamedListInitializedPlugin;
 import org.apache.solr.util.tracing.GlobalTracer;
@@ -39,8 +38,11 @@ public abstract class TracerConfigurator implements NamedListInitializedPlugin {
         GlobalTracer.setup(io.opentracing.util.GlobalTracer.get());
         registerListener(stateReader);
       } else {
-        GlobalTracer.setup(NoopTracerFactory.create());
-        GlobalTracer.get().setSamplePercentage(0.0);
+        TracerConfigurator configurator = new FSTracerConfigurator();
+        configurator.init(null);
+        GlobalTracer.setup(configurator.getTracer());
+//        GlobalTracer.setup(NoopTracerFactory.create());
+//        GlobalTracer.get().setSamplePercentage(0.0);
       }
     } else {
       TracerConfigurator configurator = loader

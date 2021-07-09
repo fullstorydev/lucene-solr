@@ -111,10 +111,18 @@ public class GlobalTracer {
   }
 
   private boolean traced() {
+    if(tracer instanceof SolrTracer) {
+      return ((SolrTracer) tracer).enabled();
+    }
     return RANDOM.nextDouble() <= rate;
   }
 
   public void close() {
     tracer.close();
+  }
+
+  public interface SolrTracer {
+    boolean enabled();
+
   }
 }
